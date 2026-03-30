@@ -279,10 +279,12 @@
         const email = document.getElementById('cadEmail').value;
         const senha = document.getElementById('cadSenha').value;
         await cadastrar(email, senha, nome);
-        showAlert('success', 'Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+        showAlert('success', 'Conta criada! Redirecionando...');
         btn.textContent = 'Conta criada!';
+        setTimeout(() => { window.location.href = 'criar-plano.html'; }, 1500);
       } catch (err) {
-        showAlert('error', err.message === 'Acesso restrito a alunos matriculados.'
+        const msgHotmart = 'Acesso exclusivo para alunos. Verifique seu e-mail da Hotmart ou entre em contato com o suporte.';
+        showAlert('error', err.message === msgHotmart
           ? err.message
           : 'Erro ao criar conta: ' + err.message);
         btn.classList.remove('loading');
