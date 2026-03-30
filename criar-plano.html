@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar Plano de Estudos — StudyPlan Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body class="wizard-page">
+  <div class="wizard-container">
+    <!-- Back -->
+    <a href="index.html" class="wizard-back">← Voltar para o inicio</a>
+
+    <!-- Progress Steps -->
+    <div class="wizard-progress" id="wizardProgress">
+      <div class="wizard-step active" data-step="1">
+        <div class="wizard-step-num">1</div>
+        Concurso
+      </div>
+      <div class="wizard-step-line"></div>
+      <div class="wizard-step" data-step="2">
+        <div class="wizard-step-num">2</div>
+        Materias
+      </div>
+      <div class="wizard-step-line"></div>
+      <div class="wizard-step" data-step="3">
+        <div class="wizard-step-num">3</div>
+        Horarios
+      </div>
+      <div class="wizard-step-line"></div>
+      <div class="wizard-step" data-step="4">
+        <div class="wizard-step-num">4</div>
+        Confirmar
+      </div>
+    </div>
+
+    <!-- STEP 1: Concurso -->
+    <div class="wizard-card" id="step1">
+      <h2>Qual concurso voce quer prestar?</h2>
+      <p>Selecione o concurso ou area de interesse para montar seu plano personalizado.</p>
+
+      <div class="form-group">
+        <label>Buscar concurso</label>
+        <input type="text" class="form-control" id="searchConcurso" placeholder="Digite o nome do concurso (ex: Policia Federal, TRT, INSS...)" oninput="filterConcursos()">
+      </div>
+
+      <div class="form-group">
+        <label>Concursos populares</label>
+        <div class="chips" id="concursoChips">
+          <div class="chip" onclick="selectConcurso(this)">Policia Federal</div>
+          <div class="chip" onclick="selectConcurso(this)">Policia Civil - GO</div>
+          <div class="chip" onclick="selectConcurso(this)">TRT (Analista)</div>
+          <div class="chip" onclick="selectConcurso(this)">INSS (Tecnico)</div>
+          <div class="chip" onclick="selectConcurso(this)">Receita Federal</div>
+          <div class="chip" onclick="selectConcurso(this)">TRF (Analista)</div>
+          <div class="chip" onclick="selectConcurso(this)">Banco do Brasil</div>
+          <div class="chip" onclick="selectConcurso(this)">Caixa Economica</div>
+          <div class="chip" onclick="selectConcurso(this)">STJ</div>
+          <div class="chip" onclick="selectConcurso(this)">TSE</div>
+          <div class="chip" onclick="selectConcurso(this)">CGU</div>
+          <div class="chip" onclick="selectConcurso(this)">TCU</div>
+          <div class="chip" onclick="selectConcurso(this)">Policia Rodoviaria Federal</div>
+          <div class="chip" onclick="selectConcurso(this)">PCDF</div>
+          <div class="chip" onclick="selectConcurso(this)">DEPEN</div>
+          <div class="chip" onclick="selectConcurso(this)">MPU</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Nivel do cargo</label>
+        <div class="chips">
+          <div class="chip" onclick="selectNivel(this)">Nivel Medio</div>
+          <div class="chip" onclick="selectNivel(this)">Nivel Superior</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Data prevista da prova (opcional)</label>
+        <input type="date" class="form-control" id="dataProva">
+        <div class="form-hint">Se nao souber, deixe em branco. O plano se ajusta automaticamente.</div>
+      </div>
+
+      <div class="wizard-actions">
+        <div></div>
+        <button class="btn btn-primary" onclick="nextStep(2)">Proximo →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Materias -->
+    <div class="wizard-card" id="step2" style="display:none;">
+      <h2>Quais materias voce precisa estudar?</h2>
+      <p>Selecione as disciplinas do edital. Voce pode ajustar o peso de cada uma depois.</p>
+
+      <div class="form-group">
+        <label>Materias Basicas</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <label class="subject-tag selected" onclick="toggleSubject(this)">
+            <input type="checkbox" checked>
+            <div class="subject-tag-info">
+              <strong>Portugues</strong>
+              <span>Gramatica, Interpretacao, Redacao</span>
+            </div>
+          </label>
+          <label class="subject-tag selected" onclick="toggleSubject(this)">
+            <input type="checkbox" checked>
+            <div class="subject-tag-info">
+              <strong>Raciocinio Logico (RLM)</strong>
+              <span>Logica, Matematica, Estatistica</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Informatica</strong>
+              <span>Redes, Seguranca, Office</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Atualidades</strong>
+              <span>Economia, Politica, Sociedade</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Materias Especificas</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <label class="subject-tag selected" onclick="toggleSubject(this)">
+            <input type="checkbox" checked>
+            <div class="subject-tag-info">
+              <strong>Direito Administrativo</strong>
+              <span>Atos, Licitacao, Servidores</span>
+            </div>
+          </label>
+          <label class="subject-tag selected" onclick="toggleSubject(this)">
+            <input type="checkbox" checked>
+            <div class="subject-tag-info">
+              <strong>Direito Constitucional</strong>
+              <span>CF/88, Direitos, Organizacao</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Direito Penal</strong>
+              <span>Parte Geral, Crimes, Penas</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Direito Processual Penal</strong>
+              <span>Inquerito, Acao, Provas</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Administracao Publica</strong>
+              <span>Gestao, Planejamento, Orcamento</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Contabilidade</strong>
+              <span>Balancos, DRE, Patrimonio</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Legislacao Especifica</strong>
+              <span>Leis e normas do orgao</span>
+            </div>
+          </label>
+          <label class="subject-tag" onclick="toggleSubject(this)">
+            <input type="checkbox">
+            <div class="subject-tag-info">
+              <strong>Admin. Financeira (AFI)</strong>
+              <span>Orcamento, LRF, PPA</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-ghost" onclick="prevStep(1)">← Voltar</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">Proximo →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Horarios -->
+    <div class="wizard-card" id="step3" style="display:none;">
+      <h2>Qual sua disponibilidade de estudo?</h2>
+      <p>Informe quando e por quanto tempo voce pode estudar durante a semana.</p>
+
+      <div class="form-group">
+        <label>Quantas horas por dia voce pode estudar?</label>
+        <div class="form-row">
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Dias uteis (Seg-Sex)</label>
+            <select class="form-control" id="horasUteis">
+              <option value="1">1 hora</option>
+              <option value="2">2 horas</option>
+              <option value="3" selected>3 horas</option>
+              <option value="4">4 horas</option>
+              <option value="5">5 horas</option>
+              <option value="6">6 horas</option>
+              <option value="8">8 horas (dedicacao integral)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Fim de semana (Sab-Dom)</label>
+            <select class="form-control" id="horasFds">
+              <option value="0">Nao estudo</option>
+              <option value="2">2 horas</option>
+              <option value="3">3 horas</option>
+              <option value="4" selected>4 horas</option>
+              <option value="6">6 horas</option>
+              <option value="8">8 horas</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Quais dias voce pode estudar?</label>
+        <div class="chips">
+          <div class="chip selected" onclick="toggleDay(this)">Segunda</div>
+          <div class="chip selected" onclick="toggleDay(this)">Terca</div>
+          <div class="chip selected" onclick="toggleDay(this)">Quarta</div>
+          <div class="chip selected" onclick="toggleDay(this)">Quinta</div>
+          <div class="chip selected" onclick="toggleDay(this)">Sexta</div>
+          <div class="chip" onclick="toggleDay(this)">Sabado</div>
+          <div class="chip" onclick="toggleDay(this)">Domingo</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Qual turno voce prefere?</label>
+        <div class="chips">
+          <div class="chip selected" onclick="selectTurno(this)">Manha (6h-12h)</div>
+          <div class="chip" onclick="selectTurno(this)">Tarde (12h-18h)</div>
+          <div class="chip" onclick="selectTurno(this)">Noite (18h-23h)</div>
+          <div class="chip" onclick="selectTurno(this)">Flexivel</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Incluir revisoes no plano?</label>
+        <div class="chips">
+          <div class="chip selected" onclick="selectRevisao(this)">Sim, com ciclo inteligente</div>
+          <div class="chip" onclick="selectRevisao(this)">Sim, 1x por semana</div>
+          <div class="chip" onclick="selectRevisao(this)">Nao</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Dia de descanso semanal</label>
+        <select class="form-control">
+          <option value="dom" selected>Domingo</option>
+          <option value="sab">Sabado</option>
+          <option value="nenhum">Nenhum (estudo todos os dias)</option>
+        </select>
+        <div class="form-hint">Recomendamos pelo menos 1 dia de descanso por semana para melhor rendimento.</div>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-ghost" onclick="prevStep(2)">← Voltar</button>
+        <button class="btn btn-primary" onclick="nextStep(4)">Proximo →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Confirmation -->
+    <div class="wizard-card" id="step4" style="display:none;">
+      <h2>Resumo do seu Plano</h2>
+      <p>Confira os detalhes antes de gerar seu plano personalizado.</p>
+
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Concurso</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoConcurso">Policia Civil - GO</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Nivel</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoNivel">Nivel Superior</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Materias Selecionadas</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoMaterias">6 materias</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Horas Semanais</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoHoras">19 horas</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Dias de Estudo</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoDias">Seg a Sex + Sab</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Turno Preferido</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoTurno">Manha</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #FFF8F0; border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; border-left: 4px solid var(--primary);">
+        <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa</strong>
+        <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;">
+          Com base na sua disponibilidade, voce levara aproximadamente <strong>5 meses</strong> para cobrir todo o conteudo.
+          Seu plano inclui ciclo de revisoes inteligente para maximizar a retencao.
+        </p>
+      </div>
+
+      <div class="form-group">
+        <label>Seu nome</label>
+        <input type="text" class="form-control" placeholder="Como devemos te chamar?" value="Raquel">
+      </div>
+
+      <div class="form-group">
+        <label>Seu email</label>
+        <input type="email" class="form-control" placeholder="seu@email.com" value="raquel.vidal@gmail.com">
+        <div class="form-hint">Enviaremos o plano para seu email e voce pode acessar de qualquer lugar.</div>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-ghost" onclick="prevStep(3)">← Voltar</button>
+        <button class="btn btn-primary btn-lg" onclick="gerarPlano()" id="btnGerar">
+          🚀 Gerar Meu Plano de Estudos
+        </button>
+      </div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="wizard-card" id="stepSuccess" style="display:none; text-align: center;">
+      <div style="font-size: 4rem; margin-bottom: 16px;">🎉</div>
+      <h2>Plano Criado com Sucesso!</h2>
+      <p style="margin-bottom: 32px;">Seu cronograma personalizado foi gerado. Acesse o dashboard para comecar a estudar agora mesmo.</p>
+
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 32px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+          <span style="color: var(--text-light); font-size: 0.85rem;">Concurso:</span>
+          <strong style="font-size: 0.85rem;">Policia Civil - GO</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+          <span style="color: var(--text-light); font-size: 0.85rem;">Materias:</span>
+          <strong style="font-size: 0.85rem;">6 disciplinas</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+          <span style="color: var(--text-light); font-size: 0.85rem;">Carga semanal:</span>
+          <strong style="font-size: 0.85rem;">19 horas</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-light); font-size: 0.85rem;">Duracao estimada:</span>
+          <strong style="font-size: 0.85rem;">5 meses</strong>
+        </div>
+      </div>
+
+      <a href="dashboard.html" class="btn btn-primary btn-lg">Acessar Meu Dashboard</a>
+      <p style="margin-top: 16px; font-size: 0.8rem; color: var(--text-lighter);">Tambem enviamos os detalhes para seu email.</p>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+
+    function nextStep(step) {
+      document.getElementById('step' + currentStep).style.display = 'none';
+      document.getElementById('step' + step).style.display = 'block';
+      updateProgress(step);
+      currentStep = step;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function prevStep(step) {
+      document.getElementById('step' + currentStep).style.display = 'none';
+      document.getElementById('step' + step).style.display = 'block';
+      updateProgress(step);
+      currentStep = step;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateProgress(activeStep) {
+      const steps = document.querySelectorAll('.wizard-step');
+      const lines = document.querySelectorAll('.wizard-step-line');
+
+      steps.forEach((s, i) => {
+        const stepNum = i + 1;
+        s.classList.remove('active', 'completed');
+        if (stepNum === activeStep) s.classList.add('active');
+        else if (stepNum < activeStep) s.classList.add('completed');
+      });
+
+      lines.forEach((l, i) => {
+        l.classList.remove('completed');
+        if (i + 1 < activeStep) l.classList.add('completed');
+      });
+    }
+
+    function selectConcurso(el) {
+      document.querySelectorAll('#concursoChips .chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('resumoConcurso').textContent = el.textContent;
+    }
+
+    function selectNivel(el) {
+      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('resumoNivel').textContent = el.textContent;
+    }
+
+    function toggleSubject(el) {
+      el.classList.toggle('selected');
+      const cb = el.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = el.classList.contains('selected');
+      updateMateriaCount();
+    }
+
+    function updateMateriaCount() {
+      const count = document.querySelectorAll('.subject-tag.selected').length;
+      document.getElementById('resumoMaterias').textContent = count + ' materias';
+    }
+
+    function toggleDay(el) {
+      el.classList.toggle('selected');
+    }
+
+    function selectTurno(el) {
+      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('resumoTurno').textContent = el.textContent.split(' (')[0];
+    }
+
+    function selectRevisao(el) {
+      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function filterConcursos() {
+      const query = document.getElementById('searchConcurso').value.toLowerCase();
+      document.querySelectorAll('#concursoChips .chip').forEach(chip => {
+        chip.style.display = chip.textContent.toLowerCase().includes(query) ? '' : 'none';
+      });
+    }
+
+    function gerarPlano() {
+      const btn = document.getElementById('btnGerar');
+      btn.innerHTML = '⏳ Gerando seu plano...';
+      btn.disabled = true;
+      btn.style.opacity = '0.7';
+
+      setTimeout(() => {
+        document.getElementById('step4').style.display = 'none';
+        document.getElementById('stepSuccess').style.display = 'block';
+
+        // Update progress to all completed
+        document.querySelectorAll('.wizard-step').forEach(s => {
+          s.classList.remove('active');
+          s.classList.add('completed');
+        });
+        document.querySelectorAll('.wizard-step-line').forEach(l => l.classList.add('completed'));
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

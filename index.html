@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyPlan Pro — Planos de Estudo Personalizados para Concursos</title>
+  <meta name="description" content="Crie planos de estudo personalizados para concursos públicos. Organize seus estudos com calendário semanal, controle de progresso e análise de desempenho.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="navbar-brand">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="36" height="36" rx="8" fill="#E8491D"/>
+          <path d="M10 10h6v6h-6zM20 10h6v6h-6zM10 20h6v6h-6zM20 20h6v6h-6z" fill="white" opacity="0.9"/>
+          <path d="M13 13h0M23 13h0M13 23h0M23 23h0" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        StudyPlan Pro
+      </a>
+      <div class="navbar-links">
+        <a href="#features">Funcionalidades</a>
+        <a href="#how-it-works">Como Funciona</a>
+        <a href="#pricing">Planos</a>
+        <a href="#testimonials">Depoimentos</a>
+      </div>
+      <div class="navbar-actions">
+        <a href="dashboard.html" class="btn btn-ghost btn-sm">Entrar</a>
+        <a href="criar-plano.html" class="btn btn-primary btn-sm">Criar Plano Gratis</a>
+      </div>
+      <button class="mobile-menu-btn" onclick="document.querySelector('.navbar-links').classList.toggle('show')" aria-label="Menu">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content animate-in">
+        <h1>Seu plano de estudos <span>personalizado</span> para concursos</h1>
+        <p>Organize seus estudos com inteligencia. Crie cronogramas semanais adaptados ao seu tempo, suas materias e seu objetivo. Tudo de forma simples e visual.</p>
+        <div class="hero-cta">
+          <a href="criar-plano.html" class="btn btn-primary btn-lg">Criar Meu Plano</a>
+          <a href="#how-it-works" class="btn btn-outline btn-lg">Como Funciona</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <strong>15.000+</strong>
+            <span>Alunos ativos</span>
+          </div>
+          <div class="hero-stat">
+            <strong>850+</strong>
+            <span>Aprovacoes</span>
+          </div>
+          <div class="hero-stat">
+            <strong>4.9/5</strong>
+            <span>Avaliacao media</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-visual animate-in delay-2">
+        <div class="hero-mockup">
+          <div class="mockup-header">
+            <div class="mockup-dot red"></div>
+            <div class="mockup-dot yellow"></div>
+            <div class="mockup-dot green"></div>
+          </div>
+          <div class="mockup-content">
+            <div class="mockup-day">SEG</div>
+            <div class="mockup-day">TER</div>
+            <div class="mockup-day">QUA</div>
+            <div class="mockup-day">QUI</div>
+            <div class="mockup-day">SEX</div>
+            <div class="mockup-day">SAB</div>
+            <div class="mockup-day">DOM</div>
+
+            <div class="mockup-block subject-1">Dir. Admin.</div>
+            <div class="mockup-block subject-2">Portugues</div>
+            <div class="mockup-block subject-1">Dir. Const.</div>
+            <div class="mockup-block subject-3">RLM</div>
+            <div class="mockup-block subject-2">Portugues</div>
+            <div class="mockup-block subject-4">Revisao</div>
+            <div class="mockup-block empty"></div>
+
+            <div class="mockup-block subject-3">RLM</div>
+            <div class="mockup-block subject-1">Dir. Admin.</div>
+            <div class="mockup-block subject-2">Portugues</div>
+            <div class="mockup-block subject-1">Dir. Admin.</div>
+            <div class="mockup-block subject-3">RLM</div>
+            <div class="mockup-block subject-2">Informatica</div>
+            <div class="mockup-block empty"></div>
+
+            <div class="mockup-block subject-4">AFO</div>
+            <div class="mockup-block subject-3">RLM</div>
+            <div class="mockup-block subject-4">AFO</div>
+            <div class="mockup-block subject-2">Portugues</div>
+            <div class="mockup-block subject-1">Dir. Const.</div>
+            <div class="mockup-block subject-1">Questoes</div>
+            <div class="mockup-block empty"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Funcionalidades</span>
+        <h2>Tudo que voce precisa para ser aprovado</h2>
+        <p>Ferramentas pensadas para quem estuda para concursos publicos no Brasil</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card animate-in">
+          <div class="feature-icon orange">📅</div>
+          <h3>Cronograma Semanal</h3>
+          <p>Calendario visual com blocos de estudo distribuidos ao longo da semana, respeitando seu tempo disponivel.</p>
+        </div>
+        <div class="feature-card animate-in delay-1">
+          <div class="feature-icon blue">📊</div>
+          <h3>Controle de Progresso</h3>
+          <p>Acompanhe horas estudadas, aulas concluidas e percentual de avanco em cada disciplina.</p>
+        </div>
+        <div class="feature-card animate-in delay-2">
+          <div class="feature-icon green">🎯</div>
+          <h3>Plano por Concurso</h3>
+          <p>Selecione o concurso desejado e receba um plano com as materias e pesos corretos do edital.</p>
+        </div>
+        <div class="feature-card animate-in delay-1">
+          <div class="feature-icon purple">🔄</div>
+          <h3>Ciclo de Revisoes</h3>
+          <p>Sistema inteligente de revisoes espacadas para fixar o conteudo no longo prazo.</p>
+        </div>
+        <div class="feature-card animate-in delay-2">
+          <div class="feature-icon teal">📱</div>
+          <h3>Acesso em Qualquer Lugar</h3>
+          <p>Funciona no celular, tablet e computador. Seus dados sincronizados em todos os dispositivos.</p>
+        </div>
+        <div class="feature-card animate-in delay-3">
+          <div class="feature-icon pink">📈</div>
+          <h3>Analise de Desempenho</h3>
+          <p>Graficos e relatorios que mostram sua evolucao e identificam pontos que precisam de atencao.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge" style="background: rgba(232,73,29,0.2);">Passo a Passo</span>
+        <h2>Simples de comecar</h2>
+        <p>Em 3 minutos voce tem seu plano de estudos pronto</p>
+      </div>
+      <div class="steps-grid">
+        <div class="step-card animate-in">
+          <div class="step-number">1</div>
+          <h3>Escolha o Concurso</h3>
+          <p>Selecione o concurso que deseja prestar entre centenas de opcoes atualizadas.</p>
+        </div>
+        <div class="step-card animate-in delay-1">
+          <div class="step-number">2</div>
+          <h3>Defina seu Tempo</h3>
+          <p>Informe quantas horas por dia e quais dias da semana voce pode estudar.</p>
+        </div>
+        <div class="step-card animate-in delay-2">
+          <div class="step-number">3</div>
+          <h3>Personalize</h3>
+          <p>Ajuste prioridades entre materias e inclua dias de revisao e descanso.</p>
+        </div>
+        <div class="step-card animate-in delay-3">
+          <div class="step-number">4</div>
+          <h3>Estude e Acompanhe</h3>
+          <p>Siga seu plano diariamente e acompanhe seu progresso em tempo real.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Planos</span>
+        <h2>Escolha o plano ideal</h2>
+        <p>Comece gratis e evolua conforme sua necessidade</p>
+      </div>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <h3>Gratis</h3>
+          <p style="color: var(--text-light); font-size: 0.9rem;">Para comecar</p>
+          <div class="pricing-price">R$0<span>/mes</span></div>
+          <ul class="pricing-features">
+            <li>1 plano de estudos</li>
+            <li>Cronograma semanal</li>
+            <li>Controle basico de progresso</li>
+            <li>Acesso mobile</li>
+          </ul>
+          <a href="criar-plano.html" class="btn btn-outline btn-block">Comecar Gratis</a>
+        </div>
+        <div class="pricing-card featured">
+          <div class="pricing-badge">Mais Popular</div>
+          <h3>Pro</h3>
+          <p style="color: var(--text-light); font-size: 0.9rem;">Para quem leva a serio</p>
+          <div class="pricing-price">R$29<span>/mes</span></div>
+          <ul class="pricing-features">
+            <li>Planos ilimitados</li>
+            <li>Ciclo de revisoes inteligente</li>
+            <li>Analise de desempenho</li>
+            <li>Banco de questoes</li>
+            <li>Suporte prioritario</li>
+          </ul>
+          <a href="criar-plano.html" class="btn btn-primary btn-block">Assinar Pro</a>
+        </div>
+        <div class="pricing-card">
+          <h3>Premium</h3>
+          <p style="color: var(--text-light); font-size: 0.9rem;">Aprovacao garantida</p>
+          <div class="pricing-price">R$49<span>/mes</span></div>
+          <ul class="pricing-features">
+            <li>Tudo do Pro</li>
+            <li>Mentoria individual</li>
+            <li>Simulados exclusivos</li>
+            <li>Plano com IA personalizada</li>
+            <li>Garantia de 30 dias</li>
+          </ul>
+          <a href="criar-plano.html" class="btn btn-secondary btn-block">Assinar Premium</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section class="testimonials" id="testimonials">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Depoimentos</span>
+        <h2>Quem usa, aprova</h2>
+        <p>Veja o que nossos alunos dizem sobre a plataforma</p>
+      </div>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <p class="testimonial-text">"Finalmente consegui me organizar! O plano de estudos visual me ajudou a ver exatamente o que eu precisava fazer cada dia. Fui aprovada no TRT em 8 meses."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">AM</div>
+            <div class="testimonial-info">
+              <strong>Ana Maria S.</strong>
+              <span>Aprovada TRT-3</span>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <p class="testimonial-text">"O ciclo de revisoes fez toda a diferenca. Eu esquecia tudo depois de 2 semanas, agora o sistema me lembra de revisar na hora certa."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">RL</div>
+            <div class="testimonial-info">
+              <strong>Ricardo L.</strong>
+              <span>Aprovado Policia Federal</span>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+          <p class="testimonial-text">"Trabalhando 8h por dia, eu achava impossivel estudar. O plano se adaptou ao meu horario e consegui 3h de estudo efetivo por dia."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">CF</div>
+            <div class="testimonial-info">
+              <strong>Carla F.</strong>
+              <span>Aprovada INSS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="container">
+      <h2>Pronto para comecar?</h2>
+      <p>Crie seu plano de estudos personalizado agora mesmo e de o primeiro passo rumo a aprovacao.</p>
+      <a href="criar-plano.html" class="btn btn-lg">Criar Meu Plano Gratis</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">📚 StudyPlan Pro</div>
+          <p class="footer-desc">A plataforma mais completa para criar planos de estudo personalizados para concursos publicos no Brasil.</p>
+        </div>
+        <div>
+          <h4>Produto</h4>
+          <ul>
+            <li><a href="#features">Funcionalidades</a></li>
+            <li><a href="#pricing">Planos</a></li>
+            <li><a href="criar-plano.html">Criar Plano</a></li>
+            <li><a href="dashboard.html">Dashboard</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Suporte</h4>
+          <ul>
+            <li><a href="#">Central de Ajuda</a></li>
+            <li><a href="#">FAQ</a></li>
+            <li><a href="#">Contato</a></li>
+            <li><a href="#">Blog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="#">Termos de Uso</a></li>
+            <li><a href="#">Politica de Privacidade</a></li>
+            <li><a href="#">Cookies</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 StudyPlan Pro. Todos os direitos reservados.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Navbar background on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      navbar.style.boxShadow = window.scrollY > 10 ? '0 2px 10px rgba(0,0,0,0.08)' : 'none';
+    });
+
+    // Animate on scroll
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.animate-in').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+      observer.observe(el);
+    });
+  </script>
+</body>
+</html>
