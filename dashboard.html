@@ -906,6 +906,91 @@
     .mini-bar { height: 5px; background: var(--bg); border-radius: 10px; overflow: hidden; }
     .mini-fill { height: 100%; border-radius: 10px; }
 
+    /* Iniciar Estudos button */
+    .btn-iniciar {
+      padding: 6px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border: 1.5px solid var(--primary);
+      background: var(--primary);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-iniciar:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+    /* Link modal mini */
+    .link-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 600;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .link-modal-overlay.show { display: flex; }
+
+    .link-modal {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 440px;
+      padding: 28px;
+      margin: 16px;
+      animation: dropIn 0.15s ease;
+    }
+
+    .link-modal h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--secondary);
+      margin-bottom: 4px;
+    }
+
+    .link-modal .modal-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-light);
+      margin-bottom: 20px;
+    }
+
+    .link-modal .form-group { margin-bottom: 16px; }
+    .link-modal .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 6px; }
+
+    .link-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-cancel {
+      padding: 8px 18px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-cancel:hover { background: var(--bg); }
+
+    .link-saved-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.68rem;
+      color: var(--success);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
     /* =========================================
        ACTIVITY FEED
     ========================================= */
@@ -1303,7 +1388,7 @@
         <div class="dashboard-two-col">
           <div class="card">
             <h3>📚 Progresso por Matéria</h3>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Direito Administrativo">
               <div class="subject-color" style="background:var(--primary)"></div>
               <div class="subject-info">
                 <strong>Direito Administrativo</strong>
@@ -1313,8 +1398,9 @@
                 <span>40%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:40%;background:var(--primary)"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Direito Administrativo')">Iniciar Estudos</button>
             </div>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Direito Constitucional">
               <div class="subject-color" style="background:var(--info)"></div>
               <div class="subject-info">
                 <strong>Direito Constitucional</strong>
@@ -1324,8 +1410,9 @@
                 <span>30%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:30%;background:var(--info)"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Direito Constitucional')">Iniciar Estudos</button>
             </div>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Português">
               <div class="subject-color" style="background:var(--success)"></div>
               <div class="subject-info">
                 <strong>Português</strong>
@@ -1335,8 +1422,9 @@
                 <span>23%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:23%;background:var(--success)"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Português')">Iniciar Estudos</button>
             </div>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Raciocínio Lógico (RLM)">
               <div class="subject-color" style="background:#805AD5"></div>
               <div class="subject-info">
                 <strong>Raciocínio Lógico (RLM)</strong>
@@ -1346,8 +1434,9 @@
                 <span>20%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:20%;background:#805AD5"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Raciocínio Lógico (RLM)')">Iniciar Estudos</button>
             </div>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Informática">
               <div class="subject-color" style="background:#319795"></div>
               <div class="subject-info">
                 <strong>Informática</strong>
@@ -1357,8 +1446,9 @@
                 <span>20%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:20%;background:#319795"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Informática')">Iniciar Estudos</button>
             </div>
-            <div class="subject-item">
+            <div class="subject-item" data-materia="Admin. Financeira (AFI)">
               <div class="subject-color" style="background:#D53F8C"></div>
               <div class="subject-info">
                 <strong>Admin. Financeira (AFI)</strong>
@@ -1368,6 +1458,7 @@
                 <span>17%</span>
                 <div class="mini-bar"><div class="mini-fill" style="width:17%;background:#D53F8C"></div></div>
               </div>
+              <button class="btn-iniciar" onclick="iniciarEstudos('Admin. Financeira (AFI)')">Iniciar Estudos</button>
             </div>
           </div>
 
@@ -1450,6 +1541,27 @@
 
   <!-- Overlay to close dropdowns -->
   <div class="overlay-close" id="overlayClose" onclick="closeAllDropdowns()"></div>
+
+  <!-- MODAL: Cadastrar Link da Matéria -->
+  <div class="link-modal-overlay" id="linkModalOverlay" onclick="if(event.target===this)fecharLinkModal()">
+    <div class="link-modal">
+      <h3 id="linkModalTitle">Cadastrar link de estudo</h3>
+      <p class="modal-subtitle" id="linkModalSubtitle">Cole o link do seu material (Estratégia, Gran, etc.)</p>
+      <div class="form-group">
+        <label for="linkUrlInput">Link do material</label>
+        <input type="url" class="form-control" id="linkUrlInput" placeholder="https://app.estrategiaconcursos.com.br/..." required>
+      </div>
+      <div class="form-group">
+        <label for="linkTituloInput">Nome do curso (opcional)</label>
+        <input type="text" class="form-control" id="linkTituloInput" placeholder="Ex: Estratégia — Dir. Administrativo">
+      </div>
+      <input type="hidden" id="linkMateriaHidden">
+      <div class="link-modal-actions">
+        <button class="btn-cancel" onclick="fecharLinkModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarLink()" id="btnSalvarLink">Salvar e abrir</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // =============================================
@@ -1592,10 +1704,139 @@
     }
 
     // =============================================
+    //  LINKS DE MATÉRIAS (localStorage + Supabase)
+    // =============================================
+
+    // Carrega links salvos do localStorage
+    function getLinksStorage() {
+      try {
+        return JSON.parse(localStorage.getItem('studyplan_links') || '{}');
+      } catch { return {}; }
+    }
+
+    function saveLinksStorage(links) {
+      localStorage.setItem('studyplan_links', JSON.stringify(links));
+    }
+
+    // Tenta carregar do Supabase, fallback localStorage
+    async function carregarLinksSupabase() {
+      try {
+        const { buscarLinks } = await import('./js/database.js');
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+        if (!user) return;
+
+        const links = await buscarLinks(user.id);
+        if (links && links.length > 0) {
+          const mapa = {};
+          links.forEach(l => { mapa[l.materia] = { url: l.url, titulo: l.titulo }; });
+          saveLinksStorage(mapa);
+          atualizarBotoesComLinks();
+        }
+      } catch (e) {
+        // Sem Supabase ativo, usa apenas localStorage
+      }
+    }
+
+    // Salva no Supabase (se disponível)
+    async function salvarLinkSupabase(materia, url, titulo) {
+      try {
+        const { criarLink } = await import('./js/database.js');
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+        if (!user) return;
+
+        await criarLink({
+          user_id: user.id,
+          materia,
+          titulo: titulo || materia,
+          url,
+          tipo: 'curso'
+        });
+      } catch (e) {
+        // Sem Supabase, link já salvo no localStorage
+      }
+    }
+
+    function iniciarEstudos(materia) {
+      const links = getLinksStorage();
+      if (links[materia] && links[materia].url) {
+        window.open(links[materia].url, '_blank');
+      } else {
+        abrirLinkModal(materia);
+      }
+    }
+
+    function abrirLinkModal(materia) {
+      document.getElementById('linkMateriaHidden').value = materia;
+      document.getElementById('linkModalTitle').textContent = 'Cadastrar link — ' + materia;
+      document.getElementById('linkModalSubtitle').textContent = 'Cole o link do seu material (Estratégia, Gran, etc.) para ' + materia;
+      document.getElementById('linkUrlInput').value = '';
+      document.getElementById('linkTituloInput').value = '';
+      document.getElementById('linkModalOverlay').classList.add('show');
+      setTimeout(() => document.getElementById('linkUrlInput').focus(), 100);
+    }
+
+    function fecharLinkModal() {
+      document.getElementById('linkModalOverlay').classList.remove('show');
+    }
+
+    function salvarLink() {
+      const materia = document.getElementById('linkMateriaHidden').value;
+      const url = document.getElementById('linkUrlInput').value.trim();
+      const titulo = document.getElementById('linkTituloInput').value.trim();
+
+      if (!url) {
+        document.getElementById('linkUrlInput').focus();
+        return;
+      }
+
+      // Salvar no localStorage
+      const links = getLinksStorage();
+      links[materia] = { url, titulo: titulo || materia };
+      saveLinksStorage(links);
+
+      // Salvar no Supabase (async, não bloqueia)
+      salvarLinkSupabase(materia, url, titulo);
+
+      // Atualizar visual dos botões
+      atualizarBotoesComLinks();
+
+      // Fechar modal e abrir o link
+      fecharLinkModal();
+      window.open(url, '_blank');
+    }
+
+    function atualizarBotoesComLinks() {
+      const links = getLinksStorage();
+      document.querySelectorAll('.subject-item[data-materia]').forEach(item => {
+        const materia = item.getAttribute('data-materia');
+        const btn = item.querySelector('.btn-iniciar');
+        const existingBadge = item.querySelector('.link-saved-badge');
+        if (existingBadge) existingBadge.remove();
+
+        if (links[materia] && links[materia].url) {
+          btn.textContent = 'Iniciar Estudos';
+          const badge = document.createElement('span');
+          badge.className = 'link-saved-badge';
+          badge.textContent = '✓ ' + (links[materia].titulo || 'Link salvo');
+          item.querySelector('.subject-info').appendChild(badge);
+        }
+      });
+    }
+
+    // Esc para fechar modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') fecharLinkModal();
+    });
+
+    // =============================================
     //  INIT
     // =============================================
     window.addEventListener('load', () => {
       renderCalendar();
+      atualizarBotoesComLinks();
+      carregarLinksSupabase();
 
       // Animate progress bars
       setTimeout(() => {
