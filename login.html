@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — StudyPlan Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <style>
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #FFF5F2 0%, var(--bg) 50%, #F0F4FF 100%);
+      padding: 24px;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 440px;
+      padding: 40px;
+    }
+
+    .login-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 32px;
+    }
+
+    .login-brand-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--primary);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+
+    .login-brand span {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--secondary);
+    }
+
+    .login-card h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--secondary);
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    .login-card .subtitle {
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--text-light);
+      margin-bottom: 28px;
+    }
+
+    .login-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 28px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+    }
+
+    .login-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-light);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-radius: 6px;
+      transition: var(--transition);
+    }
+
+    .login-tab.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      box-shadow: var(--shadow);
+    }
+
+    .login-form { display: block; }
+    .login-form.hidden { display: none; }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .alert.error {
+      background: #FFF5F5;
+      border: 1px solid #FED7D7;
+      color: #C53030;
+    }
+
+    .alert.success {
+      background: #F0FFF4;
+      border: 1px solid #C6F6D5;
+      color: #276749;
+    }
+
+    .alert.show { display: block; }
+
+    .form-group { margin-bottom: 18px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .password-wrapper {
+      position: relative;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: var(--text-lighter);
+      padding: 4px;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.82rem;
+      color: var(--text-light);
+    }
+
+    .login-footer a {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.82rem;
+      color: var(--text-light);
+    }
+    .back-link:hover { color: var(--primary); }
+
+    .btn.loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+
+      <!-- Brand -->
+      <div class="login-brand">
+        <div class="login-brand-icon">📚</div>
+        <span>StudyPlan Pro</span>
+      </div>
+
+      <h1 id="pageTitle">Entrar na plataforma</h1>
+      <p class="subtitle" id="pageSubtitle">Acesse seu plano de estudos personalizado</p>
+
+      <!-- Tabs -->
+      <div class="login-tabs">
+        <button class="login-tab active" id="tabLogin" onclick="showTab('login')">Entrar</button>
+        <button class="login-tab" id="tabCadastro" onclick="showTab('cadastro')">Criar conta</button>
+      </div>
+
+      <!-- Alerts -->
+      <div class="alert error" id="alertError"></div>
+      <div class="alert success" id="alertSuccess"></div>
+
+      <!-- LOGIN FORM -->
+      <form class="login-form" id="formLogin" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginEmail">E-mail</label>
+          <input type="email" class="form-control" id="loginEmail" placeholder="seu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginSenha">Senha</label>
+          <div class="password-wrapper">
+            <input type="password" class="form-control" id="loginSenha" placeholder="Sua senha" required minlength="6">
+            <button type="button" class="password-toggle" onclick="togglePassword('loginSenha', this)">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnLogin">Entrar</button>
+      </form>
+
+      <!-- CADASTRO FORM -->
+      <form class="login-form hidden" id="formCadastro" onsubmit="handleCadastro(event)">
+        <div class="form-group">
+          <label for="cadNome">Nome completo</label>
+          <input type="text" class="form-control" id="cadNome" placeholder="Seu nome" required>
+        </div>
+        <div class="form-group">
+          <label for="cadEmail">E-mail</label>
+          <input type="email" class="form-control" id="cadEmail" placeholder="seu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="cadSenha">Senha</label>
+          <div class="password-wrapper">
+            <input type="password" class="form-control" id="cadSenha" placeholder="Mínimo 6 caracteres" required minlength="6">
+            <button type="button" class="password-toggle" onclick="togglePassword('cadSenha', this)">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnCadastro">Criar conta</button>
+      </form>
+
+      <a href="index.html" class="back-link">← Voltar para o início</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { login, cadastrar } from './js/auth.js';
+
+    // Expose to global scope for inline handlers
+    window.handleLogin = async function(e) {
+      e.preventDefault();
+      hideAlerts();
+      const btn = document.getElementById('btnLogin');
+      btn.classList.add('loading');
+      btn.textContent = 'Entrando...';
+
+      try {
+        const email = document.getElementById('loginEmail').value;
+        const senha = document.getElementById('loginSenha').value;
+        await login(email, senha);
+        showAlert('success', 'Login realizado! Redirecionando...');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+      } catch (err) {
+        showAlert('error', err.message === 'Acesso restrito a alunos matriculados.'
+          ? err.message
+          : 'E-mail ou senha inválidos. Tente novamente.');
+        btn.classList.remove('loading');
+        btn.textContent = 'Entrar';
+      }
+    };
+
+    window.handleCadastro = async function(e) {
+      e.preventDefault();
+      hideAlerts();
+      const btn = document.getElementById('btnCadastro');
+      btn.classList.add('loading');
+      btn.textContent = 'Criando conta...';
+
+      try {
+        const nome = document.getElementById('cadNome').value;
+        const email = document.getElementById('cadEmail').value;
+        const senha = document.getElementById('cadSenha').value;
+        await cadastrar(email, senha, nome);
+        showAlert('success', 'Conta criada! Verifique seu e-mail para confirmar o cadastro.');
+        btn.textContent = 'Conta criada!';
+      } catch (err) {
+        showAlert('error', err.message === 'Acesso restrito a alunos matriculados.'
+          ? err.message
+          : 'Erro ao criar conta: ' + err.message);
+        btn.classList.remove('loading');
+        btn.textContent = 'Criar conta';
+      }
+    };
+  </script>
+
+  <script>
+    // =============================================
+    //  UI HELPERS (non-module)
+    // =============================================
+
+    function showTab(tab) {
+      document.getElementById('formLogin').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('formCadastro').classList.toggle('hidden', tab !== 'cadastro');
+      document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+      document.getElementById('tabCadastro').classList.toggle('active', tab === 'cadastro');
+      hideAlerts();
+
+      if (tab === 'login') {
+        document.getElementById('pageTitle').textContent = 'Entrar na plataforma';
+        document.getElementById('pageSubtitle').textContent = 'Acesse seu plano de estudos personalizado';
+      } else {
+        document.getElementById('pageTitle').textContent = 'Criar sua conta';
+        document.getElementById('pageSubtitle').textContent = 'Preencha os dados para começar a estudar';
+      }
+    }
+
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
+    }
+
+    function showAlert(type, msg) {
+      hideAlerts();
+      const el = document.getElementById(type === 'error' ? 'alertError' : 'alertSuccess');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function hideAlerts() {
+      document.getElementById('alertError').classList.remove('show');
+      document.getElementById('alertSuccess').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
