@@ -58,7 +58,7 @@ export async function cadastrar(email, senha, nome) {
 export async function login(email, senha) {
   const autorizado = await verificarAutorizacao(email);
   if (!autorizado) {
-    throw new Error('Acesso restrito a alunos matriculados.');
+    throw new Error('Acesso exclusivo para alunos. Verifique seu e-mail da Hotmart ou entre em contato com o suporte.');
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -77,6 +77,7 @@ export async function login(email, senha) {
 export async function logout() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+  localStorage.removeItem('studyplan_perfil');
   window.location.href = 'login.html';
 }
 
@@ -85,6 +86,11 @@ export async function logout() {
 // =============================================
 
 export async function getUsuarioAtual() {
+  // First try getSession (uses cached/persisted token)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) return session.user;
+
+  // Fallback to getUser (network call)
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
@@ -96,4 +102,30 @@ export async function protegerPagina() {
     return null;
   }
   return user;
+}
+
+// =============================================
+//  AUTH STATE LISTENER
+//  Call this on page load to handle session
+//  changes (login, logout, token refresh, expiry)
+// =============================================
+
+export function onAuthStateChange(callback) {
+  supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
+  });
+}
+
+// =============================================
+//  REDIRECT IF LOGGED IN
+//  Use on login.html to skip login if session exists
+// =============================================
+
+export async function redirecionarSeLogado(destino = 'dashboard.html') {
+  const user = await getUsuarioAtual();
+  if (user) {
+    window.location.href = destino;
+    return true;
+  }
+  return false;
 }

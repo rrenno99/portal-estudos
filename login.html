@@ -242,7 +242,10 @@
   </div>
 
   <script type="module">
-    import { login, cadastrar } from './js/auth.js';
+    import { login, cadastrar, redirecionarSeLogado } from './js/auth.js';
+
+    // If already logged in, skip to dashboard
+    redirecionarSeLogado();
 
     // Expose to global scope for inline handlers
     window.handleLogin = async function(e) {
@@ -259,7 +262,8 @@
         showAlert('success', 'Login realizado! Redirecionando...');
         setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
       } catch (err) {
-        showAlert('error', err.message === 'Acesso restrito a alunos matriculados.'
+        const isAccess = err.message && err.message.includes('Acesso exclusivo');
+        showAlert('error', isAccess
           ? err.message
           : 'E-mail ou senha inválidos. Tente novamente.');
         btn.classList.remove('loading');
@@ -283,8 +287,8 @@
         btn.textContent = 'Conta criada!';
         setTimeout(() => { window.location.href = 'criar-plano.html'; }, 1500);
       } catch (err) {
-        const msgHotmart = 'Acesso exclusivo para alunos. Verifique seu e-mail da Hotmart ou entre em contato com o suporte.';
-        showAlert('error', err.message === msgHotmart
+        const isAccess = err.message && err.message.includes('Acesso exclusivo');
+        showAlert('error', isAccess
           ? err.message
           : 'Erro ao criar conta: ' + err.message);
         btn.classList.remove('loading');

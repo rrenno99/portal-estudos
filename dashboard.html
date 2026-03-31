@@ -2486,5 +2486,34 @@
       carregarLinksSupabase();
     });
   </script>
+
+  <!-- Auth guard + session listener (module) -->
+  <script type="module">
+    import { protegerPagina, onAuthStateChange, logout } from './js/auth.js';
+
+    // Protect: redirect to login if no session
+    protegerPagina();
+
+    // Listen for auth changes (token refresh, expiry, sign out)
+    onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+        window.location.href = 'login.html';
+      }
+    });
+
+    // Wire up logout buttons
+    document.querySelectorAll('a[href="login.html"].dropdown-item.danger').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await logout();
+      });
+    });
+
+    // Sidebar logout
+    document.querySelector('.sidebar-bottom a[href="login.html"]')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await logout();
+    });
+  </script>
 </body>
 </html>

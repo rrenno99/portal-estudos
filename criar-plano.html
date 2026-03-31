@@ -1123,5 +1123,18 @@
       }, 2000);
     }
   </script>
+
+  <!-- Auth guard -->
+  <script type="module">
+    import { protegerPagina, onAuthStateChange } from './js/auth.js';
+
+    protegerPagina();
+
+    onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+        window.location.href = 'login.html';
+      }
+    });
+  </script>
 </body>
 </html>
