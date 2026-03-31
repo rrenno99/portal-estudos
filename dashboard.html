@@ -1394,7 +1394,7 @@
       </div>
 
       <div class="sidebar-bottom">
-        <a href="login.html" data-label="Sair">
+        <a href="#" data-label="Sair" id="btnLogoutSidebar">
           <span class="menu-icon">🚪</span>
           <span class="menu-label">Sair</span>
         </a>
@@ -1490,7 +1490,7 @@
                 Plano válido até <strong id="dropdownPlanDate">—</strong>
               </div>
               <div class="dropdown-divider"></div>
-              <a href="login.html" class="dropdown-item danger">
+              <a href="#" class="dropdown-item danger" id="btnLogoutDropdown">
                 <span class="item-icon">🚪</span> Sair
               </a>
             </div>
@@ -2517,24 +2517,20 @@
 
     // Listen for auth changes (token refresh, expiry, sign out)
     onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
         window.location.href = 'login.html';
       }
     });
 
-    // Wire up logout buttons
-    document.querySelectorAll('a[href="login.html"].dropdown-item.danger').forEach(el => {
-      el.addEventListener('click', async (e) => {
-        e.preventDefault();
-        await logout();
-      });
-    });
-
-    // Sidebar logout
-    document.querySelector('.sidebar-bottom a[href="login.html"]')?.addEventListener('click', async (e) => {
+    // Logout handler
+    async function handleLogout(e) {
       e.preventDefault();
       await logout();
-    });
+    }
+
+    // Wire up both logout buttons by ID
+    document.getElementById('btnLogoutDropdown')?.addEventListener('click', handleLogout);
+    document.getElementById('btnLogoutSidebar')?.addEventListener('click', handleLogout);
   </script>
 </body>
 </html>
