@@ -1214,7 +1214,7 @@
               <div class="notif-item unread">
                 <div class="notif-dot"></div>
                 <div>
-                  <div class="notif-text">🏆 Meta semanal atingida! Parabéns, Raquel!</div>
+                  <div class="notif-text">🏆 Meta semanal atingida! Parabéns!</div>
                   <div class="notif-time">Ontem, 18:30</div>
                 </div>
               </div>
@@ -1272,7 +1272,7 @@
             <h1 class="welcome-title" id="welcomeTitle">Olá! 👋</h1>
             <div class="plan-progress-wrap">
               <span class="plan-progress-label">Progresso do Plano de Estudos</span>
-              <span class="plan-progress-pct">18%</span>
+              <span class="plan-progress-pct" id="welcomeProgressPct">0%</span>
             </div>
             <div class="plan-progress-bar">
               <div class="plan-progress-fill" id="mainProgressFill" style="width:0%"></div>
@@ -1285,7 +1285,7 @@
           <div class="welcome-streak">
             <span class="streak-fire">🔥</span>
             <div class="streak-info">
-              <strong>7 dias</strong>
+              <strong id="streakCount">0 dias</strong>
               <span>em sequência</span>
             </div>
           </div>
@@ -1296,33 +1296,30 @@
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-card-icon orange">📖</div>
-              <span class="stat-change up">+12 esta semana</span>
             </div>
-            <div class="stat-value">54</div>
+            <div class="stat-value" id="statDiasEstudados">0</div>
             <div class="stat-label">Dias Estudados</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-card-icon blue">⏱️</div>
-              <span class="stat-change up">+8.5h esta semana</span>
             </div>
-            <div class="stat-value">167,8h</div>
+            <div class="stat-value" id="statHorasEstudadas">0h</div>
             <div class="stat-label">Horas Estudadas</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-card-icon green">⏳</div>
             </div>
-            <div class="stat-value">60h</div>
+            <div class="stat-value" id="statHorasRecomendadas">0h</div>
             <div class="stat-label">Horas Recomendadas</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-card-icon purple">✅</div>
-              <span class="stat-change up">+5% esta semana</span>
             </div>
-            <div class="stat-value">72%</div>
-            <div class="stat-label">Acerto em Questões</div>
+            <div class="stat-value" id="statTotalMaterias">0</div>
+            <div class="stat-label">Matérias no Plano</div>
           </div>
         </div>
 
@@ -1358,7 +1355,7 @@
         <div class="progress-section">
           <div class="progress-header">
             <h3>📈 Progresso do Plano de Estudos</h3>
-            <span style="font-size:0.85rem;font-weight:700;color:var(--primary)">18%</span>
+            <span style="font-size:0.85rem;font-weight:700;color:var(--primary)" id="progressPct">0%</span>
           </div>
           <div class="progress-bar-bg">
             <div class="progress-bar-fill" id="planProgressFill" style="width:0%"></div>
@@ -1454,7 +1451,7 @@
           <div class="aviso-item success">
             <div>
               <div class="aviso-tag">Parabéns!</div>
-              <div class="aviso-text">Você completou sua meta de estudo por 5 dias consecutivos! Continue assim, Raquel!</div>
+              <div class="aviso-text">Você completou sua meta de estudo por 5 dias consecutivos! Continue assim!</div>
               <div class="aviso-date">15/03/2025</div>
             </div>
           </div>
@@ -1929,6 +1926,67 @@
     }
 
     // =============================================
+    //  CALCULATE REAL STATS
+    // =============================================
+    function calcularEstatisticas() {
+      const plan = getPlanData();
+      const links = getLinksStorage();
+
+      // Get study tracking data
+      let stats;
+      try { stats = JSON.parse(localStorage.getItem('studyplan_stats') || 'null'); } catch { stats = null; }
+
+      const diasEstudados = stats ? (stats.diasEstudados || 0) : 0;
+      const horasEstudadas = stats ? (stats.horasEstudadas || 0) : 0;
+      const sequencia = stats ? (stats.sequencia || 0) : 0;
+
+      // Total subjects from plan
+      let totalMaterias = 0;
+      let materiasConcluidas = 0;
+
+      if (plan && plan.materias) {
+        totalMaterias = plan.materias.length;
+        // Check which subjects are marked complete in tracking
+        if (stats && stats.materiasConcluidas) {
+          materiasConcluidas = stats.materiasConcluidas.length;
+        }
+      } else {
+        totalMaterias = Object.keys(links).length;
+      }
+
+      // Calculate progress: matérias concluídas / total
+      const progresso = totalMaterias > 0 ? Math.round((materiasConcluidas / totalMaterias) * 100) : 0;
+
+      // Calculate recommended weekly hours
+      let horasRecomendadas = 0;
+      if (plan) {
+        const diasUteis = (plan.dias || []).filter(d => !['Sábado','Domingo'].includes(d)).length;
+        const diasFds = (plan.dias || []).filter(d => ['Sábado','Domingo'].includes(d)).length;
+        horasRecomendadas = (diasUteis * (plan.horasUteis || 3)) + (diasFds * (plan.horasFds || 0));
+      }
+
+      // Update UI
+      document.getElementById('statDiasEstudados').textContent = diasEstudados;
+      document.getElementById('statHorasEstudadas').textContent = horasEstudadas + 'h';
+      document.getElementById('statHorasRecomendadas').textContent = horasRecomendadas + 'h/sem';
+      document.getElementById('statTotalMaterias').textContent = totalMaterias;
+      document.getElementById('streakCount').textContent = sequencia + ' dias';
+
+      // Progress bars
+      const pctStr = progresso + '%';
+      document.getElementById('welcomeProgressPct').textContent = pctStr;
+      document.getElementById('progressPct').textContent = pctStr;
+
+      setTimeout(() => {
+        const fills = [
+          document.getElementById('mainProgressFill'),
+          document.getElementById('planProgressFill')
+        ];
+        fills.forEach(f => { if(f) f.style.width = pctStr; });
+      }, 400);
+    }
+
+    // =============================================
     //  INIT
     // =============================================
     window.addEventListener('load', () => {
@@ -1937,19 +1995,11 @@
       renderSubjectsList();
       buildDynamicSchedule();
       renderCalendar();
+      calcularEstatisticas();
 
       // 2. Then try Supabase for fresh data
       carregarPerfilSupabase();
       carregarLinksSupabase();
-
-      // 3. Animate progress bars
-      setTimeout(() => {
-        const fills = [
-          document.getElementById('mainProgressFill'),
-          document.getElementById('planProgressFill')
-        ];
-        fills.forEach(f => { if(f) f.style.width = '0%'; }); // Start at 0 for new plans
-      }, 400);
     });
   </script>
 </body>
