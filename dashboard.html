@@ -1333,6 +1333,24 @@
   </style>
 </head>
 <body>
+  <!-- Logout: standalone script, loads first, no dependencies -->
+  <script>
+    function handleLogout(e) {
+      if (e) e.preventDefault();
+      localStorage.removeItem('studyplan_perfil');
+      localStorage.removeItem('studyplan_plan');
+      localStorage.removeItem('studyplan_links');
+      localStorage.removeItem('studyplan_stats');
+      import('./js/supabase.js').then(function(m) {
+        m.supabase.auth.signOut().finally(function() {
+          window.location.href = 'login.html';
+        });
+      }).catch(function() {
+        window.location.href = 'login.html';
+      });
+    }
+  </script>
+
   <div class="app-layout">
 
     <!-- ===================== SIDEBAR ===================== -->
@@ -2134,25 +2152,6 @@
         fecharEditarPerfil();
       }
     });
-
-    // =============================================
-    //  LOGOUT (global, always available)
-    // =============================================
-    async function handleLogout(e) {
-      if (e) e.preventDefault();
-      try {
-        const { supabase } = await import('./js/supabase.js');
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.error('Erro no signOut:', err);
-      }
-      // Clear ALL user data
-      localStorage.removeItem('studyplan_perfil');
-      localStorage.removeItem('studyplan_plan');
-      localStorage.removeItem('studyplan_links');
-      localStorage.removeItem('studyplan_stats');
-      window.location.href = 'login.html';
-    }
 
     // =============================================
     //  LOAD USER PROFILE (Supabase + localStorage)
