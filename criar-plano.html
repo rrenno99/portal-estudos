@@ -462,21 +462,17 @@
       </div>
 
       <div style="background: #FFF8F0; border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; border-left: 4px solid var(--primary);">
-        <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa</strong>
-        <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;" id="resumoEstimativa">
-          Com base na sua disponibilidade, você levará aproximadamente <strong>5 meses</strong> para cobrir todo o conteúdo.
-        </p>
+        <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa de Conclusão</strong>
+        <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;" id="resumoEstimativa">—</p>
       </div>
 
-      <div class="form-group">
-        <label>Seu nome</label>
-        <input type="text" class="form-control" id="inputNome" placeholder="Como devemos te chamar?">
-      </div>
-
-      <div class="form-group">
-        <label>Seu email</label>
-        <input type="email" class="form-control" id="inputEmail" placeholder="seu@email.com">
-        <div class="form-hint">Enviaremos o plano para seu email e você pode acessar de qualquer lugar.</div>
+      <!-- User info from auth (read-only) -->
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; display:flex; align-items:center; gap:12px;">
+        <div style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0" id="resumoAvatarInitials">?</div>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;color:var(--secondary)" id="resumoUserName">—</div>
+          <div style="font-size:0.78rem;color:var(--text-light)" id="resumoUserEmail">—</div>
+        </div>
       </div>
 
       <div class="wizard-actions">
@@ -799,12 +795,12 @@
     // =============================================
     //  STEP NAVIGATION
     // =============================================
-    function nextStep(step) {
+    async function nextStep(step) {
       if (step === 2) {
         loadSubjectsForConcurso();
       }
       if (step === 4) {
-        buildReview();
+        await buildReview();
       }
       document.getElementById('step' + currentStep).style.display = 'none';
       document.getElementById('step' + step).style.display = 'block';
@@ -992,7 +988,7 @@
       return subjects;
     }
 
-    function buildReview() {
+    async function buildReview() {
       const subjects = getSelectedSubjects();
       const selectedDays = [];
       document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
@@ -1003,13 +999,10 @@
       const diasFds = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
 
-      const turnoEl = document.querySelector('#step3 .chips:nth-of-type(3) .chip.selected') ||
-                      document.querySelector('#step3 .chip.selected');
-
       document.getElementById('resumoConcurso').textContent = selectedConcurso || 'Não selecionado';
       document.getElementById('resumoNivel').textContent = selectedNivel || 'Não selecionado';
       document.getElementById('resumoMaterias').textContent = subjects.length + ' matérias';
-      document.getElementById('resumoHoras').textContent = horasSemanais + ' horas';
+      document.getElementById('resumoHoras').textContent = horasSemanais + 'h/semana (' + diasUteis + ' dias úteis × ' + horasUteis + 'h' + (diasFds > 0 ? ' + ' + diasFds + ' fim de semana × ' + horasFds + 'h' : '') + ')';
       document.getElementById('resumoDias').textContent = selectedDays.join(', ') || '—';
 
       // Find turno
@@ -1041,10 +1034,35 @@
         linksDiv.innerHTML = html;
       }
 
-      // Estimate
-      const meses = subjects.length > 0 ? Math.max(2, Math.round(subjects.length * 4 / (horasSemanais / 5))) : 5;
-      document.getElementById('resumoEstimativa').innerHTML =
-        'Com base na sua disponibilidade, você levará aproximadamente <strong>' + meses + ' meses</strong> para cobrir todo o conteúdo. Seu plano inclui ciclo de revisões inteligente para maximizar a retenção.';
+      // Estimate: 50h per subject / weekly hours = weeks → months
+      const HORAS_POR_MATERIA = 50;
+      const totalHorasNecessarias = subjects.length * HORAS_POR_MATERIA;
+      const semanasNecessarias = horasSemanais > 0 ? totalHorasNecessarias / horasSemanais : 0;
+      const mesesNecessarios = horasSemanais > 0 ? Math.max(1, Math.ceil(semanasNecessarias / 4.3)) : 0;
+
+      if (horasSemanais > 0 && subjects.length > 0) {
+        document.getElementById('resumoEstimativa').innerHTML =
+          `${subjects.length} matérias × ${HORAS_POR_MATERIA}h = <strong>${totalHorasNecessarias}h</strong> de estudo total.<br>` +
+          `Com <strong>${horasSemanais}h/semana</strong>, você concluirá em aproximadamente <strong>${mesesNecessarios} ${mesesNecessarios === 1 ? 'mês' : 'meses'}</strong>.`;
+      } else {
+        document.getElementById('resumoEstimativa').textContent = 'Selecione matérias e disponibilidade para ver a estimativa.';
+      }
+
+      // Load user from Supabase Auth (no name/email fields needed)
+      try {
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+        if (user) {
+          const nome = user.user_metadata?.nome || user.email.split('@')[0];
+          const initials = nome.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+          document.getElementById('resumoUserName').textContent = nome;
+          document.getElementById('resumoUserEmail').textContent = user.email;
+          document.getElementById('resumoAvatarInitials').textContent = initials;
+        }
+      } catch (e) {
+        document.getElementById('resumoUserName').textContent = 'Usuário';
+        document.getElementById('resumoUserEmail').textContent = '';
+      }
     }
 
     // =============================================
@@ -1081,14 +1099,30 @@
         });
       });
 
-      const nome = document.getElementById('inputNome').value.trim();
-      const email = document.getElementById('inputEmail').value.trim();
       const dataProva = document.getElementById('dataProva').value || null;
+
+      // Get name/email from Supabase Auth (not from form fields)
+      let nome = '';
+      let email = '';
+      try {
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+        if (user) {
+          nome = user.user_metadata?.nome || user.email.split('@')[0];
+          email = user.email;
+        }
+      } catch (e) {}
       const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
       const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
       const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
       const diasFdsCount = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFdsCount * horasFds);
+
+      // Calculate estimate: 50h per subject
+      const HORAS_POR_MATERIA = 50;
+      const totalHoras = subjects.length * HORAS_POR_MATERIA;
+      const semanas = horasSemanais > 0 ? totalHoras / horasSemanais : 0;
+      const metaMeses = horasSemanais > 0 ? Math.max(1, Math.ceil(semanas / 4.3)) : 0;
 
       const planData = {
         concurso: selectedConcurso || 'Personalizado',
@@ -1098,17 +1132,17 @@
         turno: turnoText,
         horasUteis,
         horasFds,
+        horasSemanais,
+        metaMeses,
         nome,
         email,
         criadoEm: new Date().toISOString()
       };
       localStorage.setItem('studyplan_plan', JSON.stringify(planData));
 
-      if (nome) {
-        localStorage.setItem('studyplan_perfil', JSON.stringify({
-          nome, email, concurso: planData.concurso
-        }));
-      }
+      localStorage.setItem('studyplan_perfil', JSON.stringify({
+        nome, email, concurso: planData.concurso
+      }));
 
       // =============================================
       //  SAVE TO SUPABASE (perfil_aluno + links_materias)
