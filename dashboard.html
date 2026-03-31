@@ -2068,12 +2068,15 @@
         if (!user) return;
 
         const links = await buscarLinks(user.id);
+        // Replace localStorage links entirely with Supabase data (source of truth)
+        const mapa = {};
         if (links && links.length > 0) {
-          const mapa = getLinksStorage();
           links.forEach(l => { mapa[l.materia] = { url: l.url, titulo: l.titulo }; });
-          saveLinksStorage(mapa);
-          renderSubjectsList();
         }
+        saveLinksStorage(mapa);
+        renderSubjectsList();
+        buildDynamicSchedule();
+        renderCalendar();
       } catch (e) { /* Sem Supabase, usa localStorage */ }
     }
 
@@ -2361,26 +2364,44 @@
         const user = await getUsuarioAtual();
         if (!user) return;
 
+        // Check if cached data belongs to current user — clear if different
+        const cachedPerfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
+        if (cachedPerfil._uid && cachedPerfil._uid !== user.id) {
+          localStorage.removeItem('studyplan_perfil');
+          localStorage.removeItem('studyplan_plan');
+          localStorage.removeItem('studyplan_links');
+          localStorage.removeItem('studyplan_stats');
+        }
+
         const perfil = await buscarPerfil(user.id);
         if (perfil) {
           setUserUI(perfil.nome, perfil.email, perfil.concurso, perfil.foto_url || null);
 
-          // Save to localStorage for offline
+          // Save to localStorage with user id tag
+          perfil._uid = user.id;
           localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
 
-          // Update plan date
           if (perfil.data_prova) {
             const d = new Date(perfil.data_prova).toLocaleDateString('pt-BR');
             document.getElementById('topbarPlanEnd').textContent = d;
             document.getElementById('progressPlanDate').textContent = 'Plano válido até ' + d;
             document.getElementById('dropdownPlanDate').textContent = d;
           }
+
+          if (perfil.horas_semanais) {
+            document.getElementById('statHorasRecomendadas').textContent = perfil.horas_semanais + 'h/sem';
+          }
         } else {
-          // No profile in Supabase, use localStorage plan data
           loadFromLocalStorage();
         }
+
+        // Reload subjects and calendar with fresh Supabase data
+        renderSubjectsList();
+        buildDynamicSchedule();
+        renderCalendar();
+        calcularEstatisticas();
+
       } catch (e) {
-        // Supabase offline, use localStorage
         loadFromLocalStorage();
       }
     }

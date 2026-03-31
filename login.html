@@ -258,6 +258,13 @@
       try {
         const email = document.getElementById('loginEmail').value;
         const senha = document.getElementById('loginSenha').value;
+
+        // Clear previous user's cached data before new login
+        localStorage.removeItem('studyplan_perfil');
+        localStorage.removeItem('studyplan_plan');
+        localStorage.removeItem('studyplan_links');
+        localStorage.removeItem('studyplan_stats');
+
         await login(email, senha);
         showAlert('success', 'Login realizado! Redirecionando...');
         setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);

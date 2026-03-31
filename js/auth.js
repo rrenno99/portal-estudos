@@ -77,7 +77,13 @@ export async function login(email, senha) {
 export async function logout() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+
+  // Clear ALL user data from localStorage
   localStorage.removeItem('studyplan_perfil');
+  localStorage.removeItem('studyplan_plan');
+  localStorage.removeItem('studyplan_links');
+  localStorage.removeItem('studyplan_stats');
+
   window.location.href = 'login.html';
 }
 
