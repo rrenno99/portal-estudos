@@ -1050,7 +1050,7 @@
     // =============================================
     //  GENERATE PLAN
     // =============================================
-    function gerarPlano() {
+    async function gerarPlano() {
       const btn = document.getElementById('btnGerar');
       btn.innerHTML = '⏳ Gerando seu plano...';
       btn.disabled = true;
@@ -1081,29 +1081,98 @@
         });
       });
 
+      const nome = document.getElementById('inputNome').value.trim();
+      const email = document.getElementById('inputEmail').value.trim();
+      const dataProva = document.getElementById('dataProva').value || null;
+      const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
+      const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
+      const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
+      const diasFdsCount = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
+      const horasSemanais = (diasUteis * horasUteis) + (diasFdsCount * horasFds);
+
       const planData = {
         concurso: selectedConcurso || 'Personalizado',
         nivel: selectedNivel || '',
         materias: subjects.map(s => ({ nome: s.nome, link: s.link })),
         dias: selectedDays,
         turno: turnoText,
-        horasUteis: parseInt(document.getElementById('horasUteis').value) || 3,
-        horasFds: parseInt(document.getElementById('horasFds').value) || 0,
-        nome: document.getElementById('inputNome').value.trim(),
-        email: document.getElementById('inputEmail').value.trim(),
+        horasUteis,
+        horasFds,
+        nome,
+        email,
         criadoEm: new Date().toISOString()
       };
       localStorage.setItem('studyplan_plan', JSON.stringify(planData));
 
-      // Also save as perfil for dashboard name loading
-      if (planData.nome) {
+      if (nome) {
         localStorage.setItem('studyplan_perfil', JSON.stringify({
-          nome: planData.nome,
-          email: planData.email,
-          concurso: planData.concurso
+          nome, email, concurso: planData.concurso
         }));
       }
 
+      // =============================================
+      //  SAVE TO SUPABASE (perfil_aluno + links_materias)
+      // =============================================
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+
+        if (user) {
+          // Upsert perfil_aluno (update if exists, insert if not)
+          const perfilData = {
+            user_id: user.id,
+            nome: nome || user.user_metadata?.nome || 'Aluno',
+            email: email || user.email,
+            concurso: planData.concurso,
+            nivel: planData.nivel,
+            data_prova: dataProva,
+            horas_semanais: horasSemanais,
+            turno_preferido: turnoText,
+            dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo'
+          };
+
+          const { error: perfilError } = await supabase
+            .from('perfil_aluno')
+            .upsert(perfilData, { onConflict: 'user_id' });
+
+          if (perfilError) console.error('Erro ao salvar perfil:', perfilError.message);
+
+          // Delete old links and insert new ones
+          await supabase
+            .from('links_materias')
+            .delete()
+            .eq('user_id', user.id);
+
+          const linksToInsert = subjects
+            .filter(s => s.link)
+            .map(s => ({
+              user_id: user.id,
+              materia: s.nome,
+              titulo: s.nome,
+              url: s.link,
+              tipo: 'curso'
+            }));
+
+          if (linksToInsert.length > 0) {
+            const { error: linksError } = await supabase
+              .from('links_materias')
+              .insert(linksToInsert);
+
+            if (linksError) console.error('Erro ao salvar links:', linksError.message);
+          }
+
+          console.log('Plano salvo no Supabase com user_id:', user.id);
+        } else {
+          console.warn('Nenhum usuário logado — plano salvo apenas no localStorage.');
+        }
+      } catch (e) {
+        console.error('Erro ao salvar no Supabase:', e);
+      }
+
+      // =============================================
+      //  SHOW SUCCESS
+      // =============================================
       setTimeout(() => {
         document.getElementById('step4').style.display = 'none';
         document.getElementById('stepSuccess').style.display = 'block';
