@@ -1195,7 +1195,7 @@
     .overlay-close {
       position: fixed;
       inset: 0;
-      z-index: 400;
+      z-index: 100;
       display: none;
     }
     .overlay-close.show { display: block; }
@@ -1333,21 +1333,19 @@
   </style>
 </head>
 <body>
-  <!-- Logout: standalone script, loads first, no dependencies -->
+  <!-- Logout: zero dependencies, always works -->
   <script>
     function handleLogout(e) {
-      if (e) e.preventDefault();
-      localStorage.removeItem('studyplan_perfil');
-      localStorage.removeItem('studyplan_plan');
-      localStorage.removeItem('studyplan_links');
-      localStorage.removeItem('studyplan_stats');
-      import('./js/supabase.js').then(function(m) {
-        m.supabase.auth.signOut().finally(function() {
-          window.location.href = 'login.html';
-        });
-      }).catch(function() {
-        window.location.href = 'login.html';
-      });
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      // 1. Clear all user data
+      var keys = Object.keys(localStorage);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('studyplan') === 0 || keys[i].indexOf('sb-') === 0) {
+          localStorage.removeItem(keys[i]);
+        }
+      }
+      // 2. Redirect immediately
+      window.location.replace('login.html');
     }
   </script>
 
@@ -1412,10 +1410,10 @@
       </div>
 
       <div class="sidebar-bottom">
-        <a href="#" data-label="Sair" onclick="handleLogout(event)">
+        <button type="button" data-label="Sair" onclick="handleLogout(event)" style="background:none;border:none;width:100%;text-align:left;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;color:rgba(255,255,255,0.6);transition:all 0.2s ease;white-space:nowrap" onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='white'" onmouseout="this.style.background='none';this.style.color='rgba(255,255,255,0.6)'">
           <span class="menu-icon">🚪</span>
           <span class="menu-label">Sair</span>
-        </a>
+        </button>
       </div>
     </aside>
 
@@ -1508,9 +1506,9 @@
                 Plano válido até <strong id="dropdownPlanDate">—</strong>
               </div>
               <div class="dropdown-divider"></div>
-              <a href="#" class="dropdown-item danger" onclick="handleLogout(event)">
+              <button type="button" class="dropdown-item danger" onclick="handleLogout(event)">
                 <span class="item-icon">🚪</span> Sair
-              </a>
+              </button>
             </div>
           </div>
         </div>
