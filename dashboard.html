@@ -1189,16 +1189,28 @@
     .aviso-text { font-size: 0.83rem; color: var(--text-light); line-height: 1.5; }
     .aviso-date { font-size: 0.73rem; color: var(--text-lighter); margin-top: 4px; }
 
-    /* =========================================
-       CLOSE OVERLAY
-    ========================================= */
-    .overlay-close {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: none;
+    /* Sidebar logout button */
+    .sidebar-logout-btn {
+      background: none;
+      border: none;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 10px;
+      color: rgba(255,255,255,0.6);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      font-size: inherit;
     }
-    .overlay-close.show { display: block; }
+    .sidebar-logout-btn:hover {
+      background: rgba(255,255,255,0.12);
+      color: white;
+    }
 
     /* =========================================
        RESPONSIVE
@@ -1410,7 +1422,7 @@
       </div>
 
       <div class="sidebar-bottom">
-        <button type="button" data-label="Sair" onclick="handleLogout(event)" style="background:none;border:none;width:100%;text-align:left;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;color:rgba(255,255,255,0.6);transition:all 0.2s ease;white-space:nowrap" onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='white'" onmouseout="this.style.background='none';this.style.color='rgba(255,255,255,0.6)'">
+        <button type="button" class="sidebar-logout-btn" onclick="handleLogout(event)">
           <span class="menu-icon">🚪</span>
           <span class="menu-label">Sair</span>
         </button>
@@ -1719,8 +1731,7 @@
     </div><!-- /.main-content -->
   </div><!-- /.app-layout -->
 
-  <!-- Overlay to close dropdowns -->
-  <div class="overlay-close" id="overlayClose" onclick="closeAllDropdowns()"></div>
+  <!-- overlay removed: using document click listener instead -->
 
   <!-- MODAL: Cadastrar Link da Matéria -->
   <div class="link-modal-overlay" id="linkModalOverlay" onclick="if(event.target===this)fecharLinkModal()">
@@ -1817,16 +1828,21 @@
       closeAllDropdowns();
       if (!isOpen) {
         dropdown.classList.add('show');
-        document.getElementById('overlayClose').classList.add('show');
         if (btnId === 'userMenuBtn') document.getElementById(btnId).classList.add('open');
       }
     }
 
     function closeAllDropdowns() {
       document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
-      document.getElementById('overlayClose').classList.remove('show');
       document.querySelectorAll('.user-avatar-btn').forEach(b => b.classList.remove('open'));
     }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.dropdown') && !e.target.closest('.user-avatar-btn') && !e.target.closest('.topbar-icon')) {
+        closeAllDropdowns();
+      }
+    });
 
     function markAllRead() {
       document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
