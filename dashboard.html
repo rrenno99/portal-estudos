@@ -1394,7 +1394,7 @@
       </div>
 
       <div class="sidebar-bottom">
-        <a href="#" data-label="Sair" id="btnLogoutSidebar">
+        <a href="#" data-label="Sair" onclick="handleLogout(event)">
           <span class="menu-icon">🚪</span>
           <span class="menu-label">Sair</span>
         </a>
@@ -1490,7 +1490,7 @@
                 Plano válido até <strong id="dropdownPlanDate">—</strong>
               </div>
               <div class="dropdown-divider"></div>
-              <a href="#" class="dropdown-item danger" id="btnLogoutDropdown">
+              <a href="#" class="dropdown-item danger" onclick="handleLogout(event)">
                 <span class="item-icon">🚪</span> Sair
               </a>
             </div>
@@ -2136,6 +2136,25 @@
     });
 
     // =============================================
+    //  LOGOUT (global, always available)
+    // =============================================
+    async function handleLogout(e) {
+      if (e) e.preventDefault();
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('Erro no signOut:', err);
+      }
+      // Clear ALL user data
+      localStorage.removeItem('studyplan_perfil');
+      localStorage.removeItem('studyplan_plan');
+      localStorage.removeItem('studyplan_links');
+      localStorage.removeItem('studyplan_stats');
+      window.location.href = 'login.html';
+    }
+
+    // =============================================
     //  LOAD USER PROFILE (Supabase + localStorage)
     // =============================================
     // Current user photo URL (tracked globally)
@@ -2510,27 +2529,15 @@
 
   <!-- Auth guard + session listener (module) -->
   <script type="module">
-    import { protegerPagina, onAuthStateChange, logout } from './js/auth.js';
+    import { protegerPagina, onAuthStateChange } from './js/auth.js';
 
-    // Protect: redirect to login if no session
     protegerPagina();
 
-    // Listen for auth changes (token refresh, expiry, sign out)
     onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
         window.location.href = 'login.html';
       }
     });
-
-    // Logout handler
-    async function handleLogout(e) {
-      e.preventDefault();
-      await logout();
-    }
-
-    // Wire up both logout buttons by ID
-    document.getElementById('btnLogoutDropdown')?.addEventListener('click', handleLogout);
-    document.getElementById('btnLogoutSidebar')?.addEventListener('click', handleLogout);
   </script>
 </body>
 </html>
