@@ -1068,6 +1068,42 @@
       });
       localStorage.setItem('studyplan_links', JSON.stringify(linksMap));
 
+      // Save full plan data to localStorage for dashboard
+      const selectedDays = [];
+      document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
+
+      let turnoText = 'Manhã';
+      document.querySelectorAll('#step3 .chips').forEach(chipsGroup => {
+        chipsGroup.querySelectorAll('.chip').forEach(c => {
+          if (c.classList.contains('selected') && c.textContent.includes('h)')) {
+            turnoText = c.textContent;
+          }
+        });
+      });
+
+      const planData = {
+        concurso: selectedConcurso || 'Personalizado',
+        nivel: selectedNivel || '',
+        materias: subjects.map(s => ({ nome: s.nome, link: s.link })),
+        dias: selectedDays,
+        turno: turnoText,
+        horasUteis: parseInt(document.getElementById('horasUteis').value) || 3,
+        horasFds: parseInt(document.getElementById('horasFds').value) || 0,
+        nome: document.getElementById('inputNome').value.trim(),
+        email: document.getElementById('inputEmail').value.trim(),
+        criadoEm: new Date().toISOString()
+      };
+      localStorage.setItem('studyplan_plan', JSON.stringify(planData));
+
+      // Also save as perfil for dashboard name loading
+      if (planData.nome) {
+        localStorage.setItem('studyplan_perfil', JSON.stringify({
+          nome: planData.nome,
+          email: planData.email,
+          concurso: planData.concurso
+        }));
+      }
+
       setTimeout(() => {
         document.getElementById('step4').style.display = 'none';
         document.getElementById('stepSuccess').style.display = 'block';

@@ -1174,8 +1174,8 @@
         <div class="topbar-left">
           <button class="sidebar-toggle" id="sidebarToggle" title="Menu">☰</button>
           <div class="topbar-greeting">
-            <h2>Olá, Raquel! 👋</h2>
-            <p>Seu plano acaba em <strong style="color:var(--primary)">09/08/2026</strong></p>
+            <h2 id="topbarGreeting">Olá! 👋</h2>
+            <p>Seu plano acaba em <strong style="color:var(--primary)" id="topbarPlanEnd">—</strong></p>
           </div>
         </div>
 
@@ -1224,22 +1224,22 @@
           <!-- User Menu -->
           <div style="position:relative">
             <button class="user-avatar-btn" id="userMenuBtn" onclick="toggleDropdown('userDropdown', 'userMenuBtn')">
-              <div class="user-avatar">RL</div>
-              <span class="user-name-label">Raquel</span>
+              <div class="user-avatar" id="avatarInitials">—</div>
+              <span class="user-name-label" id="userNameLabel">—</span>
               <span class="chevron-icon">▾</span>
             </button>
 
             <div class="dropdown" id="userDropdown" style="min-width:260px">
               <div class="user-dropdown-header">
-                <div class="user-avatar" style="width:44px;height:44px;font-size:1rem;flex-shrink:0">RL</div>
+                <div class="user-avatar" id="dropdownAvatar" style="width:44px;height:44px;font-size:1rem;flex-shrink:0">—</div>
                 <div class="user-dropdown-info">
-                  <strong>Raquel Lima</strong>
-                  <small>raquel.lima@gmail.com</small>
+                  <strong id="dropdownName">—</strong>
+                  <small id="dropdownEmail">—</small>
                   <span class="plan-tag" onclick="window.location='criar-plano.html'">Clique aqui para assinar</span>
                 </div>
               </div>
-              <button class="dropdown-item" onclick="window.location='criar-plano.html'">
-                <span class="item-icon">📄</span> Plano de Estudos (PGO/EPAQ)
+              <button class="dropdown-item" onclick="window.location='criar-plano.html'" id="dropdownPlanLabel">
+                <span class="item-icon">📄</span> Plano de Estudos
               </button>
               <button class="dropdown-item">
                 <span class="item-icon">✏️</span> Editar Cadastro
@@ -1252,7 +1252,7 @@
               </button>
               <div class="dropdown-divider"></div>
               <div style="padding:10px 16px;font-size:0.75rem;color:var(--text-lighter)">
-                Plano válido até <strong>09/08/2026</strong>
+                Plano válido até <strong id="dropdownPlanDate">—</strong>
               </div>
               <div class="dropdown-divider"></div>
               <a href="login.html" class="dropdown-item danger">
@@ -1269,7 +1269,7 @@
         <!-- Welcome banner -->
         <div class="welcome-banner">
           <div>
-            <h1 class="welcome-title">Olá, Raquel! 👋</h1>
+            <h1 class="welcome-title" id="welcomeTitle">Olá! 👋</h1>
             <div class="plan-progress-wrap">
               <span class="plan-progress-label">Progresso do Plano de Estudos</span>
               <span class="plan-progress-pct">18%</span>
@@ -1364,8 +1364,8 @@
             <div class="progress-bar-fill" id="planProgressFill" style="width:0%"></div>
           </div>
           <div class="progress-details">
-            <span>Concurso: POLÍCIA CRIMINAL (GO) — PCGO</span>
-            <span>Plano válido até 09/08/2026</span>
+            <span id="progressConcurso">Concurso: —</span>
+            <span id="progressPlanDate">Plano válido até —</span>
           </div>
         </div>
 
@@ -1388,77 +1388,9 @@
         <div class="dashboard-two-col">
           <div class="card">
             <h3>📚 Progresso por Matéria</h3>
-            <div class="subject-item" data-materia="Direito Administrativo">
-              <div class="subject-color" style="background:var(--primary)"></div>
-              <div class="subject-info">
-                <strong>Direito Administrativo</strong>
-                <span>18 aulas concluídas de 45</span>
-              </div>
-              <div class="subject-progress">
-                <span>40%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:40%;background:var(--primary)"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Direito Administrativo')">Iniciar Estudos</button>
-            </div>
-            <div class="subject-item" data-materia="Direito Constitucional">
-              <div class="subject-color" style="background:var(--info)"></div>
-              <div class="subject-info">
-                <strong>Direito Constitucional</strong>
-                <span>12 aulas concluídas de 40</span>
-              </div>
-              <div class="subject-progress">
-                <span>30%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:30%;background:var(--info)"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Direito Constitucional')">Iniciar Estudos</button>
-            </div>
-            <div class="subject-item" data-materia="Português">
-              <div class="subject-color" style="background:var(--success)"></div>
-              <div class="subject-info">
-                <strong>Português</strong>
-                <span>8 aulas concluídas de 35</span>
-              </div>
-              <div class="subject-progress">
-                <span>23%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:23%;background:var(--success)"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Português')">Iniciar Estudos</button>
-            </div>
-            <div class="subject-item" data-materia="Raciocínio Lógico (RLM)">
-              <div class="subject-color" style="background:#805AD5"></div>
-              <div class="subject-info">
-                <strong>Raciocínio Lógico (RLM)</strong>
-                <span>6 aulas concluídas de 30</span>
-              </div>
-              <div class="subject-progress">
-                <span>20%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:20%;background:#805AD5"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Raciocínio Lógico (RLM)')">Iniciar Estudos</button>
-            </div>
-            <div class="subject-item" data-materia="Informática">
-              <div class="subject-color" style="background:#319795"></div>
-              <div class="subject-info">
-                <strong>Informática</strong>
-                <span>5 aulas concluídas de 25</span>
-              </div>
-              <div class="subject-progress">
-                <span>20%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:20%;background:#319795"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Informática')">Iniciar Estudos</button>
-            </div>
-            <div class="subject-item" data-materia="Admin. Financeira (AFI)">
-              <div class="subject-color" style="background:#D53F8C"></div>
-              <div class="subject-info">
-                <strong>Admin. Financeira (AFI)</strong>
-                <span>5 aulas concluídas de 30</span>
-              </div>
-              <div class="subject-progress">
-                <span>17%</span>
-                <div class="mini-bar"><div class="mini-fill" style="width:17%;background:#D53F8C"></div></div>
-              </div>
-              <button class="btn-iniciar" onclick="iniciarEstudos('Admin. Financeira (AFI)')">Iniciar Estudos</button>
+            <div id="subjectsListDynamic">
+              <!-- Rendered by JS from plan data -->
+              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando matérias...</p>
             </div>
           </div>
 
@@ -1578,7 +1510,6 @@
       }
     });
 
-    // Close sidebar on outside click (mobile)
     document.querySelector('.main-content').addEventListener('click', (e) => {
       if (!sidebar.contains(e.target) && !document.getElementById('sidebarToggle').contains(e.target)) {
         sidebar.classList.remove('mobile-open');
@@ -1595,9 +1526,7 @@
       if (!isOpen) {
         dropdown.classList.add('show');
         document.getElementById('overlayClose').classList.add('show');
-        if (btnId === 'userMenuBtn') {
-          document.getElementById(btnId).classList.add('open');
-        }
+        if (btnId === 'userMenuBtn') document.getElementById(btnId).classList.add('open');
       }
     }
 
@@ -1609,40 +1538,193 @@
 
     function markAllRead() {
       document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
-      document.querySelector('.notif-dot') && document.querySelectorAll('.notif-dot').forEach(d => d.style.display = 'none');
+      document.querySelectorAll('.notif-dot').forEach(d => d.style.display = 'none');
       const badge = document.getElementById('notifCount');
       if (badge) badge.style.display = 'none';
     }
 
-    // =============================================
-    //  SCROLL TO CALENDAR
-    // =============================================
     function scrollToCalendar(e) {
       e.preventDefault();
       document.getElementById('calendarSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // =============================================
-    //  WEEKLY CALENDAR
+    //  SUBJECT COLORS PALETTE
+    // =============================================
+    const SUBJECT_COLORS = [
+      { bg: 'var(--primary)', cls: 'subject-dynamic-0' },
+      { bg: 'var(--info)', cls: 'subject-dynamic-1' },
+      { bg: 'var(--success)', cls: 'subject-dynamic-2' },
+      { bg: '#805AD5', cls: 'subject-dynamic-3' },
+      { bg: '#319795', cls: 'subject-dynamic-4' },
+      { bg: '#D53F8C', cls: 'subject-dynamic-5' },
+      { bg: '#DD6B20', cls: 'subject-dynamic-6' },
+      { bg: '#2B6CB0', cls: 'subject-dynamic-7' },
+      { bg: '#38A169', cls: 'subject-dynamic-8' },
+      { bg: '#9F7AEA', cls: 'subject-dynamic-9' },
+      { bg: '#E53E3E', cls: 'subject-dynamic-10' },
+      { bg: '#2D3748', cls: 'subject-dynamic-11' },
+    ];
+
+    // Inject dynamic calendar CSS for subject colors
+    (function() {
+      const style = document.createElement('style');
+      SUBJECT_COLORS.forEach((c, i) => {
+        style.textContent += `.cal-slot.${c.cls}{background:${c.bg};color:white;font-weight:600;}`;
+      });
+      style.textContent += `.cal-slot.subject-revisao{background:var(--secondary);color:white;font-weight:600;}`;
+      document.head.appendChild(style);
+    })();
+
+    // =============================================
+    //  PLAN DATA (from localStorage + Supabase)
+    // =============================================
+    function getPlanData() {
+      try {
+        return JSON.parse(localStorage.getItem('studyplan_plan') || 'null');
+      } catch { return null; }
+    }
+
+    function getLinksStorage() {
+      try {
+        return JSON.parse(localStorage.getItem('studyplan_links') || '{}');
+      } catch { return {}; }
+    }
+
+    function saveLinksStorage(links) {
+      localStorage.setItem('studyplan_links', JSON.stringify(links));
+    }
+
+    // =============================================
+    //  RENDER SUBJECTS LIST (DYNAMIC)
+    // =============================================
+    function renderSubjectsList() {
+      const container = document.getElementById('subjectsListDynamic');
+      const plan = getPlanData();
+      const links = getLinksStorage();
+
+      // Get subjects from plan or from links keys
+      let subjects = [];
+      if (plan && plan.materias && plan.materias.length > 0) {
+        subjects = plan.materias;
+      } else {
+        // Fallback: build from links keys
+        const linkKeys = Object.keys(links);
+        if (linkKeys.length > 0) {
+          subjects = linkKeys.map(k => ({ nome: k }));
+        }
+      }
+
+      if (subjects.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:24px 0">
+            <p style="color:var(--text-light);font-size:0.88rem;margin-bottom:12px">Nenhum plano criado ainda.</p>
+            <a href="criar-plano.html" class="btn btn-primary" style="font-size:0.85rem">Criar Meu Plano</a>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      subjects.forEach((s, i) => {
+        const nome = s.nome || s;
+        const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
+        const linkData = links[nome];
+        const hasLink = linkData && linkData.url;
+
+        const item = document.createElement('div');
+        item.className = 'subject-item';
+        item.setAttribute('data-materia', nome);
+        item.innerHTML = `
+          <div class="subject-color" style="background:${color.bg}"></div>
+          <div class="subject-info">
+            <strong>${nome}</strong>
+            <span>Início do estudo</span>
+            ${hasLink ? '<span class="link-saved-badge">✓ ' + (linkData.titulo || 'Link salvo') + '</span>' : ''}
+          </div>
+          <div class="subject-progress">
+            <span>0%</span>
+            <div class="mini-bar"><div class="mini-fill" style="width:0%;background:${color.bg}"></div></div>
+          </div>
+          <button class="btn-iniciar" onclick="iniciarEstudos('${nome.replace(/'/g, "\\'")}')">Iniciar Estudos</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // =============================================
+    //  DYNAMIC WEEKLY CALENDAR
     // =============================================
     const DAYS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    const TIMES = ['08:00','09:00','10:00','11:00','14:00','15:00','19:00','20:00'];
-
-    const SCHEDULE = {
-      // day index (0=Sun, 1=Mon...) -> time -> subject class + label
-      1: { '08:00': ['subject-dir-admin','Dir. Admin.'], '09:00':['subject-dir-admin','Dir. Admin.'], '10:00':['subject-rlm','RLM'], '11:00':['subject-afi','AFI'], '14:00':['subject-portugues','Português'], '15:00':['subject-dir-const','Dir. Const.'], '19:00':['subject-informatica','Informática'], '20:00':['revisao','Revisão'] },
-      2: { '08:00':['subject-portugues','Português'], '09:00':['subject-portugues','Português'], '10:00':['subject-dir-admin','Dir. Admin.'], '11:00':['subject-dir-admin','Dir. Admin.'], '14:00':['subject-rlm','RLM'], '15:00':['subject-informatica','Informática'], '19:00':['subject-dir-const','Dir. Const.'], '20:00':['subject-dir-const','Dir. Const.'] },
-      3: { '08:00':['subject-dir-const','Dir. Const.'], '09:00':['subject-dir-const','Dir. Const.'], '10:00':['subject-portugues','Português'], '11:00':['subject-afi','AFI'], '14:00':['subject-dir-admin','Dir. Admin.'], '15:00':['subject-rlm','RLM'], '19:00':['subject-rlm','RLM'], '20:00':['revisao','Simulado'] },
-      4: { '08:00':['subject-rlm','RLM'], '09:00':['subject-rlm','RLM'], '10:00':['subject-dir-const','Dir. Const.'], '11:00':['subject-portugues','Português'], '14:00':['subject-informatica','Informática'], '15:00':['subject-dir-admin','Dir. Admin.'], '19:00':['subject-dir-admin','Dir. Admin.'], '20:00':['subject-afi','AFI'] },
-      5: { '08:00':['subject-portugues','Português'], '09:00':['subject-dir-admin','Dir. Admin.'], '10:00':['subject-rlm','RLM'], '11:00':['subject-dir-const','Dir. Const.'], '14:00':['subject-afi','AFI'], '15:00':['subject-portugues','Português'], '19:00':['subject-informatica','Informática'], '20:00':['revisao','Revisão'] },
-      6: { '08:00':['revisao','Revisão Geral'], '09:00':['revisao','Revisão Geral'], '10:00':['subject-informatica','Informática'], '11:00':['subject-informatica','Informática'], '14:00':['revisao','Questões'], '15:00':['revisao','Questões'] },
-    };
 
     let weekOffset = 0;
+    let dynamicSchedule = {};
+
+    function buildDynamicSchedule() {
+      const plan = getPlanData();
+      const links = getLinksStorage();
+
+      let subjects = [];
+      if (plan && plan.materias && plan.materias.length > 0) {
+        subjects = plan.materias.map(s => s.nome || s);
+      } else {
+        subjects = Object.keys(links);
+      }
+
+      if (subjects.length === 0) {
+        dynamicSchedule = {};
+        return;
+      }
+
+      // Determine study days (1=Mon..6=Sat, 0=Sun)
+      let studyDays = [1, 2, 3, 4, 5]; // default Mon-Fri
+      if (plan && plan.dias) {
+        const dayMap = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
+        studyDays = plan.dias.map(d => dayMap[d]).filter(d => d !== undefined);
+      }
+
+      // Determine time slots based on turno
+      let times = ['08:00','09:00','10:00','11:00','14:00','15:00'];
+      if (plan && plan.turno) {
+        if (plan.turno.includes('Manhã'))   times = ['07:00','08:00','09:00','10:00','11:00'];
+        if (plan.turno.includes('Tarde'))   times = ['13:00','14:00','15:00','16:00','17:00'];
+        if (plan.turno.includes('Noite'))   times = ['19:00','20:00','21:00','22:00'];
+        if (plan.turno.includes('Flexível') || plan.turno.includes('Flexivel'))
+          times = ['08:00','09:00','10:00','14:00','15:00','19:00','20:00'];
+      }
+
+      // Distribute subjects across days and time slots
+      dynamicSchedule = {};
+      let subjectIdx = 0;
+
+      studyDays.forEach(day => {
+        dynamicSchedule[day] = {};
+        times.forEach((time, ti) => {
+          // Last slot on some days = Revisão
+          const isSaturday = day === 6;
+          if (isSaturday && ti >= times.length - 2) {
+            dynamicSchedule[day][time] = ['subject-revisao', 'Revisão'];
+            return;
+          }
+          if (!isSaturday && ti === times.length - 1 && times.length > 3) {
+            dynamicSchedule[day][time] = ['subject-revisao', 'Revisão'];
+            return;
+          }
+
+          const sName = subjects[subjectIdx % subjects.length];
+          const colorIdx = subjects.indexOf(sName) % SUBJECT_COLORS.length;
+          const shortName = sName.length > 16 ? sName.substring(0, 14) + '…' : sName;
+          dynamicSchedule[day][time] = [SUBJECT_COLORS[colorIdx].cls, shortName];
+          subjectIdx++;
+        });
+      });
+
+      // Store times globally for rendering
+      window._calendarTimes = times;
+    }
 
     function getWeekDates(offset) {
       const now = new Date();
-      const day = now.getDay(); // 0=Sun
+      const day = now.getDay();
       const monday = new Date(now);
       monday.setDate(now.getDate() - day + 1 + offset * 7);
       const days = [];
@@ -1661,16 +1743,13 @@
     function renderCalendar() {
       const days = getWeekDates(weekOffset);
       const today = new Date();
+      const times = window._calendarTimes || ['08:00','09:00','10:00','11:00','14:00','15:00'];
 
-      // Update week label
-      const start = formatDate(days[0]);
-      const end   = formatDate(days[6]);
-      document.getElementById('weekLabel').textContent = `${start} — ${end}`;
+      document.getElementById('weekLabel').textContent = `${formatDate(days[0])} — ${formatDate(days[6])}`;
 
       const grid = document.getElementById('weeklyCalendar');
       grid.innerHTML = '';
 
-      // Header row: empty time cell + 7 day headers
       grid.appendChild(el('div','cal-time',''));
       days.forEach((d, i) => {
         const isToday = d.toDateString() === today.toDateString();
@@ -1679,12 +1758,11 @@
         grid.appendChild(h);
       });
 
-      // Time rows
-      TIMES.forEach(time => {
+      times.forEach(time => {
         grid.appendChild(el('div','cal-time', time));
         days.forEach((d, i) => {
-          const dayOfWeek = (i + 1) % 7; // Mon=1 ... Sun=0
-          const slot = SCHEDULE[dayOfWeek] && SCHEDULE[dayOfWeek][time];
+          const dayOfWeek = (i + 1) % 7;
+          const slot = dynamicSchedule[dayOfWeek] && dynamicSchedule[dayOfWeek][time];
           const cell = el('div', 'cal-slot ' + (slot ? slot[0] : 'empty'), slot ? slot[1] : '');
           grid.appendChild(cell);
         });
@@ -1704,21 +1782,8 @@
     }
 
     // =============================================
-    //  LINKS DE MATÉRIAS (localStorage + Supabase)
+    //  LINKS + MODAL
     // =============================================
-
-    // Carrega links salvos do localStorage
-    function getLinksStorage() {
-      try {
-        return JSON.parse(localStorage.getItem('studyplan_links') || '{}');
-      } catch { return {}; }
-    }
-
-    function saveLinksStorage(links) {
-      localStorage.setItem('studyplan_links', JSON.stringify(links));
-    }
-
-    // Tenta carregar do Supabase, fallback localStorage
     async function carregarLinksSupabase() {
       try {
         const { buscarLinks } = await import('./js/database.js');
@@ -1728,34 +1793,22 @@
 
         const links = await buscarLinks(user.id);
         if (links && links.length > 0) {
-          const mapa = {};
+          const mapa = getLinksStorage();
           links.forEach(l => { mapa[l.materia] = { url: l.url, titulo: l.titulo }; });
           saveLinksStorage(mapa);
-          atualizarBotoesComLinks();
+          renderSubjectsList();
         }
-      } catch (e) {
-        // Sem Supabase ativo, usa apenas localStorage
-      }
+      } catch (e) { /* Sem Supabase, usa localStorage */ }
     }
 
-    // Salva no Supabase (se disponível)
     async function salvarLinkSupabase(materia, url, titulo) {
       try {
         const { criarLink } = await import('./js/database.js');
         const { getUsuarioAtual } = await import('./js/auth.js');
         const user = await getUsuarioAtual();
         if (!user) return;
-
-        await criarLink({
-          user_id: user.id,
-          materia,
-          titulo: titulo || materia,
-          url,
-          tipo: 'curso'
-        });
-      } catch (e) {
-        // Sem Supabase, link já salvo no localStorage
-      }
+        await criarLink({ user_id: user.id, materia, titulo: titulo || materia, url, tipo: 'curso' });
+      } catch (e) { /* localStorage fallback */ }
     }
 
     function iniciarEstudos(materia) {
@@ -1785,66 +1838,117 @@
       const materia = document.getElementById('linkMateriaHidden').value;
       const url = document.getElementById('linkUrlInput').value.trim();
       const titulo = document.getElementById('linkTituloInput').value.trim();
+      if (!url) { document.getElementById('linkUrlInput').focus(); return; }
 
-      if (!url) {
-        document.getElementById('linkUrlInput').focus();
-        return;
-      }
-
-      // Salvar no localStorage
       const links = getLinksStorage();
       links[materia] = { url, titulo: titulo || materia };
       saveLinksStorage(links);
-
-      // Salvar no Supabase (async, não bloqueia)
       salvarLinkSupabase(materia, url, titulo);
-
-      // Atualizar visual dos botões
-      atualizarBotoesComLinks();
-
-      // Fechar modal e abrir o link
+      renderSubjectsList();
       fecharLinkModal();
       window.open(url, '_blank');
     }
 
-    function atualizarBotoesComLinks() {
-      const links = getLinksStorage();
-      document.querySelectorAll('.subject-item[data-materia]').forEach(item => {
-        const materia = item.getAttribute('data-materia');
-        const btn = item.querySelector('.btn-iniciar');
-        const existingBadge = item.querySelector('.link-saved-badge');
-        if (existingBadge) existingBadge.remove();
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharLinkModal(); });
 
-        if (links[materia] && links[materia].url) {
-          btn.textContent = 'Iniciar Estudos';
-          const badge = document.createElement('span');
-          badge.className = 'link-saved-badge';
-          badge.textContent = '✓ ' + (links[materia].titulo || 'Link salvo');
-          item.querySelector('.subject-info').appendChild(badge);
-        }
-      });
+    // =============================================
+    //  LOAD USER PROFILE (Supabase + localStorage)
+    // =============================================
+    function setUserUI(nome, email, concurso) {
+      const initials = nome ? nome.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '?';
+      const firstName = nome ? nome.split(' ')[0] : 'Aluno';
+
+      document.getElementById('welcomeTitle').textContent = `Olá, ${firstName}! 👋`;
+      document.getElementById('topbarGreeting').textContent = `Olá, ${firstName}! 👋`;
+      document.getElementById('userNameLabel').textContent = firstName;
+      document.getElementById('avatarInitials').textContent = initials;
+      document.getElementById('dropdownAvatar').textContent = initials;
+      document.getElementById('dropdownName').textContent = nome || 'Aluno';
+      document.getElementById('dropdownEmail').textContent = email || '';
+
+      if (concurso) {
+        document.getElementById('progressConcurso').textContent = 'Concurso: ' + concurso;
+        const planLabel = document.getElementById('dropdownPlanLabel');
+        if (planLabel) planLabel.innerHTML = '<span class="item-icon">📄</span> Plano: ' + concurso;
+      }
     }
 
-    // Esc para fechar modal
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') fecharLinkModal();
-    });
+    async function carregarPerfilSupabase() {
+      try {
+        const { buscarPerfil } = await import('./js/database.js');
+        const { getUsuarioAtual } = await import('./js/auth.js');
+        const user = await getUsuarioAtual();
+        if (!user) return;
+
+        const perfil = await buscarPerfil(user.id);
+        if (perfil) {
+          setUserUI(perfil.nome, perfil.email, perfil.concurso);
+
+          // Save to localStorage for offline
+          localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
+
+          // Update plan date
+          if (perfil.data_prova) {
+            const d = new Date(perfil.data_prova).toLocaleDateString('pt-BR');
+            document.getElementById('topbarPlanEnd').textContent = d;
+            document.getElementById('progressPlanDate').textContent = 'Plano válido até ' + d;
+            document.getElementById('dropdownPlanDate').textContent = d;
+          }
+        } else {
+          // No profile in Supabase, use localStorage plan data
+          loadFromLocalStorage();
+        }
+      } catch (e) {
+        // Supabase offline, use localStorage
+        loadFromLocalStorage();
+      }
+    }
+
+    function loadFromLocalStorage() {
+      // Load profile from localStorage
+      try {
+        const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || 'null');
+        if (perfil) {
+          setUserUI(perfil.nome, perfil.email, perfil.concurso);
+        }
+      } catch {}
+
+      // Load plan from localStorage (saved by wizard)
+      const plan = getPlanData();
+      if (plan) {
+        if (plan.nome) {
+          const existing = JSON.parse(localStorage.getItem('studyplan_perfil') || 'null');
+          if (!existing) {
+            setUserUI(plan.nome, plan.email, plan.concurso);
+          }
+        }
+        if (plan.concurso) {
+          document.getElementById('progressConcurso').textContent = 'Concurso: ' + plan.concurso;
+        }
+      }
+    }
 
     // =============================================
     //  INIT
     // =============================================
     window.addEventListener('load', () => {
+      // 1. Load local data immediately
+      loadFromLocalStorage();
+      renderSubjectsList();
+      buildDynamicSchedule();
       renderCalendar();
-      atualizarBotoesComLinks();
+
+      // 2. Then try Supabase for fresh data
+      carregarPerfilSupabase();
       carregarLinksSupabase();
 
-      // Animate progress bars
+      // 3. Animate progress bars
       setTimeout(() => {
         const fills = [
           document.getElementById('mainProgressFill'),
           document.getElementById('planProgressFill')
         ];
-        fills.forEach(f => { if(f) f.style.width = '18%'; });
+        fills.forEach(f => { if(f) f.style.width = '0%'; }); // Start at 0 for new plans
       }, 400);
     });
   </script>
