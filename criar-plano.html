@@ -9,6 +9,207 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <style>
+    /* Subject card with link field */
+    .subject-card {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      background: var(--bg-card);
+      transition: var(--transition);
+    }
+    .subject-card.selected {
+      border-color: var(--primary);
+      background: rgba(232,73,29,0.04);
+    }
+    .subject-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .subject-card-header input[type="checkbox"] {
+      accent-color: var(--primary);
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .subject-card-info { flex: 1; }
+    .subject-card-info strong { font-size: 0.88rem; color: var(--text); display: block; }
+    .subject-card-info span { font-size: 0.73rem; color: var(--text-light); }
+    .subject-card-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--text-lighter);
+      padding: 4px;
+      border-radius: 4px;
+      transition: var(--transition);
+      display: none;
+    }
+    .subject-card-remove:hover { color: var(--danger); background: rgba(229,62,62,0.08); }
+    .subject-card.custom .subject-card-remove { display: block; }
+
+    /* Link field inside subject card */
+    .subject-link-field {
+      margin-top: 10px;
+      display: none;
+    }
+    .subject-card.selected .subject-link-field { display: block; }
+    .subject-link-field label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-light);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .subject-link-field input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--text);
+      background: var(--bg);
+      font-family: inherit;
+      transition: var(--transition);
+    }
+    .subject-link-field input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(232,73,29,0.08);
+      background: var(--bg-card);
+    }
+    .subject-link-field input::placeholder { color: var(--text-lighter); }
+
+    .subjects-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* Add custom subject */
+    .add-subject-area {
+      margin-top: 16px;
+    }
+    .add-subject-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius-sm);
+      background: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      transition: var(--transition);
+      width: 100%;
+      justify-content: center;
+    }
+    .add-subject-btn:hover { border-color: var(--primary); background: rgba(232,73,29,0.04); }
+
+    .add-subject-form {
+      display: none;
+      gap: 10px;
+      margin-top: 10px;
+      align-items: flex-end;
+    }
+    .add-subject-form.show { display: flex; }
+    .add-subject-form .form-group { flex: 1; margin-bottom: 0; }
+    .add-subject-form .form-group label { font-size: 0.78rem; }
+
+    .btn-add-confirm {
+      padding: 10px 18px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      height: 42px;
+    }
+    .btn-add-confirm:hover { background: var(--primary-dark); }
+
+    .btn-add-cancel {
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: var(--transition);
+      height: 42px;
+    }
+    .btn-add-cancel:hover { background: var(--bg); }
+
+    /* Concurso loading indicator */
+    .loading-subjects {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-light);
+      font-size: 0.88rem;
+    }
+    .loading-subjects .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Concurso badge in step 2 */
+    .concurso-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(232,73,29,0.08);
+      border: 1px solid rgba(232,73,29,0.2);
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    /* Review links list */
+    .review-link-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.83rem;
+    }
+    .review-link-item:last-child { border-bottom: none; }
+    .review-link-name { font-weight: 600; color: var(--text); }
+    .review-link-url {
+      font-size: 0.75rem;
+      color: var(--primary);
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .review-link-none { color: var(--text-lighter); font-style: italic; }
+
+    @media (max-width: 600px) {
+      .subjects-grid { grid-template-columns: 1fr; }
+      .add-subject-form { flex-direction: column; align-items: stretch; }
+    }
+  </style>
 </head>
 <body class="wizard-page">
   <div class="wizard-container">
@@ -24,12 +225,12 @@
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="2">
         <div class="wizard-step-num">2</div>
-        Materias
+        Matérias
       </div>
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="3">
         <div class="wizard-step-num">3</div>
-        Horarios
+        Horários
       </div>
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="4">
@@ -40,30 +241,30 @@
 
     <!-- STEP 1: Concurso -->
     <div class="wizard-card" id="step1">
-      <h2>Qual concurso voce quer prestar?</h2>
-      <p>Selecione o concurso ou area de interesse para montar seu plano personalizado.</p>
+      <h2>Qual concurso você quer prestar?</h2>
+      <p>Selecione o concurso ou área de interesse para montar seu plano personalizado.</p>
 
       <div class="form-group">
         <label>Buscar concurso</label>
-        <input type="text" class="form-control" id="searchConcurso" placeholder="Digite o nome do concurso (ex: Policia Federal, TRT, INSS...)" oninput="filterConcursos()">
+        <input type="text" class="form-control" id="searchConcurso" placeholder="Digite o nome do concurso (ex: TCU, Polícia Federal, INSS...)" oninput="filterConcursos()">
       </div>
 
       <div class="form-group">
         <label>Concursos populares</label>
         <div class="chips" id="concursoChips">
-          <div class="chip" onclick="selectConcurso(this)">Policia Federal</div>
-          <div class="chip" onclick="selectConcurso(this)">Policia Civil - GO</div>
+          <div class="chip" onclick="selectConcurso(this)">Polícia Federal</div>
+          <div class="chip" onclick="selectConcurso(this)">Polícia Civil - GO</div>
           <div class="chip" onclick="selectConcurso(this)">TRT (Analista)</div>
-          <div class="chip" onclick="selectConcurso(this)">INSS (Tecnico)</div>
+          <div class="chip" onclick="selectConcurso(this)">INSS (Técnico)</div>
           <div class="chip" onclick="selectConcurso(this)">Receita Federal</div>
           <div class="chip" onclick="selectConcurso(this)">TRF (Analista)</div>
           <div class="chip" onclick="selectConcurso(this)">Banco do Brasil</div>
-          <div class="chip" onclick="selectConcurso(this)">Caixa Economica</div>
+          <div class="chip" onclick="selectConcurso(this)">Caixa Econômica</div>
           <div class="chip" onclick="selectConcurso(this)">STJ</div>
           <div class="chip" onclick="selectConcurso(this)">TSE</div>
           <div class="chip" onclick="selectConcurso(this)">CGU</div>
           <div class="chip" onclick="selectConcurso(this)">TCU</div>
-          <div class="chip" onclick="selectConcurso(this)">Policia Rodoviaria Federal</div>
+          <div class="chip" onclick="selectConcurso(this)">Polícia Rodoviária Federal</div>
           <div class="chip" onclick="selectConcurso(this)">PCDF</div>
           <div class="chip" onclick="selectConcurso(this)">DEPEN</div>
           <div class="chip" onclick="selectConcurso(this)">MPU</div>
@@ -71,142 +272,83 @@
       </div>
 
       <div class="form-group">
-        <label>Nivel do cargo</label>
+        <label>Nível do cargo</label>
         <div class="chips">
-          <div class="chip" onclick="selectNivel(this)">Nivel Medio</div>
-          <div class="chip" onclick="selectNivel(this)">Nivel Superior</div>
+          <div class="chip" onclick="selectNivel(this)">Nível Médio</div>
+          <div class="chip" onclick="selectNivel(this)">Nível Superior</div>
         </div>
       </div>
 
       <div class="form-group">
         <label>Data prevista da prova (opcional)</label>
         <input type="date" class="form-control" id="dataProva">
-        <div class="form-hint">Se nao souber, deixe em branco. O plano se ajusta automaticamente.</div>
+        <div class="form-hint">Se não souber, deixe em branco. O plano se ajusta automaticamente.</div>
       </div>
 
       <div class="wizard-actions">
         <div></div>
-        <button class="btn btn-primary" onclick="nextStep(2)">Proximo →</button>
+        <button class="btn btn-primary" onclick="nextStep(2)">Próximo →</button>
       </div>
     </div>
 
-    <!-- STEP 2: Materias -->
+    <!-- STEP 2: Matérias -->
     <div class="wizard-card" id="step2" style="display:none;">
-      <h2>Quais materias voce precisa estudar?</h2>
-      <p>Selecione as disciplinas do edital. Voce pode ajustar o peso de cada uma depois.</p>
+      <h2>Quais matérias você precisa estudar?</h2>
+      <p>Matérias sugeridas com base no último edital. Você pode desmarcar, reordenar ou adicionar novas.</p>
 
-      <div class="form-group">
-        <label>Materias Basicas</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <label class="subject-tag selected" onclick="toggleSubject(this)">
-            <input type="checkbox" checked>
-            <div class="subject-tag-info">
-              <strong>Portugues</strong>
-              <span>Gramatica, Interpretacao, Redacao</span>
-            </div>
-          </label>
-          <label class="subject-tag selected" onclick="toggleSubject(this)">
-            <input type="checkbox" checked>
-            <div class="subject-tag-info">
-              <strong>Raciocinio Logico (RLM)</strong>
-              <span>Logica, Matematica, Estatistica</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Informatica</strong>
-              <span>Redes, Seguranca, Office</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Atualidades</strong>
-              <span>Economia, Politica, Sociedade</span>
-            </div>
-          </label>
+      <div class="concurso-badge" id="concursoBadge">📋 Nenhum concurso selecionado</div>
+
+      <div id="subjectsContainer">
+        <div class="loading-subjects" id="loadingSubjects" style="display:none">
+          <span class="spinner"></span> Carregando matérias do edital...
+        </div>
+
+        <div class="form-group" id="basicasGroup">
+          <label>Matérias Básicas</label>
+          <div class="subjects-grid" id="basicasGrid"></div>
+        </div>
+
+        <div class="form-group" id="especificasGroup">
+          <label>Matérias Específicas</label>
+          <div class="subjects-grid" id="especificasGrid"></div>
         </div>
       </div>
 
-      <div class="form-group">
-        <label>Materias Especificas</label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <label class="subject-tag selected" onclick="toggleSubject(this)">
-            <input type="checkbox" checked>
-            <div class="subject-tag-info">
-              <strong>Direito Administrativo</strong>
-              <span>Atos, Licitacao, Servidores</span>
-            </div>
-          </label>
-          <label class="subject-tag selected" onclick="toggleSubject(this)">
-            <input type="checkbox" checked>
-            <div class="subject-tag-info">
-              <strong>Direito Constitucional</strong>
-              <span>CF/88, Direitos, Organizacao</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Direito Penal</strong>
-              <span>Parte Geral, Crimes, Penas</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Direito Processual Penal</strong>
-              <span>Inquerito, Acao, Provas</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Administracao Publica</strong>
-              <span>Gestao, Planejamento, Orcamento</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Contabilidade</strong>
-              <span>Balancos, DRE, Patrimonio</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Legislacao Especifica</strong>
-              <span>Leis e normas do orgao</span>
-            </div>
-          </label>
-          <label class="subject-tag" onclick="toggleSubject(this)">
-            <input type="checkbox">
-            <div class="subject-tag-info">
-              <strong>Admin. Financeira (AFI)</strong>
-              <span>Orcamento, LRF, PPA</span>
-            </div>
-          </label>
+      <!-- Add custom subject -->
+      <div class="add-subject-area">
+        <button class="add-subject-btn" id="addSubjectBtn" onclick="showAddSubjectForm()">
+          + Adicionar Matéria Personalizada
+        </button>
+        <div class="add-subject-form" id="addSubjectForm">
+          <div class="form-group">
+            <label>Nome da matéria</label>
+            <input type="text" class="form-control" id="customSubjectName" placeholder="Ex: Direito Tributário">
+          </div>
+          <div class="form-group">
+            <label>Tópicos (opcional)</label>
+            <input type="text" class="form-control" id="customSubjectTopics" placeholder="Ex: ICMS, ISS, Princípios">
+          </div>
+          <button class="btn-add-confirm" onclick="addCustomSubject()">Adicionar</button>
+          <button class="btn-add-cancel" onclick="hideAddSubjectForm()">✕</button>
         </div>
       </div>
 
       <div class="wizard-actions">
         <button class="btn btn-ghost" onclick="prevStep(1)">← Voltar</button>
-        <button class="btn btn-primary" onclick="nextStep(3)">Proximo →</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">Próximo →</button>
       </div>
     </div>
 
-    <!-- STEP 3: Horarios -->
+    <!-- STEP 3: Horários -->
     <div class="wizard-card" id="step3" style="display:none;">
       <h2>Qual sua disponibilidade de estudo?</h2>
-      <p>Informe quando e por quanto tempo voce pode estudar durante a semana.</p>
+      <p>Informe quando e por quanto tempo você pode estudar durante a semana.</p>
 
       <div class="form-group">
-        <label>Quantas horas por dia voce pode estudar?</label>
+        <label>Quantas horas por dia você pode estudar?</label>
         <div class="form-row">
           <div>
-            <label style="font-size: 0.8rem; color: var(--text-light);">Dias uteis (Seg-Sex)</label>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Dias úteis (Seg-Sex)</label>
             <select class="form-control" id="horasUteis">
               <option value="1">1 hora</option>
               <option value="2">2 horas</option>
@@ -214,13 +356,13 @@
               <option value="4">4 horas</option>
               <option value="5">5 horas</option>
               <option value="6">6 horas</option>
-              <option value="8">8 horas (dedicacao integral)</option>
+              <option value="8">8 horas (dedicação integral)</option>
             </select>
           </div>
           <div>
-            <label style="font-size: 0.8rem; color: var(--text-light);">Fim de semana (Sab-Dom)</label>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Fim de semana (Sáb-Dom)</label>
             <select class="form-control" id="horasFds">
-              <option value="0">Nao estudo</option>
+              <option value="0">Não estudo</option>
               <option value="2">2 horas</option>
               <option value="3">3 horas</option>
               <option value="4" selected>4 horas</option>
@@ -232,34 +374,34 @@
       </div>
 
       <div class="form-group">
-        <label>Quais dias voce pode estudar?</label>
+        <label>Quais dias você pode estudar?</label>
         <div class="chips">
           <div class="chip selected" onclick="toggleDay(this)">Segunda</div>
-          <div class="chip selected" onclick="toggleDay(this)">Terca</div>
+          <div class="chip selected" onclick="toggleDay(this)">Terça</div>
           <div class="chip selected" onclick="toggleDay(this)">Quarta</div>
           <div class="chip selected" onclick="toggleDay(this)">Quinta</div>
           <div class="chip selected" onclick="toggleDay(this)">Sexta</div>
-          <div class="chip" onclick="toggleDay(this)">Sabado</div>
+          <div class="chip" onclick="toggleDay(this)">Sábado</div>
           <div class="chip" onclick="toggleDay(this)">Domingo</div>
         </div>
       </div>
 
       <div class="form-group">
-        <label>Qual turno voce prefere?</label>
+        <label>Qual turno você prefere?</label>
         <div class="chips">
-          <div class="chip selected" onclick="selectTurno(this)">Manha (6h-12h)</div>
+          <div class="chip selected" onclick="selectTurno(this)">Manhã (6h-12h)</div>
           <div class="chip" onclick="selectTurno(this)">Tarde (12h-18h)</div>
           <div class="chip" onclick="selectTurno(this)">Noite (18h-23h)</div>
-          <div class="chip" onclick="selectTurno(this)">Flexivel</div>
+          <div class="chip" onclick="selectTurno(this)">Flexível</div>
         </div>
       </div>
 
       <div class="form-group">
-        <label>Incluir revisoes no plano?</label>
+        <label>Incluir revisões no plano?</label>
         <div class="chips">
           <div class="chip selected" onclick="selectRevisao(this)">Sim, com ciclo inteligente</div>
           <div class="chip" onclick="selectRevisao(this)">Sim, 1x por semana</div>
-          <div class="chip" onclick="selectRevisao(this)">Nao</div>
+          <div class="chip" onclick="selectRevisao(this)">Não</div>
         </div>
       </div>
 
@@ -267,7 +409,7 @@
         <label>Dia de descanso semanal</label>
         <select class="form-control">
           <option value="dom" selected>Domingo</option>
-          <option value="sab">Sabado</option>
+          <option value="sab">Sábado</option>
           <option value="nenhum">Nenhum (estudo todos os dias)</option>
         </select>
         <div class="form-hint">Recomendamos pelo menos 1 dia de descanso por semana para melhor rendimento.</div>
@@ -275,7 +417,7 @@
 
       <div class="wizard-actions">
         <button class="btn btn-ghost" onclick="prevStep(2)">← Voltar</button>
-        <button class="btn btn-primary" onclick="nextStep(4)">Proximo →</button>
+        <button class="btn btn-primary" onclick="nextStep(4)">Próximo →</button>
       </div>
     </div>
 
@@ -288,48 +430,53 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
           <div>
             <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Concurso</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoConcurso">Policia Civil - GO</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoConcurso">—</div>
           </div>
           <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Nivel</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoNivel">Nivel Superior</div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Nível</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoNivel">—</div>
           </div>
           <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Materias Selecionadas</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoMaterias">6 materias</div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Matérias Selecionadas</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoMaterias">—</div>
           </div>
           <div>
             <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Horas Semanais</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoHoras">19 horas</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoHoras">—</div>
           </div>
           <div>
             <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Dias de Estudo</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoDias">Seg a Sex + Sab</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoDias">—</div>
           </div>
           <div>
             <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Turno Preferido</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoTurno">Manha</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoTurno">—</div>
           </div>
         </div>
       </div>
 
+      <!-- Links review -->
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 20px; margin-bottom: 24px;">
+        <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 10px; font-weight: 600;">Links de Estudo Cadastrados</div>
+        <div id="resumoLinks">—</div>
+      </div>
+
       <div style="background: #FFF8F0; border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; border-left: 4px solid var(--primary);">
         <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa</strong>
-        <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;">
-          Com base na sua disponibilidade, voce levara aproximadamente <strong>5 meses</strong> para cobrir todo o conteudo.
-          Seu plano inclui ciclo de revisoes inteligente para maximizar a retencao.
+        <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;" id="resumoEstimativa">
+          Com base na sua disponibilidade, você levará aproximadamente <strong>5 meses</strong> para cobrir todo o conteúdo.
         </p>
       </div>
 
       <div class="form-group">
         <label>Seu nome</label>
-        <input type="text" class="form-control" placeholder="Como devemos te chamar?" value="Raquel">
+        <input type="text" class="form-control" id="inputNome" placeholder="Como devemos te chamar?">
       </div>
 
       <div class="form-group">
         <label>Seu email</label>
-        <input type="email" class="form-control" placeholder="seu@email.com" value="raquel.vidal@gmail.com">
-        <div class="form-hint">Enviaremos o plano para seu email e voce pode acessar de qualquer lugar.</div>
+        <input type="email" class="form-control" id="inputEmail" placeholder="seu@email.com">
+        <div class="form-hint">Enviaremos o plano para seu email e você pode acessar de qualquer lugar.</div>
       </div>
 
       <div class="wizard-actions">
@@ -344,36 +491,321 @@
     <div class="wizard-card" id="stepSuccess" style="display:none; text-align: center;">
       <div style="font-size: 4rem; margin-bottom: 16px;">🎉</div>
       <h2>Plano Criado com Sucesso!</h2>
-      <p style="margin-bottom: 32px;">Seu cronograma personalizado foi gerado. Acesse o dashboard para comecar a estudar agora mesmo.</p>
+      <p style="margin-bottom: 32px;">Seu cronograma personalizado foi gerado. Acesse o dashboard para começar a estudar agora mesmo.</p>
 
       <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 32px; text-align: left;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: var(--text-light); font-size: 0.85rem;">Concurso:</span>
-          <strong style="font-size: 0.85rem;">Policia Civil - GO</strong>
+          <strong style="font-size: 0.85rem;" id="successConcurso">—</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <span style="color: var(--text-light); font-size: 0.85rem;">Materias:</span>
-          <strong style="font-size: 0.85rem;">6 disciplinas</strong>
+          <span style="color: var(--text-light); font-size: 0.85rem;">Matérias:</span>
+          <strong style="font-size: 0.85rem;" id="successMaterias">—</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: var(--text-light); font-size: 0.85rem;">Carga semanal:</span>
-          <strong style="font-size: 0.85rem;">19 horas</strong>
+          <strong style="font-size: 0.85rem;" id="successHoras">—</strong>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span style="color: var(--text-light); font-size: 0.85rem;">Duracao estimada:</span>
-          <strong style="font-size: 0.85rem;">5 meses</strong>
+          <span style="color: var(--text-light); font-size: 0.85rem;">Links cadastrados:</span>
+          <strong style="font-size: 0.85rem;" id="successLinks">—</strong>
         </div>
       </div>
 
       <a href="dashboard.html" class="btn btn-primary btn-lg">Acessar Meu Dashboard</a>
-      <p style="margin-top: 16px; font-size: 0.8rem; color: var(--text-lighter);">Tambem enviamos os detalhes para seu email.</p>
+      <p style="margin-top: 16px; font-size: 0.8rem; color: var(--text-lighter);">Também enviamos os detalhes para seu email.</p>
     </div>
   </div>
 
   <script>
-    let currentStep = 1;
+    // =============================================
+    //  DATABASE DE MATÉRIAS POR CONCURSO
+    //  (baseado nos últimos editais conhecidos)
+    // =============================================
+    const MATERIAS_POR_CONCURSO = {
+      'TCU': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação Oficial' },
+          { nome: 'Língua Inglesa', topicos: 'Interpretação de textos em inglês' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Probabilidade, Estatística' },
+        ],
+        especificas: [
+          { nome: 'Controle Externo', topicos: 'Fiscalização, TCU, Lei Orgânica' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitações, Contratos, Lei 14.133' },
+          { nome: 'Direito Constitucional', topicos: 'CF/88, Organização do Estado, Controle' },
+          { nome: 'Direito Financeiro', topicos: 'Orçamento, LRF, Créditos Adicionais' },
+          { nome: 'Administração Financeira e Orçamentária (AFO)', topicos: 'PPA, LDO, LOA, Ciclo Orçamentário' },
+          { nome: 'Contabilidade Pública', topicos: 'MCASP, DCASP, Balanços Públicos' },
+          { nome: 'Auditoria Governamental', topicos: 'NBASP, Tipos de Auditoria, Relatórios' },
+          { nome: 'Administração Pública', topicos: 'Governança, Gestão por Resultados' },
+          { nome: 'Economia', topicos: 'Microeconomia, Macroeconomia, Finanças Públicas' },
+          { nome: 'Tecnologia da Informação', topicos: 'Governança TI, COBIT, ITIL, Segurança' },
+        ]
+      },
+      'Polícia Federal': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Semântica' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica Proposicional, Quantitativo' },
+          { nome: 'Informática', topicos: 'Redes, Segurança, Sistemas Operacionais' },
+          { nome: 'Língua Inglesa', topicos: 'Interpretação de textos' },
+        ],
+        especificas: [
+          { nome: 'Direito Administrativo', topicos: 'Atos, Poderes, Responsabilidade' },
+          { nome: 'Direito Constitucional', topicos: 'Direitos Fundamentais, Organização' },
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes contra Adm. Pública' },
+          { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação Penal, Provas, Prisão' },
+          { nome: 'Legislação Penal Especial', topicos: 'Lei de Drogas, Armas, Tortura, Terrorismo' },
+          { nome: 'Contabilidade', topicos: 'Balanço, DRE, Análise de Demonstrações' },
+          { nome: 'Estatística', topicos: 'Descritiva, Probabilidade, Inferência' },
+        ]
+      },
+      'Polícia Civil - GO': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática Básica' },
+          { nome: 'Informática', topicos: 'Office, Redes, Segurança' },
+          { nome: 'Atualidades', topicos: 'Política, Economia, Sociedade' },
+        ],
+        especificas: [
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Servidores' },
+          { nome: 'Direito Constitucional', topicos: 'CF/88, Direitos, Organização' },
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes' },
+          { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação, Provas' },
+          { nome: 'Legislação Penal Especial', topicos: 'Drogas, ECA, Maria da Penha' },
+          { nome: 'Medicina Legal', topicos: 'Traumatologia, Tanatologia, Toxicologia' },
+        ]
+      },
+      'INSS (Técnico)': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática Financeira' },
+          { nome: 'Informática', topicos: 'Office, Internet, Segurança' },
+          { nome: 'Ética no Serviço Público', topicos: 'Código de Ética, Lei 8.112' },
+        ],
+        especificas: [
+          { nome: 'Direito Constitucional', topicos: 'Seguridade Social, Direitos Sociais' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Processo Administrativo' },
+          { nome: 'Direito Previdenciário', topicos: 'RGPS, Benefícios, Custeio, Lei 8.213' },
+          { nome: 'Seguridade Social', topicos: 'Saúde, Previdência, Assistência' },
+        ]
+      },
+      'Receita Federal': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação Oficial' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Estatística, Probabilidade' },
+          { nome: 'Língua Inglesa', topicos: 'Interpretação, Vocabulário Técnico' },
+        ],
+        especificas: [
+          { nome: 'Direito Tributário', topicos: 'CTN, Tributos, Obrigação Tributária' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Processo, PAD' },
+          { nome: 'Direito Constitucional', topicos: 'Sistema Tributário Nacional' },
+          { nome: 'Legislação Aduaneira', topicos: 'Importação, Exportação, Regimes' },
+          { nome: 'Contabilidade Geral', topicos: 'Balanço, DRE, Análise' },
+          { nome: 'Contabilidade Avançada', topicos: 'Consolidação, Conversão, CPC' },
+          { nome: 'Auditoria', topicos: 'NBC, Planejamento, Relatórios' },
+          { nome: 'Comércio Internacional', topicos: 'Câmbio, Políticas Comerciais' },
+          { nome: 'Economia', topicos: 'Micro, Macro, Finanças Públicas' },
+        ]
+      },
+      'TRT (Analista)': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Segurança, Redes' },
+        ],
+        especificas: [
+          { nome: 'Direito do Trabalho', topicos: 'CLT, Contrato, Jornada, Férias' },
+          { nome: 'Direito Processual do Trabalho', topicos: 'Ações, Recursos, Execução' },
+          { nome: 'Direito Constitucional', topicos: 'Direitos Sociais, Organização' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Servidores' },
+          { nome: 'Administração Pública', topicos: 'Gestão, Planejamento' },
+        ]
+      },
+      'TRF (Analista)': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Segurança, Redes' },
+        ],
+        especificas: [
+          { nome: 'Direito Constitucional', topicos: 'CF/88, Organização, Controle' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Improbidade' },
+          { nome: 'Direito Civil', topicos: 'Parte Geral, Obrigações, Contratos' },
+          { nome: 'Direito Processual Civil', topicos: 'CPC, Recursos, Execução' },
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes' },
+          { nome: 'Direito Processual Penal', topicos: 'Ação, Provas, Recursos' },
+        ]
+      },
+      'Banco do Brasil': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Internet, Segurança' },
+          { nome: 'Língua Inglesa', topicos: 'Interpretação de textos' },
+        ],
+        especificas: [
+          { nome: 'Conhecimentos Bancários', topicos: 'SFN, Produtos, Serviços' },
+          { nome: 'Matemática Financeira', topicos: 'Juros, Amortização, Desconto' },
+          { nome: 'Atualidades do Mercado Financeiro', topicos: 'PIX, Open Banking, LGPD' },
+          { nome: 'Vendas e Negociação', topicos: 'Técnicas, CRM, Marketing' },
+          { nome: 'Probabilidade e Estatística', topicos: 'Descritiva, Probabilidade' },
+        ]
+      },
+      'Caixa Econômica': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Internet, Segurança' },
+        ],
+        especificas: [
+          { nome: 'Conhecimentos Bancários', topicos: 'SFN, Produtos, Serviços, FGTS' },
+          { nome: 'Matemática Financeira', topicos: 'Juros, Amortização, SAC, PRICE' },
+          { nome: 'Atualidades', topicos: 'Economia, Política, Sociedade' },
+          { nome: 'Ética', topicos: 'Código de Conduta, Compliance' },
+        ]
+      },
+      'STJ': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação Oficial' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Quantitativo' },
+          { nome: 'Informática', topicos: 'Office, Segurança, Redes' },
+        ],
+        especificas: [
+          { nome: 'Direito Constitucional', topicos: 'CF/88, Poder Judiciário, Controle' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação 14.133, PAD' },
+          { nome: 'Direito Civil', topicos: 'Parte Geral, Obrigações' },
+          { nome: 'Direito Processual Civil', topicos: 'CPC, Recursos Especiais' },
+          { nome: 'Administração Pública', topicos: 'Governança, Gestão' },
+        ]
+      },
+      'TSE': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Segurança, Redes' },
+        ],
+        especificas: [
+          { nome: 'Direito Constitucional', topicos: 'Direitos Políticos, Organização' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Contratos' },
+          { nome: 'Direito Eleitoral', topicos: 'Código Eleitoral, Partidos, Eleições' },
+          { nome: 'Administração Pública', topicos: 'Gestão, Governança, Planejamento' },
+        ]
+      },
+      'CGU': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática, Redação' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Estatística' },
+          { nome: 'Língua Inglesa', topicos: 'Interpretação de textos' },
+        ],
+        especificas: [
+          { nome: 'Direito Administrativo', topicos: 'Improbidade, PAD, Lei 14.133' },
+          { nome: 'Direito Constitucional', topicos: 'CF/88, Administração Pública' },
+          { nome: 'Controle Interno', topicos: 'Auditoria, Corregedoria, Ouvidoria' },
+          { nome: 'Contabilidade Pública', topicos: 'MCASP, Balanços, DCASP' },
+          { nome: 'Administração Financeira e Orçamentária', topicos: 'PPA, LDO, LOA, LRF' },
+          { nome: 'Auditoria', topicos: 'NBC, NBASP, Planejamento' },
+          { nome: 'Combate à Corrupção', topicos: 'Lei Anticorrupção, Lavagem de Dinheiro' },
+        ]
+      },
+      'Polícia Rodoviária Federal': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Internet, Segurança' },
+        ],
+        especificas: [
+          { nome: 'Legislação de Trânsito', topicos: 'CTB, Resoluções CONTRAN' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Poderes, Processo' },
+          { nome: 'Direito Constitucional', topicos: 'Direitos Fundamentais' },
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes de Trânsito' },
+          { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação Penal' },
+          { nome: 'Física aplicada ao Trânsito', topicos: 'Mecânica, Cinemática' },
+        ]
+      },
+      'PCDF': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Redes, Segurança' },
+          { nome: 'Atualidades', topicos: 'DF, Brasil, Mundo' },
+        ],
+        especificas: [
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes' },
+          { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação, Provas' },
+          { nome: 'Direito Constitucional', topicos: 'Direitos, Segurança Pública' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Servidores, PAD' },
+          { nome: 'Legislação Penal Especial', topicos: 'Drogas, Armas, Tortura' },
+          { nome: 'Lei Orgânica do DF', topicos: 'LODF, Organização' },
+        ]
+      },
+      'DEPEN': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Matemática' },
+          { nome: 'Informática', topicos: 'Office, Internet' },
+        ],
+        especificas: [
+          { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes' },
+          { nome: 'Direito Processual Penal', topicos: 'Execução Penal' },
+          { nome: 'Direito Constitucional', topicos: 'Direitos Fundamentais' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação' },
+          { nome: 'Execução Penal', topicos: 'LEP, Regime, Progressão' },
+          { nome: 'Direitos Humanos', topicos: 'Tratados, Regras de Mandela' },
+        ]
+      },
+      'MPU': {
+        basicas: [
+          { nome: 'Língua Portuguesa', topicos: 'Interpretação, Gramática' },
+          { nome: 'Raciocínio Lógico', topicos: 'Lógica, Quantitativo' },
+          { nome: 'Informática', topicos: 'Office, Segurança, Redes' },
+        ],
+        especificas: [
+          { nome: 'Direito Constitucional', topicos: 'Ministério Público, CF/88' },
+          { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Servidores' },
+          { nome: 'Legislação do MPU', topicos: 'LC 75/93, Organização do MPU' },
+          { nome: 'Direito Civil', topicos: 'Parte Geral, Obrigações' },
+          { nome: 'Direito Processual Civil', topicos: 'CPC, Ações' },
+          { nome: 'Administração Pública', topicos: 'Gestão, Governança' },
+        ]
+      },
+    };
 
+    // Matérias genéricas (fallback)
+    const MATERIAS_GENERICAS = {
+      basicas: [
+        { nome: 'Língua Portuguesa', topicos: 'Gramática, Interpretação, Redação' },
+        { nome: 'Raciocínio Lógico (RLM)', topicos: 'Lógica, Matemática, Estatística' },
+        { nome: 'Informática', topicos: 'Redes, Segurança, Office' },
+        { nome: 'Atualidades', topicos: 'Economia, Política, Sociedade' },
+      ],
+      especificas: [
+        { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Servidores' },
+        { nome: 'Direito Constitucional', topicos: 'CF/88, Direitos, Organização' },
+        { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes, Penas' },
+        { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação, Provas' },
+        { nome: 'Administração Pública', topicos: 'Gestão, Planejamento, Orçamento' },
+        { nome: 'Contabilidade', topicos: 'Balanços, DRE, Patrimônio' },
+      ]
+    };
+
+    // =============================================
+    //  STATE
+    // =============================================
+    let currentStep = 1;
+    let selectedConcurso = '';
+    let selectedNivel = '';
+    let customSubjectCounter = 0;
+
+    // =============================================
+    //  STEP NAVIGATION
+    // =============================================
     function nextStep(step) {
+      if (step === 2) {
+        loadSubjectsForConcurso();
+      }
+      if (step === 4) {
+        buildReview();
+      }
       document.getElementById('step' + currentStep).style.display = 'none';
       document.getElementById('step' + step).style.display = 'block';
       updateProgress(step);
@@ -390,59 +822,31 @@
     }
 
     function updateProgress(activeStep) {
-      const steps = document.querySelectorAll('.wizard-step');
-      const lines = document.querySelectorAll('.wizard-step-line');
-
-      steps.forEach((s, i) => {
+      document.querySelectorAll('.wizard-step').forEach((s, i) => {
         const stepNum = i + 1;
         s.classList.remove('active', 'completed');
         if (stepNum === activeStep) s.classList.add('active');
         else if (stepNum < activeStep) s.classList.add('completed');
       });
-
-      lines.forEach((l, i) => {
+      document.querySelectorAll('.wizard-step-line').forEach((l, i) => {
         l.classList.remove('completed');
         if (i + 1 < activeStep) l.classList.add('completed');
       });
     }
 
+    // =============================================
+    //  STEP 1: CONCURSO
+    // =============================================
     function selectConcurso(el) {
       document.querySelectorAll('#concursoChips .chip').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
-      document.getElementById('resumoConcurso').textContent = el.textContent;
+      selectedConcurso = el.textContent.trim();
     }
 
     function selectNivel(el) {
       el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
-      document.getElementById('resumoNivel').textContent = el.textContent;
-    }
-
-    function toggleSubject(el) {
-      el.classList.toggle('selected');
-      const cb = el.querySelector('input[type="checkbox"]');
-      if (cb) cb.checked = el.classList.contains('selected');
-      updateMateriaCount();
-    }
-
-    function updateMateriaCount() {
-      const count = document.querySelectorAll('.subject-tag.selected').length;
-      document.getElementById('resumoMaterias').textContent = count + ' materias';
-    }
-
-    function toggleDay(el) {
-      el.classList.toggle('selected');
-    }
-
-    function selectTurno(el) {
-      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
-      document.getElementById('resumoTurno').textContent = el.textContent.split(' (')[0];
-    }
-
-    function selectRevisao(el) {
-      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
+      selectedNivel = el.textContent.trim();
     }
 
     function filterConcursos() {
@@ -452,17 +856,227 @@
       });
     }
 
+    // =============================================
+    //  STEP 2: MATÉRIAS DINÂMICAS
+    // =============================================
+    function loadSubjectsForConcurso() {
+      const badge = document.getElementById('concursoBadge');
+      const basGrid = document.getElementById('basicasGrid');
+      const espGrid = document.getElementById('especificasGrid');
+
+      badge.textContent = selectedConcurso ? '📋 ' + selectedConcurso : '📋 Matérias genéricas';
+
+      // Show loading briefly
+      const loader = document.getElementById('loadingSubjects');
+      loader.style.display = 'block';
+      basGrid.innerHTML = '';
+      espGrid.innerHTML = '';
+
+      setTimeout(() => {
+        loader.style.display = 'none';
+
+        const materias = MATERIAS_POR_CONCURSO[selectedConcurso] || MATERIAS_GENERICAS;
+
+        materias.basicas.forEach(m => {
+          basGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false));
+        });
+
+        materias.especificas.forEach(m => {
+          espGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false));
+        });
+      }, 500);
+    }
+
+    function createSubjectCard(nome, topicos, checked, isCustom) {
+      const card = document.createElement('div');
+      card.className = 'subject-card' + (checked ? ' selected' : '') + (isCustom ? ' custom' : '');
+      card.setAttribute('data-subject', nome);
+
+      card.innerHTML = `
+        <div class="subject-card-header" onclick="toggleSubjectCard(this.parentElement)">
+          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleSubjectCard(this.parentElement)">
+          <div class="subject-card-info">
+            <strong>${nome}</strong>
+            ${topicos ? '<span>' + topicos + '</span>' : ''}
+          </div>
+          <button class="subject-card-remove" onclick="event.stopPropagation(); removeCustomSubject(this)" title="Remover">✕</button>
+        </div>
+        <div class="subject-link-field">
+          <label>🔗 Link do curso (Estratégia, Gran, etc.)</label>
+          <input type="url" placeholder="https://app.estrategiaconcursos.com.br/..." data-link-for="${nome}">
+        </div>
+      `;
+
+      return card;
+    }
+
+    function toggleSubjectCard(card) {
+      const cb = card.querySelector('input[type="checkbox"]');
+      const isNowSelected = !card.classList.contains('selected');
+      card.classList.toggle('selected', isNowSelected);
+      cb.checked = isNowSelected;
+    }
+
+    function removeCustomSubject(btn) {
+      const card = btn.closest('.subject-card');
+      card.remove();
+    }
+
+    // =============================================
+    //  ADD CUSTOM SUBJECT
+    // =============================================
+    function showAddSubjectForm() {
+      document.getElementById('addSubjectForm').classList.add('show');
+      document.getElementById('addSubjectBtn').style.display = 'none';
+      document.getElementById('customSubjectName').focus();
+    }
+
+    function hideAddSubjectForm() {
+      document.getElementById('addSubjectForm').classList.remove('show');
+      document.getElementById('addSubjectBtn').style.display = '';
+      document.getElementById('customSubjectName').value = '';
+      document.getElementById('customSubjectTopics').value = '';
+    }
+
+    function addCustomSubject() {
+      const name = document.getElementById('customSubjectName').value.trim();
+      const topics = document.getElementById('customSubjectTopics').value.trim();
+
+      if (!name) {
+        document.getElementById('customSubjectName').focus();
+        return;
+      }
+
+      const grid = document.getElementById('especificasGrid');
+      grid.appendChild(createSubjectCard(name, topics, true, true));
+
+      hideAddSubjectForm();
+    }
+
+    // Enter to confirm add
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.getElementById('addSubjectForm').classList.contains('show')) {
+        e.preventDefault();
+        addCustomSubject();
+      }
+    });
+
+    // =============================================
+    //  STEP 3 HELPERS
+    // =============================================
+    function toggleDay(el) { el.classList.toggle('selected'); }
+
+    function selectTurno(el) {
+      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function selectRevisao(el) {
+      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    // =============================================
+    //  STEP 4: BUILD REVIEW
+    // =============================================
+    function getSelectedSubjects() {
+      const subjects = [];
+      document.querySelectorAll('.subject-card.selected').forEach(card => {
+        const nome = card.getAttribute('data-subject');
+        const linkInput = card.querySelector('input[type="url"]');
+        subjects.push({
+          nome,
+          link: linkInput ? linkInput.value.trim() : ''
+        });
+      });
+      return subjects;
+    }
+
+    function buildReview() {
+      const subjects = getSelectedSubjects();
+      const selectedDays = [];
+      document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
+
+      const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
+      const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
+      const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
+      const diasFds = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
+      const horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
+
+      const turnoEl = document.querySelector('#step3 .chips:nth-of-type(3) .chip.selected') ||
+                      document.querySelector('#step3 .chip.selected');
+
+      document.getElementById('resumoConcurso').textContent = selectedConcurso || 'Não selecionado';
+      document.getElementById('resumoNivel').textContent = selectedNivel || 'Não selecionado';
+      document.getElementById('resumoMaterias').textContent = subjects.length + ' matérias';
+      document.getElementById('resumoHoras').textContent = horasSemanais + ' horas';
+      document.getElementById('resumoDias').textContent = selectedDays.join(', ') || '—';
+
+      // Find turno
+      let turnoText = 'Manhã';
+      document.querySelectorAll('#step3 .chips').forEach(chipsGroup => {
+        chipsGroup.querySelectorAll('.chip').forEach(c => {
+          if (c.classList.contains('selected') && c.textContent.includes('h)')) {
+            turnoText = c.textContent.split(' (')[0];
+          }
+        });
+      });
+      document.getElementById('resumoTurno').textContent = turnoText;
+
+      // Links review
+      const linksDiv = document.getElementById('resumoLinks');
+      if (subjects.length === 0) {
+        linksDiv.innerHTML = '<em style="color:var(--text-lighter)">Nenhuma matéria selecionada</em>';
+      } else {
+        let html = '';
+        subjects.forEach(s => {
+          html += `<div class="review-link-item">
+            <span class="review-link-name">${s.nome}</span>
+            ${s.link
+              ? '<span class="review-link-url" title="' + s.link + '">' + s.link + '</span>'
+              : '<span class="review-link-none">Sem link</span>'
+            }
+          </div>`;
+        });
+        linksDiv.innerHTML = html;
+      }
+
+      // Estimate
+      const meses = subjects.length > 0 ? Math.max(2, Math.round(subjects.length * 4 / (horasSemanais / 5))) : 5;
+      document.getElementById('resumoEstimativa').innerHTML =
+        'Com base na sua disponibilidade, você levará aproximadamente <strong>' + meses + ' meses</strong> para cobrir todo o conteúdo. Seu plano inclui ciclo de revisões inteligente para maximizar a retenção.';
+    }
+
+    // =============================================
+    //  GENERATE PLAN
+    // =============================================
     function gerarPlano() {
       const btn = document.getElementById('btnGerar');
       btn.innerHTML = '⏳ Gerando seu plano...';
       btn.disabled = true;
       btn.style.opacity = '0.7';
 
+      const subjects = getSelectedSubjects();
+      const linksComLink = subjects.filter(s => s.link).length;
+
+      // Save links to localStorage for dashboard
+      const linksMap = {};
+      subjects.forEach(s => {
+        if (s.link) {
+          linksMap[s.nome] = { url: s.link, titulo: s.nome };
+        }
+      });
+      localStorage.setItem('studyplan_links', JSON.stringify(linksMap));
+
       setTimeout(() => {
         document.getElementById('step4').style.display = 'none';
         document.getElementById('stepSuccess').style.display = 'block';
 
-        // Update progress to all completed
+        document.getElementById('successConcurso').textContent = selectedConcurso || 'Personalizado';
+        document.getElementById('successMaterias').textContent = subjects.length + ' disciplinas';
+        document.getElementById('successHoras').textContent = document.getElementById('resumoHoras').textContent;
+        document.getElementById('successLinks').textContent = linksComLink + ' de ' + subjects.length;
+
         document.querySelectorAll('.wizard-step').forEach(s => {
           s.classList.remove('active');
           s.classList.add('completed');
