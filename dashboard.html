@@ -2553,28 +2553,35 @@
     // =============================================
     async function carregarLinksSupabase() {
       try {
-        const { buscarLinks } = await import('./js/database.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
-        if (!user) return;
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { console.warn('[Links] Sem sessão'); return; }
 
-        const links = await buscarLinks(user.id);
-        // Replace localStorage entirely with Supabase data (source of truth)
+        const { data: links, error } = await supabase
+          .from('links_materias')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) { console.error('[Links] Erro:', error.message); return; }
+
+        console.log('[Links] Carregados:', (links || []).length, 'matérias');
+
         const mapa = {};
         if (links && links.length > 0) {
           links.forEach(l => {
             mapa[l.materia] = { url: l.url, titulo: l.titulo, concluido: !!l.concluido, id: l.id };
           });
 
-          // Also update plan materias so calendar/schedule work
-          const plan = getPlanData();
-          if (plan) {
-            plan.materias = links.map(l => ({ nome: l.materia, link: l.url }));
-            localStorage.setItem('studyplan_plan', JSON.stringify(plan));
-          }
+          // Update plan materias so calendar/schedule work
+          const plan = getPlanData() || {};
+          plan.materias = links.map(l => ({ nome: l.materia, link: l.url }));
+          localStorage.setItem('studyplan_plan', JSON.stringify(plan));
         }
         saveLinksStorage(mapa);
-      } catch (e) { /* Sem Supabase, usa localStorage */ }
+      } catch (e) {
+        console.error('[Links] Exceção:', e);
+      }
     }
 
     async function salvarLinkSupabase(materia, url, titulo) {
@@ -3173,12 +3180,14 @@
 
     async function carregarPerfilSupabase() {
       try {
-        const { buscarPerfil } = await import('./js/database.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
-        if (!user) return;
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { console.warn('[Perfil] Sem sessão'); return; }
 
-        // Check if cached data belongs to current user — clear if different
+        const user = session.user;
+        console.log('[Perfil] Buscando perfil para:', user.id);
+
+        // Check if cached data belongs to current user
         const cachedPerfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
         if (cachedPerfil._uid && cachedPerfil._uid !== user.id) {
           localStorage.removeItem('studyplan_perfil');
@@ -3187,7 +3196,16 @@
           localStorage.removeItem('studyplan_stats');
         }
 
-        const perfil = await buscarPerfil(user.id);
+        const { data: perfil, error } = await supabase
+          .from('perfil_aluno')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('[Perfil] Erro:', error.message);
+          return;
+        }
         if (perfil) {
           setUserUI(perfil.nome, perfil.email, perfil.concurso, perfil.foto_url || null);
 
@@ -3241,6 +3259,7 @@
         }
 
       } catch (e) {
+        console.error('[Perfil] Exceção:', e);
         loadFromLocalStorage();
       }
     }
@@ -3330,6 +3349,28 @@
     // =============================================
     //  INIT — load everything from Supabase
     // =============================================
+    // Global supabase + session (cached after first load)
+    let _sb = null;
+    let _session = null;
+
+    async function getSupabaseSession() {
+      if (_sb && _session) return { supabase: _sb, session: _session };
+      try {
+        const mod = await import('./js/supabase.js');
+        _sb = mod.supabase;
+        const { data } = await _sb.auth.getSession();
+        _session = data.session;
+        if (_session) {
+          console.log('[Auth] Sessão OK:', _session.user.id, _session.user.email);
+        } else {
+          console.warn('[Auth] Sem sessão ativa');
+        }
+      } catch (e) {
+        console.error('[Auth] Erro ao conectar Supabase:', e);
+      }
+      return { supabase: _sb, session: _session };
+    }
+
     async function initDashboard() {
       // 1. Show local data immediately (may be empty after login)
       loadFromLocalStorage();
@@ -3338,23 +3379,37 @@
       renderCalendar();
       calcularEstatisticas();
 
-      // 2. Load from Supabase sequentially (source of truth)
+      // 2. Connect to Supabase once
+      const { supabase, session } = await getSupabaseSession();
+      if (!supabase || !session) {
+        console.warn('[Init] Sem Supabase/sessão — usando apenas localStorage');
+        return;
+      }
+
+      // 3. Load from Supabase sequentially (source of truth)
       try {
         await carregarPerfilSupabase();
+      } catch (e) { console.error('[Init] Erro perfil:', e); }
+
+      try {
         await carregarLinksSupabase();
+      } catch (e) { console.error('[Init] Erro links:', e); }
+
+      try {
         await carregarAulasSupabase();
+      } catch (e) { console.error('[Init] Erro aulas:', e); }
+
+      try {
         await carregarSessoesSupabase();
+      } catch (e) { console.error('[Init] Erro sessões:', e); }
 
-        // 3. Re-render with complete data
-        renderSubjectsList();
-        buildDynamicSchedule();
-        renderCalendar();
-        calcularEstatisticas();
+      // 4. Final re-render with complete data
+      renderSubjectsList();
+      buildDynamicSchedule();
+      renderCalendar();
+      calcularEstatisticas();
 
-        console.log('[Init] Dashboard carregado com sucesso');
-      } catch (e) {
-        console.error('[Init] Erro ao carregar dados:', e);
-      }
+      console.log('[Init] Dashboard carregado');
     }
 
     window.addEventListener('load', initDashboard);
