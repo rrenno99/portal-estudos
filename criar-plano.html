@@ -1184,28 +1184,27 @@
           console.error('[Supabase] ERRO ao deletar links antigos:', deleteError.code, deleteError.message);
         }
 
-        // 3c. Insert each subject link one by one
+        // 3c. Insert ALL selected subjects (with or without link)
         let linksSalvos = 0;
         for (let i = 0; i < subjects.length; i++) {
           const s = subjects[i];
-          if (!s.link) continue;
 
           const linkData = {
             user_id: user.id,
             materia: s.nome,
             titulo: s.nome,
-            url: s.link,
-            tipo: 'curso'
+            url: s.link || '',
+            tipo: s.link ? 'curso' : 'pendente'
           };
 
-          console.log('[Supabase] Salvando link ' + (i+1) + ':', s.nome);
+          console.log('[Supabase] Salvando matéria ' + (i+1) + '/' + subjects.length + ':', s.nome, s.link ? '(com link)' : '(sem link)');
 
           const { error: linkError } = await supabase
             .from('links_materias')
             .insert([linkData]);
 
           if (linkError) {
-            console.error('[Supabase] ERRO link "' + s.nome + '":', linkError.code, linkError.message, linkError.details);
+            console.error('[Supabase] ERRO matéria "' + s.nome + '":', linkError.code, linkError.message, linkError.details);
           } else {
             linksSalvos++;
           }

@@ -28,7 +28,7 @@ CREATE TABLE links_materias (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   materia TEXT NOT NULL,
   titulo TEXT NOT NULL,
-  url TEXT NOT NULL,
+  url TEXT DEFAULT '',
   tipo TEXT DEFAULT 'artigo',
   descricao TEXT,
   concluido BOOLEAN DEFAULT false,
