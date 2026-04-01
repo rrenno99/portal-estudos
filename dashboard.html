@@ -2103,7 +2103,31 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    // =============================================
+    //  SUPABASE INIT (runs first in module)
+    // =============================================
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const _supabase = createClient(
+      'https://hcngacohwiwphcbroint.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
+      { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
+    );
+
+    const { data: { session: _session } } = await _supabase.auth.getSession();
+    if (!_session) { window.location.href = 'login.html'; }
+
+    _supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') window.location.href = 'login.html'; });
+
+    // Global references used by all functions below
+    window._supabase = _supabase;
+    window._userId = _session.user.id;
+    window._userEmail = _session.user.email;
+    window._userName = _session.user.user_metadata?.nome || _session.user.email.split('@')[0];
+
+    console.log('[Init] Supabase OK, user:', window._userId);
+
     // =============================================
     //  SIDEBAR TOGGLE
     // =============================================
@@ -3334,73 +3358,30 @@
 
     // =============================================
     //  INIT — load everything from Supabase
-    // =============================================
-    // =============================================
-    //  DATA LOADING (called when supabase is ready)
-    // =============================================
-    async function carregarDadosSupabase() {
-      if (!window._supabase || !window._userId) {
-        console.warn('[Init] Supabase não disponível');
-        return;
-      }
-      console.log('[Init] Carregando dados para:', window._userId);
-
-      try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
-      try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
-      try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
-      try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
-
-      renderSubjectsList();
-      buildDynamicSchedule();
-      renderCalendar();
-      calcularEstatisticas();
-      console.log('[Init] Dashboard carregado');
-    }
-
-    window.carregarDadosSupabase = carregarDadosSupabase;
-
-    // Show empty state immediately while Supabase loads
+    // Show local data immediately while Supabase loads
     loadFromLocalStorage();
     renderSubjectsList();
     buildDynamicSchedule();
     renderCalendar();
     calcularEstatisticas();
-  </script>
 
-  <!-- Supabase loader: module that exposes supabase to window, then loads data -->
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    // =============================================
+    //  LOAD ALL DATA FROM SUPABASE
+    // =============================================
+    console.log('[Init] Carregando dados do Supabase...');
 
-    const supabase = createClient(
-      'https://hcngacohwiwphcbroint.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
-      { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
-    );
+    try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
+    try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
+    try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
+    try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
 
-    // Auth guard
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      window.location.href = 'login.html';
-    }
+    // Final re-render
+    renderSubjectsList();
+    buildDynamicSchedule();
+    renderCalendar();
+    calcularEstatisticas();
 
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange((event, sess) => {
-      if (event === 'SIGNED_OUT') window.location.href = 'login.html';
-    });
-
-    // Expose to window for the main script
-    window._supabase = supabase;
-    window._userId = session.user.id;
-    window._userEmail = session.user.email;
-    window._userName = session.user.user_metadata?.nome || session.user.email.split('@')[0];
-
-    console.log('[Module] Supabase pronto, user:', window._userId, window._userEmail);
-
-    // Load data — the main script's functions are already defined at this point
-    // because module scripts run after regular scripts
-    if (typeof window.carregarDadosSupabase === 'function') {
-      await window.carregarDadosSupabase();
-    }
+    console.log('[Init] Dashboard completo');
   </script>
 </body>
 </html>
