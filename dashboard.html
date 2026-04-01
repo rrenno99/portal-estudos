@@ -1234,6 +1234,144 @@
     }
 
     /* =========================================
+       TIMER MODAL
+    ========================================= */
+    .timer-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 800;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .timer-modal-overlay.show { display: flex; }
+
+    .timer-modal {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 400px;
+      margin: 16px;
+      text-align: center;
+      overflow: hidden;
+      animation: dropIn 0.15s ease;
+    }
+
+    .timer-header {
+      padding: 20px 24px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .timer-header h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--secondary);
+      margin: 0 0 4px;
+    }
+    .timer-materia {
+      font-size: 0.82rem;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .timer-body {
+      padding: 32px 24px;
+    }
+
+    .timer-display {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--secondary);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      font-family: 'Inter', monospace;
+    }
+
+    .timer-status {
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      height: 20px;
+    }
+    .timer-status.running { color: var(--success); }
+    .timer-status.paused  { color: #FF9800; }
+    .timer-status.stopped { color: var(--text-lighter); }
+
+    .timer-progress-ring {
+      width: 200px;
+      height: 200px;
+      margin: 0 auto 24px;
+      position: relative;
+    }
+    .timer-progress-ring svg {
+      transform: rotate(-90deg);
+    }
+    .timer-ring-bg {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 6;
+    }
+    .timer-ring-fill {
+      fill: none;
+      stroke: var(--primary);
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear;
+    }
+    .timer-ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .timer-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .timer-btn {
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: var(--transition);
+      min-width: 100px;
+    }
+    .timer-btn:hover { transform: translateY(-1px); }
+    .timer-btn.start  { background: var(--success); color: white; }
+    .timer-btn.pause  { background: #FF9800; color: white; }
+    .timer-btn.finish { background: var(--primary); color: white; }
+    .timer-btn.cancel { background: var(--bg); color: var(--text-light); border: 1.5px solid var(--border); }
+    .timer-btn.start:hover  { background: #2E7D32; }
+    .timer-btn.pause:hover  { background: #E65100; }
+    .timer-btn.finish:hover { background: var(--primary-dark); }
+    .timer-btn.cancel:hover { background: var(--border); }
+    .timer-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .timer-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-lighter);
+    }
+
+    @media (max-width: 600px) {
+      .timer-modal { max-width: 100%; margin: 0; border-radius: 16px 16px 0 0; position: fixed; bottom: 0; left: 0; right: 0; }
+      .timer-display { font-size: 2.8rem; }
+      .timer-progress-ring { width: 160px; height: 160px; }
+      .timer-btn { padding: 14px 20px; min-height: 48px; }
+    }
+
+    /* =========================================
        ACTIVITY FEED
     ========================================= */
     .activity-feed { }
@@ -1676,8 +1814,8 @@
             <div class="stat-card-header">
               <div class="stat-card-icon blue">⏱️</div>
             </div>
-            <div class="stat-value" id="statHorasEstudadas">0</div>
-            <div class="stat-label">Total de Matérias</div>
+            <div class="stat-value" id="statHorasEstudadas">0h</div>
+            <div class="stat-label">Horas Estudadas</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
@@ -1903,6 +2041,38 @@
       <div class="profile-modal-footer">
         <button class="btn-cancel" onclick="fecharEditarPerfil()">Cancelar</button>
         <button class="btn btn-primary" onclick="salvarPerfil()" id="btnSalvarPerfil">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Cronômetro de Estudo -->
+  <div class="timer-modal-overlay" id="timerModalOverlay">
+    <div class="timer-modal">
+      <div class="timer-header">
+        <h3>Cronômetro de Estudo</h3>
+        <div class="timer-materia" id="timerMateria">—</div>
+      </div>
+      <div class="timer-body">
+        <div class="timer-progress-ring">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle class="timer-ring-bg" cx="100" cy="100" r="90"></circle>
+            <circle class="timer-ring-fill" id="timerRingFill" cx="100" cy="100" r="90"
+              stroke-dasharray="565.48" stroke-dashoffset="0"></circle>
+          </svg>
+          <div class="timer-ring-center">
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <div class="timer-status stopped" id="timerStatus">Pronto para iniciar</div>
+          </div>
+        </div>
+        <div class="timer-controls">
+          <button class="timer-btn start" id="btnTimerStart" onclick="timerStart()">▶ Iniciar</button>
+          <button class="timer-btn pause" id="btnTimerPause" onclick="timerPause()" style="display:none">⏸ Pausar</button>
+          <button class="timer-btn finish" id="btnTimerFinish" onclick="timerFinish()" style="display:none">✓ Finalizar</button>
+          <button class="timer-btn cancel" id="btnTimerCancel" onclick="timerCancel()">✕ Cancelar</button>
+        </div>
+      </div>
+      <div class="timer-footer" id="timerFooter">
+        O link do seu curso foi aberto em outra aba. Estude e finalize quando terminar.
       </div>
     </div>
   </div>
@@ -2360,8 +2530,181 @@
       const links = getLinksStorage();
       if (links[materia] && links[materia].url) {
         window.open(links[materia].url, '_blank');
+        abrirTimer(materia);
       } else {
         abrirLinkModal(materia);
+      }
+    }
+
+    // =============================================
+    //  CRONÔMETRO DE ESTUDO
+    // =============================================
+    let timerInterval = null;
+    let timerSeconds = 0;
+    let timerRunning = false;
+    let timerMateria = '';
+    let timerStartTime = null;
+    const POMODORO_MINUTES = 25;
+    const POMODORO_SECONDS = POMODORO_MINUTES * 60;
+
+    function abrirTimer(materia) {
+      timerMateria = materia;
+      timerSeconds = 0;
+      timerRunning = false;
+      timerStartTime = null;
+
+      document.getElementById('timerMateria').textContent = materia;
+      document.getElementById('timerDisplay').textContent = '00:00:00';
+      document.getElementById('timerStatus').textContent = 'Pronto para iniciar';
+      document.getElementById('timerStatus').className = 'timer-status stopped';
+      document.getElementById('btnTimerStart').style.display = '';
+      document.getElementById('btnTimerStart').textContent = '▶ Iniciar';
+      document.getElementById('btnTimerPause').style.display = 'none';
+      document.getElementById('btnTimerFinish').style.display = 'none';
+      updateTimerRing(0);
+      document.getElementById('timerModalOverlay').classList.add('show');
+    }
+
+    function timerStart() {
+      if (!timerStartTime) timerStartTime = new Date();
+      timerRunning = true;
+
+      document.getElementById('timerStatus').textContent = 'Estudando...';
+      document.getElementById('timerStatus').className = 'timer-status running';
+      document.getElementById('btnTimerStart').style.display = 'none';
+      document.getElementById('btnTimerPause').style.display = '';
+      document.getElementById('btnTimerFinish').style.display = '';
+
+      clearInterval(timerInterval);
+      timerInterval = setInterval(function() {
+        timerSeconds++;
+        document.getElementById('timerDisplay').textContent = formatTimer(timerSeconds);
+        updateTimerRing(timerSeconds);
+      }, 1000);
+    }
+
+    function timerPause() {
+      timerRunning = false;
+      clearInterval(timerInterval);
+
+      document.getElementById('timerStatus').textContent = 'Pausado';
+      document.getElementById('timerStatus').className = 'timer-status paused';
+      document.getElementById('btnTimerPause').style.display = 'none';
+      document.getElementById('btnTimerStart').style.display = '';
+      document.getElementById('btnTimerStart').textContent = '▶ Retomar';
+    }
+
+    async function timerFinish() {
+      clearInterval(timerInterval);
+      timerRunning = false;
+
+      if (timerSeconds < 5) {
+        fecharTimer();
+        return;
+      }
+
+      document.getElementById('timerStatus').textContent = 'Salvando sessão...';
+      document.getElementById('timerStatus').className = 'timer-status stopped';
+      document.getElementById('btnTimerFinish').disabled = true;
+
+      // Save to Supabase
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          const { error } = await supabase
+            .from('sessoes_estudo')
+            .insert([{
+              user_id: session.user.id,
+              materia: timerMateria,
+              tempo_segundos: timerSeconds,
+              data_inicio: timerStartTime.toISOString(),
+              status: 'concluido'
+            }]);
+
+          if (error) {
+            console.error('[Timer] Erro ao salvar sessão:', error.message);
+          } else {
+            console.log('[Timer] Sessão salva:', timerMateria, timerSeconds + 's');
+          }
+        }
+      } catch (e) {
+        console.error('[Timer] Erro:', e);
+      }
+
+      // Update stats
+      await carregarSessoesSupabase();
+      calcularEstatisticas();
+
+      // Show summary
+      const mins = Math.floor(timerSeconds / 60);
+      const secs = timerSeconds % 60;
+      document.getElementById('timerStatus').textContent = 'Sessão salva! ' + mins + 'min ' + secs + 's em ' + timerMateria;
+      document.getElementById('timerStatus').className = 'timer-status running';
+      document.getElementById('btnTimerFinish').style.display = 'none';
+      document.getElementById('btnTimerPause').style.display = 'none';
+      document.getElementById('btnTimerStart').style.display = 'none';
+      document.getElementById('btnTimerCancel').textContent = '✓ Fechar';
+
+      setTimeout(fecharTimer, 3000);
+    }
+
+    function timerCancel() {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      fecharTimer();
+    }
+
+    function fecharTimer() {
+      clearInterval(timerInterval);
+      document.getElementById('timerModalOverlay').classList.remove('show');
+      document.getElementById('btnTimerCancel').textContent = '✕ Cancelar';
+      document.getElementById('btnTimerFinish').disabled = false;
+    }
+
+    function formatTimer(totalSecs) {
+      const h = Math.floor(totalSecs / 3600);
+      const m = Math.floor((totalSecs % 3600) / 60);
+      const s = totalSecs % 60;
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function updateTimerRing(secs) {
+      const circumference = 2 * Math.PI * 90; // r=90
+      const progress = (secs % POMODORO_SECONDS) / POMODORO_SECONDS;
+      const offset = circumference * (1 - progress);
+      const ring = document.getElementById('timerRingFill');
+      if (ring) ring.style.strokeDashoffset = offset;
+    }
+
+    // =============================================
+    //  LOAD STUDY SESSIONS FROM SUPABASE
+    // =============================================
+    let totalHorasEstudadas = 0;
+
+    async function carregarSessoesSupabase() {
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { data, error } = await supabase
+          .from('sessoes_estudo')
+          .select('tempo_segundos')
+          .eq('user_id', session.user.id)
+          .eq('status', 'concluido');
+
+        if (error) {
+          console.error('[Sessões] Erro:', error.message);
+          return;
+        }
+
+        const totalSegundos = (data || []).reduce((acc, s) => acc + s.tempo_segundos, 0);
+        totalHorasEstudadas = totalSegundos / 3600;
+        console.log('[Sessões] Total:', Math.round(totalHorasEstudadas * 10) / 10, 'horas');
+      } catch (e) {
+        console.error('[Sessões] Erro:', e);
       }
     }
 
@@ -2734,7 +3077,7 @@
 
       // Update UI
       document.getElementById('statDiasEstudados').textContent = aulasConcluidas + '/' + totalAulas;
-      document.getElementById('statHorasEstudadas').textContent = totalMaterias;
+      document.getElementById('statHorasEstudadas').textContent = Math.round(totalHorasEstudadas * 10) / 10 + 'h';
       document.getElementById('statHorasRecomendadas').textContent = horasRecomendadas + 'h/sem';
       document.getElementById('statTotalMaterias').textContent = progresso + '%';
       document.getElementById('streakCount').textContent = materiasConcluidas + '/' + totalMaterias;
@@ -2768,6 +3111,7 @@
       carregarPerfilSupabase();
       carregarLinksSupabase();
       carregarAulasSupabase();
+      carregarSessoesSupabase();
     });
   </script>
 

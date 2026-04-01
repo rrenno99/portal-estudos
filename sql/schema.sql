@@ -38,6 +38,26 @@ CREATE TABLE links_materias (
 );
 
 -- =============================================
+--  TABELA: sessoes_estudo
+--  Cronômetro de tempo por sessão de estudo
+-- =============================================
+CREATE TABLE sessoes_estudo (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  materia TEXT NOT NULL,
+  tempo_segundos INTEGER NOT NULL DEFAULT 0,
+  data_inicio TIMESTAMPTZ DEFAULT now(),
+  status TEXT DEFAULT 'concluido' CHECK (status IN ('concluido', 'cancelado'))
+);
+
+CREATE INDEX idx_sessoes_user_id ON sessoes_estudo(user_id);
+
+ALTER TABLE sessoes_estudo ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Aluno lê próprias sessões" ON sessoes_estudo FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Aluno cria próprias sessões" ON sessoes_estudo FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- =============================================
 --  TABELA: aulas_materia
 --  Progresso individual de cada aula por matéria
 --  status: 'pendente' | 'estudando' | 'concluido'
