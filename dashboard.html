@@ -906,6 +906,35 @@
     .mini-bar { height: 5px; background: var(--bg); border-radius: 10px; overflow: hidden; }
     .mini-fill { height: 100%; border-radius: 10px; }
 
+    /* Subject completed state */
+    .subject-item.concluida {
+      opacity: 0.65;
+    }
+    .subject-item.concluida .subject-info strong {
+      text-decoration: line-through;
+      color: var(--text-light);
+    }
+
+    .btn-concluir {
+      padding: 6px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-light);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-concluir:hover { border-color: var(--success); color: var(--success); }
+    .btn-concluir.done {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+    }
+
     /* Iniciar Estudos button */
     .btn-iniciar {
       padding: 6px 14px;
@@ -1557,14 +1586,14 @@
               <div class="stat-card-icon orange">📖</div>
             </div>
             <div class="stat-value" id="statDiasEstudados">0</div>
-            <div class="stat-label">Dias Estudados</div>
+            <div class="stat-label">Matérias Concluídas</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
               <div class="stat-card-icon blue">⏱️</div>
             </div>
-            <div class="stat-value" id="statHorasEstudadas">0h</div>
-            <div class="stat-label">Horas Estudadas</div>
+            <div class="stat-value" id="statHorasEstudadas">0</div>
+            <div class="stat-label">Total de Matérias</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
@@ -1577,8 +1606,8 @@
             <div class="stat-card-header">
               <div class="stat-card-icon purple">✅</div>
             </div>
-            <div class="stat-value" id="statTotalMaterias">0</div>
-            <div class="stat-label">Matérias no Plano</div>
+            <div class="stat-value" id="statTotalMaterias">0%</div>
+            <div class="stat-label">Progresso Geral</div>
           </div>
         </div>
 
@@ -1907,16 +1936,13 @@
       const plan = getPlanData();
       const links = getLinksStorage();
 
-      // Get subjects from plan or from links keys
+      // Get subjects: prefer links (Supabase source of truth), fallback to plan
       let subjects = [];
-      if (plan && plan.materias && plan.materias.length > 0) {
+      const linkKeys = Object.keys(links);
+      if (linkKeys.length > 0) {
+        subjects = linkKeys.map(k => ({ nome: k }));
+      } else if (plan && plan.materias && plan.materias.length > 0) {
         subjects = plan.materias;
-      } else {
-        // Fallback: build from links keys
-        const linkKeys = Object.keys(links);
-        if (linkKeys.length > 0) {
-          subjects = linkKeys.map(k => ({ nome: k }));
-        }
       }
 
       if (subjects.length === 0) {
@@ -1934,22 +1960,23 @@
         const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
         const linkData = links[nome];
         const hasLink = linkData && linkData.url;
+        const concluida = linkData && linkData.concluido;
+        const escapedName = nome.replace(/'/g, "\\'");
 
         const item = document.createElement('div');
-        item.className = 'subject-item';
+        item.className = 'subject-item' + (concluida ? ' concluida' : '');
         item.setAttribute('data-materia', nome);
         item.innerHTML = `
           <div class="subject-color" style="background:${color.bg}"></div>
           <div class="subject-info">
             <strong>${nome}</strong>
-            <span>Início do estudo</span>
+            <span>${concluida ? 'Concluída' : 'Em andamento'}</span>
             ${hasLink ? '<span class="link-saved-badge">✓ ' + (linkData.titulo || 'Link salvo') + '</span>' : ''}
           </div>
-          <div class="subject-progress">
-            <span>0%</span>
-            <div class="mini-bar"><div class="mini-fill" style="width:0%;background:${color.bg}"></div></div>
-          </div>
-          <button class="btn-iniciar" onclick="iniciarEstudos('${nome.replace(/'/g, "\\'")}')">Iniciar Estudos</button>
+          <button class="btn-concluir ${concluida ? 'done' : ''}" onclick="toggleConcluir('${escapedName}')">
+            ${concluida ? '✓ Concluída' : 'Concluir'}
+          </button>
+          <button class="btn-iniciar" onclick="iniciarEstudos('${escapedName}')">Iniciar Estudos</button>
         `;
         container.appendChild(item);
       });
@@ -2096,15 +2123,18 @@
         if (!user) return;
 
         const links = await buscarLinks(user.id);
-        // Replace localStorage links entirely with Supabase data (source of truth)
+        // Replace localStorage entirely with Supabase data (source of truth)
         const mapa = {};
         if (links && links.length > 0) {
-          links.forEach(l => { mapa[l.materia] = { url: l.url, titulo: l.titulo }; });
+          links.forEach(l => {
+            mapa[l.materia] = { url: l.url, titulo: l.titulo, concluido: !!l.concluido, id: l.id };
+          });
         }
         saveLinksStorage(mapa);
         renderSubjectsList();
         buildDynamicSchedule();
         renderCalendar();
+        calcularEstatisticas();
       } catch (e) { /* Sem Supabase, usa localStorage */ }
     }
 
@@ -2162,6 +2192,42 @@
         fecharEditarPerfil();
       }
     });
+
+    // =============================================
+    //  TOGGLE CONCLUIR MATÉRIA
+    // =============================================
+    async function toggleConcluir(materia) {
+      const links = getLinksStorage();
+      const item = links[materia];
+      if (!item) return;
+
+      const novoConcluido = !item.concluido;
+
+      // Update localStorage immediately
+      item.concluido = novoConcluido;
+      saveLinksStorage(links);
+
+      // Re-render UI
+      renderSubjectsList();
+      calcularEstatisticas();
+
+      // Update Supabase
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const { error } = await supabase
+          .from('links_materias')
+          .update({ concluido: novoConcluido })
+          .eq('user_id', session.user.id)
+          .eq('materia', materia);
+
+        if (error) console.error('[Supabase] Erro ao atualizar concluido:', error.message);
+      } catch (e) {
+        console.error('[Concluir] Erro:', e);
+      }
+    }
 
     // =============================================
     //  LOAD USER PROFILE (Supabase + localStorage)
@@ -2465,27 +2531,10 @@
       const plan = getPlanData();
       const links = getLinksStorage();
 
-      // Get study tracking data
-      let stats;
-      try { stats = JSON.parse(localStorage.getItem('studyplan_stats') || 'null'); } catch { stats = null; }
-
-      const diasEstudados = stats ? (stats.diasEstudados || 0) : 0;
-      const horasEstudadas = stats ? (stats.horasEstudadas || 0) : 0;
-      const sequencia = stats ? (stats.sequencia || 0) : 0;
-
-      // Total subjects from plan
-      let totalMaterias = 0;
-      let materiasConcluidas = 0;
-
-      if (plan && plan.materias) {
-        totalMaterias = plan.materias.length;
-        // Check which subjects are marked complete in tracking
-        if (stats && stats.materiasConcluidas) {
-          materiasConcluidas = stats.materiasConcluidas.length;
-        }
-      } else {
-        totalMaterias = Object.keys(links).length;
-      }
+      // Count from links (source of truth)
+      const materias = Object.values(links);
+      const totalMaterias = materias.length;
+      const materiasConcluidas = materias.filter(l => l.concluido).length;
 
       // Calculate progress: matérias concluídas / total
       const progresso = totalMaterias > 0 ? Math.round((materiasConcluidas / totalMaterias) * 100) : 0;
@@ -2499,11 +2548,11 @@
       }
 
       // Update UI
-      document.getElementById('statDiasEstudados').textContent = diasEstudados;
-      document.getElementById('statHorasEstudadas').textContent = horasEstudadas + 'h';
+      document.getElementById('statDiasEstudados').textContent = materiasConcluidas;
+      document.getElementById('statHorasEstudadas').textContent = totalMaterias;
       document.getElementById('statHorasRecomendadas').textContent = horasRecomendadas + 'h/sem';
-      document.getElementById('statTotalMaterias').textContent = totalMaterias;
-      document.getElementById('streakCount').textContent = sequencia + ' dias';
+      document.getElementById('statTotalMaterias').textContent = progresso + '%';
+      document.getElementById('streakCount').textContent = materiasConcluidas + '/' + totalMaterias;
 
       // Progress bars
       const pctStr = progresso + '%';

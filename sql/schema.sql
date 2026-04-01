@@ -75,7 +75,8 @@ CREATE POLICY "Aluno cria próprios links"
 
 CREATE POLICY "Aluno atualiza próprios links"
   ON links_materias FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Aluno deleta próprios links"
   ON links_materias FOR DELETE
