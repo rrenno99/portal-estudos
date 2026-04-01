@@ -2115,8 +2115,18 @@
       { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
     );
 
-    const { data: { session: _session } } = await _supabase.auth.getSession();
-    if (!_session) { window.location.href = 'login.html'; }
+    let _session = null;
+    try {
+      const { data } = await _supabase.auth.getSession();
+      _session = data.session;
+    } catch (e) {
+      console.error('[Init] Erro getSession:', e);
+    }
+
+    if (!_session) {
+      window.location.href = 'login.html';
+      throw new Error('No session');  // stops module execution
+    }
 
     _supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') window.location.href = 'login.html'; });
 
@@ -2127,6 +2137,9 @@
     window._userName = _session.user.user_metadata?.nome || _session.user.email.split('@')[0];
 
     console.log('[Init] Supabase OK, user:', window._userId);
+
+    // Visual confirmation that module loaded
+    document.title = 'Dashboard | ' + window._userName;
 
     // =============================================
     //  SIDEBAR TOGGLE
@@ -3382,6 +3395,33 @@
     calcularEstatisticas();
 
     console.log('[Init] Dashboard completo');
+
+    // =============================================
+    //  EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
+    // =============================================
+    window.scrollToCalendar = scrollToCalendar;
+    window.toggleDropdown = toggleDropdown;
+    window.closeAllDropdowns = closeAllDropdowns;
+    window.markAllRead = markAllRead;
+    window.shiftWeek = shiftWeek;
+    window.iniciarEstudos = iniciarEstudos;
+    window.abrirLinkModal = abrirLinkModal;
+    window.fecharLinkModal = fecharLinkModal;
+    window.salvarLink = salvarLink;
+    window.abrirEditarPerfil = abrirEditarPerfil;
+    window.fecharEditarPerfil = fecharEditarPerfil;
+    window.salvarPerfil = salvarPerfil;
+    window.removerFoto = removerFoto;
+    window.handleFotoUpload = handleFotoUpload;
+    window.toggleExpandSubject = toggleExpandSubject;
+    window.toggleAulaStatus = toggleAulaStatus;
+    window.timerStart = timerStart;
+    window.timerPause = timerPause;
+    window.timerFinish = timerFinish;
+    window.timerCancel = timerCancel;
+    window.feedbackConcluiu = feedbackConcluiu;
+    window.feedbackEstudando = feedbackEstudando;
+    window.feedbackApenasMarcar = feedbackApenasMarcar;
   </script>
 </body>
 </html>
