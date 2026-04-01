@@ -1349,14 +1349,10 @@
   <script>
     function handleLogout(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-      // 1. Clear all user data
-      var keys = Object.keys(localStorage);
-      for (var i = 0; i < keys.length; i++) {
-        if (keys[i].indexOf('studyplan') === 0 || keys[i].indexOf('sb-') === 0) {
-          localStorage.removeItem(keys[i]);
-        }
-      }
-      // 2. Redirect immediately
+      // Clear everything: user data + Supabase auth session
+      localStorage.clear();
+      sessionStorage.clear();
+      // Redirect
       window.location.replace('login.html');
     }
   </script>

@@ -242,10 +242,7 @@
   </div>
 
   <script type="module">
-    import { login, cadastrar, redirecionarSeLogado } from './js/auth.js';
-
-    // If already logged in, skip to dashboard
-    redirecionarSeLogado();
+    import { login, cadastrar } from './js/auth.js';
 
     // Expose to global scope for inline handlers
     window.handleLogin = async function(e) {
