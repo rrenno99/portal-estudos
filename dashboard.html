@@ -1234,141 +1234,137 @@
     }
 
     /* =========================================
-       TIMER MODAL
+       FLOATING DRAGGABLE TIMER
     ========================================= */
-    .timer-modal-overlay {
+    .timer-float {
       position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 800;
-      display: none;
-      align-items: center;
-      justify-content: center;
-    }
-    .timer-modal-overlay.show { display: flex; }
-
-    .timer-modal {
+      bottom: 24px;
+      right: 24px;
+      width: 320px;
       background: var(--bg-card);
       border-radius: var(--radius);
-      box-shadow: var(--shadow-lg);
-      width: 100%;
-      max-width: 400px;
-      margin: 16px;
-      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      border: 1px solid var(--border);
+      z-index: 900;
+      display: none;
       overflow: hidden;
-      animation: dropIn 0.15s ease;
+      transition: box-shadow 0.2s;
     }
+    .timer-float.show { display: block; }
+    .timer-float.dragging { box-shadow: 0 12px 40px rgba(0,0,0,0.25); opacity: 0.95; }
 
-    .timer-header {
-      padding: 20px 24px 12px;
-      border-bottom: 1px solid var(--border);
+    .timer-float-header {
+      padding: 12px 16px;
+      background: var(--secondary);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: grab;
+      user-select: none;
     }
-    .timer-header h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--secondary);
-      margin: 0 0 4px;
+    .timer-float-header:active { cursor: grabbing; }
+    .timer-float-header h4 { font-size: 0.82rem; font-weight: 600; margin: 0; }
+    .timer-float-materia { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
+    .timer-float-close {
+      background: none; border: none; color: rgba(255,255,255,0.6);
+      font-size: 1.1rem; cursor: pointer; padding: 4px 6px; border-radius: 4px;
     }
-    .timer-materia {
-      font-size: 0.82rem;
-      color: var(--primary);
-      font-weight: 600;
-    }
+    .timer-float-close:hover { color: white; background: rgba(255,255,255,0.15); }
 
-    .timer-body {
-      padding: 32px 24px;
-    }
+    .timer-float-body { padding: 20px 16px; text-align: center; }
 
-    .timer-display {
-      font-size: 3.5rem;
+    .timer-float-display {
+      font-size: 2.6rem;
       font-weight: 800;
       color: var(--secondary);
       font-variant-numeric: tabular-nums;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-      font-family: 'Inter', monospace;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
     }
 
-    .timer-status {
-      font-size: 0.82rem;
+    .timer-float-status {
+      font-size: 0.78rem;
       font-weight: 600;
-      margin-bottom: 24px;
-      height: 20px;
+      margin-bottom: 16px;
+      height: 18px;
     }
-    .timer-status.running { color: var(--success); }
-    .timer-status.paused  { color: #FF9800; }
-    .timer-status.stopped { color: var(--text-lighter); }
+    .timer-float-status.running { color: var(--success); }
+    .timer-float-status.paused  { color: #FF9800; }
+    .timer-float-status.stopped { color: var(--text-lighter); }
 
-    .timer-progress-ring {
-      width: 200px;
-      height: 200px;
-      margin: 0 auto 24px;
+    .timer-float-ring {
+      width: 140px; height: 140px;
+      margin: 0 auto 16px;
       position: relative;
     }
-    .timer-progress-ring svg {
-      transform: rotate(-90deg);
-    }
-    .timer-ring-bg {
-      fill: none;
-      stroke: var(--border);
-      stroke-width: 6;
-    }
-    .timer-ring-fill {
-      fill: none;
-      stroke: var(--primary);
-      stroke-width: 6;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 1s linear;
-    }
+    .timer-float-ring svg { transform: rotate(-90deg); width: 140px; height: 140px; }
+    .timer-ring-bg { fill: none; stroke: var(--border); stroke-width: 5; }
+    .timer-ring-fill { fill: none; stroke: var(--primary); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
     .timer-ring-center {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
 
-    .timer-controls {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
+    .timer-float-controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
     .timer-btn {
-      padding: 12px 24px;
-      border-radius: var(--radius-sm);
-      font-size: 0.88rem;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: var(--transition);
-      min-width: 100px;
+      padding: 10px 18px; border-radius: var(--radius-sm);
+      font-size: 0.82rem; font-weight: 600; border: none;
+      cursor: pointer; transition: var(--transition);
     }
     .timer-btn:hover { transform: translateY(-1px); }
     .timer-btn.start  { background: var(--success); color: white; }
     .timer-btn.pause  { background: #FF9800; color: white; }
     .timer-btn.finish { background: var(--primary); color: white; }
     .timer-btn.cancel { background: var(--bg); color: var(--text-light); border: 1.5px solid var(--border); }
-    .timer-btn.start:hover  { background: #2E7D32; }
-    .timer-btn.pause:hover  { background: #E65100; }
-    .timer-btn.finish:hover { background: var(--primary-dark); }
-    .timer-btn.cancel:hover { background: var(--border); }
     .timer-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    .timer-footer {
-      padding: 16px 24px;
-      border-top: 1px solid var(--border);
-      font-size: 0.78rem;
-      color: var(--text-lighter);
+    .timer-float-footer {
+      padding: 10px 16px; border-top: 1px solid var(--border);
+      font-size: 0.72rem; color: var(--text-lighter); text-align: center;
     }
 
+    /* Pomodoro alert flash */
+    .timer-float.pomodoro-alert { animation: pomodoroFlash 0.5s ease 3; }
+    @keyframes pomodoroFlash {
+      0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+      50% { box-shadow: 0 0 0 4px var(--primary), 0 8px 32px rgba(0,0,0,0.18); }
+    }
+
+    /* Feedback options after finish */
+    .timer-feedback { display: none; padding: 16px; }
+    .timer-feedback.show { display: block; }
+    .timer-feedback h4 { font-size: 0.88rem; font-weight: 700; color: var(--secondary); margin: 0 0 12px; }
+
+    .feedback-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border); background: var(--bg-card);
+      cursor: pointer; margin-bottom: 8px; transition: var(--transition);
+      width: 100%; text-align: left; font-family: inherit; font-size: 0.82rem;
+    }
+    .feedback-option:hover { border-color: var(--primary); background: rgba(30,136,229,0.04); }
+
+    .feedback-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .feedback-icon.green  { background: #E8F5E9; }
+    .feedback-icon.orange { background: #FFF3E0; }
+    .feedback-icon.gray   { background: var(--bg); }
+
+    .feedback-text strong { display: block; font-size: 0.82rem; color: var(--text); }
+    .feedback-text span   { font-size: 0.72rem; color: var(--text-light); }
+
     @media (max-width: 600px) {
-      .timer-modal { max-width: 100%; margin: 0; border-radius: 16px 16px 0 0; position: fixed; bottom: 0; left: 0; right: 0; }
-      .timer-display { font-size: 2.8rem; }
-      .timer-progress-ring { width: 160px; height: 160px; }
-      .timer-btn { padding: 14px 20px; min-height: 48px; }
+      .timer-float { bottom: 0; right: 0; left: 0; width: 100%; border-radius: 16px 16px 0 0; }
+      .timer-float-display { font-size: 2.2rem; }
+      .timer-float-ring { width: 110px; height: 110px; }
+      .timer-float-ring svg { width: 110px; height: 110px; }
+      .timer-btn { min-height: 44px; padding: 10px 14px; }
+      .feedback-option { padding: 14px; }
     }
 
     /* =========================================
@@ -2045,35 +2041,65 @@
     </div>
   </div>
 
-  <!-- MODAL: Cronômetro de Estudo -->
-  <div class="timer-modal-overlay" id="timerModalOverlay">
-    <div class="timer-modal">
-      <div class="timer-header">
-        <h3>Cronômetro de Estudo</h3>
-        <div class="timer-materia" id="timerMateria">—</div>
+  <!-- FLOATING TIMER (draggable) -->
+  <div class="timer-float" id="timerFloat">
+    <div class="timer-float-header" id="timerDragHandle">
+      <div>
+        <h4>Cronômetro de Estudo</h4>
+        <div class="timer-float-materia" id="timerMateria">—</div>
       </div>
-      <div class="timer-body">
-        <div class="timer-progress-ring">
-          <svg width="200" height="200" viewBox="0 0 200 200">
-            <circle class="timer-ring-bg" cx="100" cy="100" r="90"></circle>
-            <circle class="timer-ring-fill" id="timerRingFill" cx="100" cy="100" r="90"
-              stroke-dasharray="565.48" stroke-dashoffset="0"></circle>
-          </svg>
-          <div class="timer-ring-center">
-            <div class="timer-display" id="timerDisplay">00:00:00</div>
-            <div class="timer-status stopped" id="timerStatus">Pronto para iniciar</div>
-          </div>
-        </div>
-        <div class="timer-controls">
-          <button class="timer-btn start" id="btnTimerStart" onclick="timerStart()">▶ Iniciar</button>
-          <button class="timer-btn pause" id="btnTimerPause" onclick="timerPause()" style="display:none">⏸ Pausar</button>
-          <button class="timer-btn finish" id="btnTimerFinish" onclick="timerFinish()" style="display:none">✓ Finalizar</button>
-          <button class="timer-btn cancel" id="btnTimerCancel" onclick="timerCancel()">✕ Cancelar</button>
+      <button class="timer-float-close" onclick="timerCancel()" title="Minimizar">✕</button>
+    </div>
+
+    <!-- Timer view -->
+    <div class="timer-float-body" id="timerBodyView">
+      <div class="timer-float-ring">
+        <svg viewBox="0 0 140 140">
+          <circle class="timer-ring-bg" cx="70" cy="70" r="62"></circle>
+          <circle class="timer-ring-fill" id="timerRingFill" cx="70" cy="70" r="62"
+            stroke-dasharray="389.56" stroke-dashoffset="0"></circle>
+        </svg>
+        <div class="timer-ring-center">
+          <div class="timer-float-display" id="timerDisplay">00:00:00</div>
+          <div class="timer-float-status stopped" id="timerStatus">Pronto</div>
         </div>
       </div>
-      <div class="timer-footer" id="timerFooter">
-        O link do seu curso foi aberto em outra aba. Estude e finalize quando terminar.
+      <div class="timer-float-controls">
+        <button class="timer-btn start" id="btnTimerStart" onclick="timerStart()">▶ Iniciar</button>
+        <button class="timer-btn pause" id="btnTimerPause" onclick="timerPause()" style="display:none">⏸ Pausar</button>
+        <button class="timer-btn finish" id="btnTimerFinish" onclick="timerFinish()" style="display:none">✓ Finalizar</button>
+        <button class="timer-btn cancel" id="btnTimerCancel" onclick="timerCancel()">✕ Cancelar</button>
       </div>
+    </div>
+
+    <!-- Feedback view (shown after Finalizar) -->
+    <div class="timer-feedback" id="timerFeedbackView">
+      <h4>Como foi o estudo? <span id="feedbackTime" style="font-weight:400;color:var(--text-light)"></span></h4>
+      <button class="feedback-option" onclick="feedbackConcluiu()">
+        <div class="feedback-icon green">✓</div>
+        <div class="feedback-text">
+          <strong>Concluí a aula</strong>
+          <span>Marca a aula como 100% concluída</span>
+        </div>
+      </button>
+      <button class="feedback-option" onclick="feedbackEstudando()">
+        <div class="feedback-icon orange">▶</div>
+        <div class="feedback-text">
+          <strong>Ainda estou estudando</strong>
+          <span>Mantém a aula em andamento (50%)</span>
+        </div>
+      </button>
+      <button class="feedback-option" onclick="feedbackApenasMarcar()">
+        <div class="feedback-icon gray">⏱</div>
+        <div class="feedback-text">
+          <strong>Apenas marque o tempo</strong>
+          <span>Salva as horas sem alterar o progresso</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="timer-float-footer">
+      Arraste o cabeçalho para mover · Pomodoro: alerta em 25min e 50min
     </div>
   </div>
 
@@ -2537,32 +2563,57 @@
     }
 
     // =============================================
-    //  CRONÔMETRO DE ESTUDO
+    //  FLOATING DRAGGABLE TIMER
     // =============================================
     let timerInterval = null;
     let timerSeconds = 0;
     let timerRunning = false;
     let timerMateria = '';
     let timerStartTime = null;
-    const POMODORO_MINUTES = 25;
-    const POMODORO_SECONDS = POMODORO_MINUTES * 60;
+    let pomodoroAlerted25 = false;
+    let pomodoroAlerted50 = false;
+    const RING_R = 62;
+    const RING_CIRC = 2 * Math.PI * RING_R;
+
+    // Audio context for Pomodoro alerts
+    function playPomodoroBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Play 3 gentle beeps
+        [0, 0.25, 0.5].forEach(delay => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          osc.type = 'sine';
+          gain.gain.value = 0.15;
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + 0.15);
+        });
+      } catch (e) { /* audio not available */ }
+    }
 
     function abrirTimer(materia) {
       timerMateria = materia;
       timerSeconds = 0;
       timerRunning = false;
       timerStartTime = null;
+      pomodoroAlerted25 = false;
+      pomodoroAlerted50 = false;
 
       document.getElementById('timerMateria').textContent = materia;
       document.getElementById('timerDisplay').textContent = '00:00:00';
-      document.getElementById('timerStatus').textContent = 'Pronto para iniciar';
-      document.getElementById('timerStatus').className = 'timer-status stopped';
+      document.getElementById('timerStatus').textContent = 'Pronto';
+      document.getElementById('timerStatus').className = 'timer-float-status stopped';
       document.getElementById('btnTimerStart').style.display = '';
       document.getElementById('btnTimerStart').textContent = '▶ Iniciar';
       document.getElementById('btnTimerPause').style.display = 'none';
       document.getElementById('btnTimerFinish').style.display = 'none';
+      document.getElementById('timerBodyView').style.display = '';
+      document.getElementById('timerFeedbackView').classList.remove('show');
       updateTimerRing(0);
-      document.getElementById('timerModalOverlay').classList.add('show');
+      document.getElementById('timerFloat').classList.add('show');
     }
 
     function timerStart() {
@@ -2570,7 +2621,7 @@
       timerRunning = true;
 
       document.getElementById('timerStatus').textContent = 'Estudando...';
-      document.getElementById('timerStatus').className = 'timer-status running';
+      document.getElementById('timerStatus').className = 'timer-float-status running';
       document.getElementById('btnTimerStart').style.display = 'none';
       document.getElementById('btnTimerPause').style.display = '';
       document.getElementById('btnTimerFinish').style.display = '';
@@ -2580,74 +2631,120 @@
         timerSeconds++;
         document.getElementById('timerDisplay').textContent = formatTimer(timerSeconds);
         updateTimerRing(timerSeconds);
+
+        // Pomodoro alerts at 25min and 50min
+        if (timerSeconds === 25 * 60 && !pomodoroAlerted25) {
+          pomodoroAlerted25 = true;
+          playPomodoroBeep();
+          document.getElementById('timerFloat').classList.add('pomodoro-alert');
+          setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
+        }
+        if (timerSeconds === 50 * 60 && !pomodoroAlerted50) {
+          pomodoroAlerted50 = true;
+          playPomodoroBeep();
+          document.getElementById('timerFloat').classList.add('pomodoro-alert');
+          setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
+        }
       }, 1000);
     }
 
     function timerPause() {
       timerRunning = false;
       clearInterval(timerInterval);
-
       document.getElementById('timerStatus').textContent = 'Pausado';
-      document.getElementById('timerStatus').className = 'timer-status paused';
+      document.getElementById('timerStatus').className = 'timer-float-status paused';
       document.getElementById('btnTimerPause').style.display = 'none';
       document.getElementById('btnTimerStart').style.display = '';
       document.getElementById('btnTimerStart').textContent = '▶ Retomar';
     }
 
-    async function timerFinish() {
+    function timerFinish() {
       clearInterval(timerInterval);
       timerRunning = false;
 
-      if (timerSeconds < 5) {
-        fecharTimer();
-        return;
-      }
+      if (timerSeconds < 5) { fecharTimer(); return; }
 
-      document.getElementById('timerStatus').textContent = 'Salvando sessão...';
-      document.getElementById('timerStatus').className = 'timer-status stopped';
-      document.getElementById('btnTimerFinish').disabled = true;
+      // Show feedback options
+      const mins = Math.floor(timerSeconds / 60);
+      const secs = timerSeconds % 60;
+      document.getElementById('feedbackTime').textContent = '(' + mins + 'min ' + secs + 's)';
+      document.getElementById('timerBodyView').style.display = 'none';
+      document.getElementById('timerFeedbackView').classList.add('show');
+    }
 
-      // Save to Supabase
+    async function salvarSessao() {
       try {
         const { supabase } = await import('./js/supabase.js');
         const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-        if (session) {
-          const { error } = await supabase
-            .from('sessoes_estudo')
-            .insert([{
-              user_id: session.user.id,
-              materia: timerMateria,
-              tempo_segundos: timerSeconds,
-              data_inicio: timerStartTime.toISOString(),
-              status: 'concluido'
-            }]);
+        const { error } = await supabase
+          .from('sessoes_estudo')
+          .insert([{
+            user_id: session.user.id,
+            materia: timerMateria,
+            tempo_segundos: timerSeconds,
+            data_inicio: timerStartTime.toISOString(),
+            status: 'concluido'
+          }]);
 
-          if (error) {
-            console.error('[Timer] Erro ao salvar sessão:', error.message);
-          } else {
-            console.log('[Timer] Sessão salva:', timerMateria, timerSeconds + 's');
-          }
-        }
+        if (error) console.error('[Timer] Erro ao salvar sessão:', error.message);
+        else console.log('[Timer] Sessão salva:', timerMateria, timerSeconds + 's');
       } catch (e) {
         console.error('[Timer] Erro:', e);
       }
-
-      // Update stats
       await carregarSessoesSupabase();
       calcularEstatisticas();
+    }
 
-      // Show summary
-      const mins = Math.floor(timerSeconds / 60);
-      const secs = timerSeconds % 60;
-      document.getElementById('timerStatus').textContent = 'Sessão salva! ' + mins + 'min ' + secs + 's em ' + timerMateria;
-      document.getElementById('timerStatus').className = 'timer-status running';
-      document.getElementById('btnTimerFinish').style.display = 'none';
-      document.getElementById('btnTimerPause').style.display = 'none';
-      document.getElementById('btnTimerStart').style.display = 'none';
-      document.getElementById('btnTimerCancel').textContent = '✓ Fechar';
+    // Feedback: Concluí a aula
+    async function feedbackConcluiu() {
+      await salvarSessao();
+      // Find first non-concluida aula and mark as concluido
+      const aulas = getAulasMateria(timerMateria);
+      const aula = aulas.find(a => a.status !== 'concluido');
+      if (aula) {
+        aula.status = 'concluido';
+        renderSubjectsList();
+        calcularEstatisticas();
+        try {
+          const { supabase } = await import('./js/supabase.js');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.from('aulas_materia').update({ status: 'concluido' })
+              .eq('user_id', session.user.id).eq('materia', timerMateria).eq('numero', aula.numero);
+          }
+        } catch (e) {}
+      }
+      fecharTimer();
+    }
 
-      setTimeout(fecharTimer, 3000);
+    // Feedback: Ainda estou estudando
+    async function feedbackEstudando() {
+      await salvarSessao();
+      // Find first pendente aula and mark as estudando
+      const aulas = getAulasMateria(timerMateria);
+      const aula = aulas.find(a => a.status === 'pendente');
+      if (aula) {
+        aula.status = 'estudando';
+        renderSubjectsList();
+        calcularEstatisticas();
+        try {
+          const { supabase } = await import('./js/supabase.js');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.from('aulas_materia').update({ status: 'estudando' })
+              .eq('user_id', session.user.id).eq('materia', timerMateria).eq('numero', aula.numero);
+          }
+        } catch (e) {}
+      }
+      fecharTimer();
+    }
+
+    // Feedback: Apenas marque o tempo
+    async function feedbackApenasMarcar() {
+      await salvarSessao();
+      fecharTimer();
     }
 
     function timerCancel() {
@@ -2658,8 +2755,7 @@
 
     function fecharTimer() {
       clearInterval(timerInterval);
-      document.getElementById('timerModalOverlay').classList.remove('show');
-      document.getElementById('btnTimerCancel').textContent = '✕ Cancelar';
+      document.getElementById('timerFloat').classList.remove('show');
       document.getElementById('btnTimerFinish').disabled = false;
     }
 
@@ -2671,12 +2767,62 @@
     }
 
     function updateTimerRing(secs) {
-      const circumference = 2 * Math.PI * 90; // r=90
-      const progress = (secs % POMODORO_SECONDS) / POMODORO_SECONDS;
-      const offset = circumference * (1 - progress);
+      const progress = (secs % (25 * 60)) / (25 * 60);
+      const offset = RING_CIRC * (1 - progress);
       const ring = document.getElementById('timerRingFill');
       if (ring) ring.style.strokeDashoffset = offset;
     }
+
+    // =============================================
+    //  DRAG TO MOVE TIMER
+    // =============================================
+    (function() {
+      const handle = document.getElementById('timerDragHandle');
+      const widget = document.getElementById('timerFloat');
+      if (!handle || !widget) return;
+
+      let dragging = false, startX, startY, origX, origY;
+
+      handle.addEventListener('mousedown', startDrag);
+      handle.addEventListener('touchstart', startDrag, { passive: false });
+
+      function startDrag(e) {
+        dragging = true;
+        widget.classList.add('dragging');
+        const ev = e.touches ? e.touches[0] : e;
+        const rect = widget.getBoundingClientRect();
+        startX = ev.clientX;
+        startY = ev.clientY;
+        origX = rect.left;
+        origY = rect.top;
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+        document.addEventListener('touchmove', onDrag, { passive: false });
+        document.addEventListener('touchend', stopDrag);
+        e.preventDefault();
+      }
+
+      function onDrag(e) {
+        if (!dragging) return;
+        const ev = e.touches ? e.touches[0] : e;
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        widget.style.left = (origX + dx) + 'px';
+        widget.style.top = (origY + dy) + 'px';
+        widget.style.right = 'auto';
+        widget.style.bottom = 'auto';
+        e.preventDefault();
+      }
+
+      function stopDrag() {
+        dragging = false;
+        widget.classList.remove('dragging');
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+        document.removeEventListener('touchmove', onDrag);
+        document.removeEventListener('touchend', stopDrag);
+      }
+    })();
 
     // =============================================
     //  LOAD STUDY SESSIONS FROM SUPABASE
@@ -2695,10 +2841,7 @@
           .eq('user_id', session.user.id)
           .eq('status', 'concluido');
 
-        if (error) {
-          console.error('[Sessões] Erro:', error.message);
-          return;
-        }
+        if (error) { console.error('[Sessões] Erro:', error.message); return; }
 
         const totalSegundos = (data || []).reduce((acc, s) => acc + s.tempo_segundos, 0);
         totalHorasEstudadas = totalSegundos / 3600;
