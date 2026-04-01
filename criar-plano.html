@@ -51,10 +51,46 @@
     .subject-card-remove:hover { color: var(--danger); background: rgba(229,62,62,0.08); }
     .subject-card.custom .subject-card-remove { display: block; }
 
-    /* Link field inside subject card */
-    .subject-link-field {
+    /* Extra fields inside subject card (shown when selected) */
+    .subject-extra-fields {
       margin-top: 10px;
       display: none;
+      gap: 10px;
+    }
+    .subject-card.selected .subject-extra-fields { display: flex; flex-wrap: wrap; }
+
+    .subject-aulas-field {
+      flex: 0 0 120px;
+    }
+    .subject-aulas-field label {
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: var(--text-light);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .subject-aulas-field input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--text);
+      background: var(--bg);
+      font-family: inherit;
+      transition: var(--transition);
+      text-align: center;
+    }
+    .subject-aulas-field input:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--bg-card);
+    }
+
+    /* Link field inside subject card */
+    .subject-link-field {
+      flex: 1;
+      min-width: 200px;
     }
     .subject-card.selected .subject-link-field { display: block; }
     .subject-link-field label {
@@ -897,9 +933,15 @@
           </div>
           <button class="subject-card-remove" onclick="event.stopPropagation(); removeCustomSubject(this)" title="Remover">✕</button>
         </div>
-        <div class="subject-link-field">
-          <label>🔗 Link do curso (Estratégia, Gran, etc.)</label>
-          <input type="url" placeholder="https://app.estrategiaconcursos.com.br/..." data-link-for="${nome}">
+        <div class="subject-extra-fields">
+          <div class="subject-aulas-field">
+            <label>📚 Nº de aulas</label>
+            <input type="number" min="1" max="200" value="10" data-aulas-for="${nome}" onclick="event.stopPropagation()">
+          </div>
+          <div class="subject-link-field">
+            <label>🔗 Link do curso (Estratégia, Gran, etc.)</label>
+            <input type="url" placeholder="https://app.estrategiaconcursos.com.br/..." data-link-for="${nome}">
+          </div>
         </div>
       `;
 
@@ -980,9 +1022,11 @@
       document.querySelectorAll('.subject-card.selected').forEach(card => {
         const nome = card.getAttribute('data-subject');
         const linkInput = card.querySelector('input[type="url"]');
+        const aulasInput = card.querySelector('input[type="number"]');
         subjects.push({
           nome,
-          link: linkInput ? linkInput.value.trim() : ''
+          link: linkInput ? linkInput.value.trim() : '',
+          aulas: aulasInput ? (parseInt(aulasInput.value) || 10) : 10
         });
       });
       return subjects;
@@ -1211,6 +1255,42 @@
         }
 
         console.log('[Supabase] ' + linksSalvos + ' links salvos de ' + linksComLink + ' total.');
+
+        // 3d. Create aulas for each subject
+        btn.innerHTML = '⏳ Criando aulas...';
+
+        // Delete old aulas
+        await supabase.from('aulas_materia').delete().eq('user_id', user.id);
+
+        let aulasSalvas = 0;
+        for (let i = 0; i < subjects.length; i++) {
+          const s = subjects[i];
+          const numAulas = s.aulas || 10;
+          const aulasRows = [];
+
+          for (let a = 1; a <= numAulas; a++) {
+            aulasRows.push({
+              user_id: user.id,
+              materia: s.nome,
+              numero: a,
+              titulo: 'Aula ' + a,
+              status: 'pendente'
+            });
+          }
+
+          const { error: aulasError } = await supabase
+            .from('aulas_materia')
+            .insert(aulasRows);
+
+          if (aulasError) {
+            console.error('[Supabase] ERRO aulas "' + s.nome + '":', aulasError.message);
+          } else {
+            aulasSalvas += numAulas;
+            console.log('[Supabase] ' + numAulas + ' aulas criadas para:', s.nome);
+          }
+        }
+
+        console.log('[Supabase] Total de aulas criadas:', aulasSalvas);
         savedToSupabase = true;
 
       } catch (e) {

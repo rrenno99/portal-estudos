@@ -38,11 +38,28 @@ CREATE TABLE links_materias (
 );
 
 -- =============================================
+--  TABELA: aulas_materia
+--  Progresso individual de cada aula por matéria
+--  status: 'pendente' | 'estudando' | 'concluido'
+-- =============================================
+CREATE TABLE aulas_materia (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  materia TEXT NOT NULL,
+  numero INTEGER NOT NULL,
+  titulo TEXT DEFAULT '',
+  status TEXT DEFAULT 'pendente' CHECK (status IN ('pendente', 'estudando', 'concluido')),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- =============================================
 --  INDICES
 -- =============================================
 CREATE INDEX idx_perfil_user_id ON perfil_aluno(user_id);
 CREATE INDEX idx_links_user_id ON links_materias(user_id);
 CREATE INDEX idx_links_materia ON links_materias(materia);
+CREATE INDEX idx_aulas_user_id ON aulas_materia(user_id);
+CREATE INDEX idx_aulas_materia ON aulas_materia(user_id, materia);
 
 -- =============================================
 --  ROW LEVEL SECURITY (RLS)
@@ -82,6 +99,26 @@ CREATE POLICY "Aluno deleta próprios links"
   ON links_materias FOR DELETE
   USING (auth.uid() = user_id);
 
+-- aulas_materia: CRUD apenas para o próprio usuário
+ALTER TABLE aulas_materia ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Aluno lê próprias aulas"
+  ON aulas_materia FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Aluno cria próprias aulas"
+  ON aulas_materia FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Aluno atualiza próprias aulas"
+  ON aulas_materia FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Aluno deleta próprias aulas"
+  ON aulas_materia FOR DELETE
+  USING (auth.uid() = user_id);
+
 -- =============================================
 --  TRIGGER: auto-update updated_at
 -- =============================================
@@ -95,6 +132,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER perfil_aluno_updated_at
   BEFORE UPDATE ON perfil_aluno
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER aulas_materia_updated_at
+  BEFORE UPDATE ON aulas_materia
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- =============================================
