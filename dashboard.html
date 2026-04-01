@@ -2332,14 +2332,13 @@
 
       // Sync to Supabase
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) return;
 
         const { error } = await supabase
           .from('aulas_materia')
           .update({ status: aula.status })
-          .eq('user_id', session.user.id)
+          .eq('user_id', window._userId)
           .eq('materia', materia)
           .eq('numero', numero);
 
@@ -2354,14 +2353,13 @@
     // =============================================
     async function carregarAulasSupabase() {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) return;
 
         const { data, error } = await supabase
           .from('aulas_materia')
           .select('*')
-          .eq('user_id', session.user.id)
+          .eq('user_id', window._userId)
           .order('numero', { ascending: true });
 
         if (error) {
@@ -2553,14 +2551,13 @@
     // =============================================
     async function carregarLinksSupabase() {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { console.warn('[Links] Sem sessão'); return; }
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) { console.warn('[Links] Sem Supabase'); return; }
 
         const { data: links, error } = await supabase
           .from('links_materias')
           .select('*')
-          .eq('user_id', session.user.id)
+          .eq('user_id', window._userId)
           .order('created_at', { ascending: true });
 
         if (error) { console.error('[Links] Erro:', error.message); return; }
@@ -2586,15 +2583,14 @@
 
     async function salvarLinkSupabase(materia, url, titulo) {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) return;
 
         // Try UPDATE first (materia already exists from wizard)
         const { data: updated, error: updateErr } = await supabase
           .from('links_materias')
           .update({ url: url, titulo: titulo || materia, tipo: 'curso' })
-          .eq('user_id', session.user.id)
+          .eq('user_id', window._userId)
           .eq('materia', materia)
           .select();
 
@@ -2606,7 +2602,7 @@
         if (!updated || updated.length === 0) {
           const { error: insertErr } = await supabase
             .from('links_materias')
-            .insert([{ user_id: session.user.id, materia, titulo: titulo || materia, url, tipo: 'curso' }]);
+            .insert([{ user_id: window._userId, materia, titulo: titulo || materia, url, tipo: 'curso' }]);
 
           if (insertErr) console.error('[Link] Erro INSERT:', insertErr.message);
           else console.log('[Link] Novo link inserido:', materia);
@@ -2738,14 +2734,13 @@
 
     async function salvarSessao() {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) return;
 
         const { error } = await supabase
           .from('sessoes_estudo')
           .insert([{
-            user_id: session.user.id,
+            user_id: window._userId,
             materia: timerMateria,
             tempo_segundos: timerSeconds,
             data_inicio: timerStartTime.toISOString(),
@@ -2772,11 +2767,10 @@
         renderSubjectsList();
         calcularEstatisticas();
         try {
-          const { supabase } = await import('./js/supabase.js');
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
+          const supabase = window._supabase;
+          if (supabase && window._userId) {
             await supabase.from('aulas_materia').update({ status: 'concluido' })
-              .eq('user_id', session.user.id).eq('materia', timerMateria).eq('numero', aula.numero);
+              .eq('user_id', window._userId).eq('materia', timerMateria).eq('numero', aula.numero);
           }
         } catch (e) {}
       }
@@ -2794,11 +2788,10 @@
         renderSubjectsList();
         calcularEstatisticas();
         try {
-          const { supabase } = await import('./js/supabase.js');
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
+          const supabase = window._supabase;
+          if (supabase && window._userId) {
             await supabase.from('aulas_materia').update({ status: 'estudando' })
-              .eq('user_id', session.user.id).eq('materia', timerMateria).eq('numero', aula.numero);
+              .eq('user_id', window._userId).eq('materia', timerMateria).eq('numero', aula.numero);
           }
         } catch (e) {}
       }
@@ -2895,14 +2888,13 @@
 
     async function carregarSessoesSupabase() {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) return;
 
         const { data, error } = await supabase
           .from('sessoes_estudo')
           .select('tempo_segundos')
-          .eq('user_id', session.user.id)
+          .eq('user_id', window._userId)
           .eq('status', 'concluido');
 
         if (error) { console.error('[Sessões] Erro:', error.message); return; }
@@ -3050,15 +3042,13 @@
       // Update UI immediately
       setUserUI(nome, perfil.email, concurso, currentFotoUrl);
 
-      // Try Supabase update
+      // Supabase update
       try {
-        const { atualizarPerfil } = await import('./js/database.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
-        if (user) {
-          await atualizarPerfil(user.id, { nome, concurso, telefone });
+        const sb = window._supabase;
+        if (sb && window._userId) {
+          await sb.from('perfil_aluno').update({ nome, concurso, telefone }).eq('user_id', window._userId);
         }
-      } catch (e) { /* localStorage already updated */ }
+      } catch (e) { console.error('[Perfil] Erro update:', e); }
 
       btn.textContent = 'Salvo!';
       setTimeout(() => {
@@ -3094,31 +3084,30 @@
 
       // Upload to Supabase Storage
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const { atualizarPerfil } = await import('./js/database.js');
-        const user = await getUsuarioAtual();
-        if (!user) { alert('Faça login para enviar a foto.'); return; }
+        const supabase = window._supabase;
+        const sb = window._supabase;
+        const user = window._userId ? { id: window._userId } : null;
+        if (!sb || !user) { alert('Faça login para enviar a foto.'); return; }
 
         const ext = file.name.split('.').pop();
         const filePath = `${user.id}/avatar.${ext}`;
 
         // Upload (upsert)
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await sb.storage
           .from('avatars')
           .upload(filePath, file, { upsert: true });
 
         if (uploadError) throw uploadError;
 
         // Get public URL
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = sb.storage
           .from('avatars')
           .getPublicUrl(filePath);
 
         const fotoUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
 
         // Save to perfil_aluno
-        await atualizarPerfil(user.id, { foto_url: fotoUrl });
+        await sb.from('perfil_aluno').update({ foto_url: fotoUrl }).eq('user_id', user.id);
 
         // Update localStorage and UI
         const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
@@ -3154,24 +3143,23 @@
 
       // Try Supabase
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const { atualizarPerfil } = await import('./js/database.js');
-        const user = await getUsuarioAtual();
-        if (!user) return;
+        const supabase = window._supabase;
+        const sb = window._supabase;
+        const user = window._userId ? { id: window._userId } : null;
+        if (!sb || !user) return;
 
         // Delete from storage
-        const { data: files } = await supabase.storage
+        const { data: files } = await sb.storage
           .from('avatars')
           .list(user.id);
 
         if (files && files.length > 0) {
           const paths = files.map(f => `${user.id}/${f.name}`);
-          await supabase.storage.from('avatars').remove(paths);
+          await sb.storage.from('avatars').remove(paths);
         }
 
         // Clear from perfil_aluno
-        await atualizarPerfil(user.id, { foto_url: null });
+        await sb.from('perfil_aluno').update({ foto_url: null }).eq('user_id', user.id);
 
       } catch (e) {
         console.error('Erro ao remover foto:', e);
@@ -3180,16 +3168,14 @@
 
     async function carregarPerfilSupabase() {
       try {
-        const { supabase } = await import('./js/supabase.js');
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { console.warn('[Perfil] Sem sessão'); return; }
-
-        const user = session.user;
-        console.log('[Perfil] Buscando perfil para:', user.id);
+        const supabase = window._supabase;
+        if (!supabase || !window._userId) { console.warn('[Perfil] Sem Supabase'); return; }
+        const userId = window._userId;
+        console.log('[Perfil] Buscando perfil para:', userId);
 
         // Check if cached data belongs to current user
         const cachedPerfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
-        if (cachedPerfil._uid && cachedPerfil._uid !== user.id) {
+        if (cachedPerfil._uid && cachedPerfil._uid !== userId) {
           localStorage.removeItem('studyplan_perfil');
           localStorage.removeItem('studyplan_plan');
           localStorage.removeItem('studyplan_links');
@@ -3199,7 +3185,7 @@
         const { data: perfil, error } = await supabase
           .from('perfil_aluno')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -3210,7 +3196,7 @@
           setUserUI(perfil.nome, perfil.email, perfil.concurso, perfil.foto_url || null);
 
           // Save to localStorage with user id tag
-          perfil._uid = user.id;
+          perfil._uid = userId;
           localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
 
           if (perfil.data_prova) {
@@ -3349,83 +3335,80 @@
     // =============================================
     //  INIT — load everything from Supabase
     // =============================================
-    // Global supabase + session (cached after first load)
-    let _sb = null;
-    let _session = null;
-
-    async function getSupabaseSession() {
-      if (_sb && _session) return { supabase: _sb, session: _session };
-      try {
-        const mod = await import('./js/supabase.js');
-        _sb = mod.supabase;
-        const { data } = await _sb.auth.getSession();
-        _session = data.session;
-        if (_session) {
-          console.log('[Auth] Sessão OK:', _session.user.id, _session.user.email);
-        } else {
-          console.warn('[Auth] Sem sessão ativa');
-        }
-      } catch (e) {
-        console.error('[Auth] Erro ao conectar Supabase:', e);
+    // =============================================
+    //  DATA LOADING (called when supabase is ready)
+    // =============================================
+    async function carregarDadosSupabase() {
+      if (!window._supabase || !window._userId) {
+        console.warn('[Init] Supabase não disponível');
+        return;
       }
-      return { supabase: _sb, session: _session };
+      console.log('[Init] Carregando dados para:', window._userId);
+
+      try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
+      try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
+      try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
+      try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
+
+      renderSubjectsList();
+      buildDynamicSchedule();
+      renderCalendar();
+      calcularEstatisticas();
+      console.log('[Init] Dashboard carregado');
     }
 
-    async function initDashboard() {
-      // 1. Show local data immediately (may be empty after login)
+    window.carregarDadosSupabase = carregarDadosSupabase;
+
+    window.addEventListener('load', function() {
       loadFromLocalStorage();
       renderSubjectsList();
       buildDynamicSchedule();
       renderCalendar();
       calcularEstatisticas();
 
-      // 2. Connect to Supabase once
-      const { supabase, session } = await getSupabaseSession();
-      if (!supabase || !session) {
-        console.warn('[Init] Sem Supabase/sessão — usando apenas localStorage');
-        return;
-      }
-
-      // 3. Load from Supabase sequentially (source of truth)
-      try {
-        await carregarPerfilSupabase();
-      } catch (e) { console.error('[Init] Erro perfil:', e); }
-
-      try {
-        await carregarLinksSupabase();
-      } catch (e) { console.error('[Init] Erro links:', e); }
-
-      try {
-        await carregarAulasSupabase();
-      } catch (e) { console.error('[Init] Erro aulas:', e); }
-
-      try {
-        await carregarSessoesSupabase();
-      } catch (e) { console.error('[Init] Erro sessões:', e); }
-
-      // 4. Final re-render with complete data
-      renderSubjectsList();
-      buildDynamicSchedule();
-      renderCalendar();
-      calcularEstatisticas();
-
-      console.log('[Init] Dashboard carregado');
-    }
-
-    window.addEventListener('load', initDashboard);
-  </script>
-
-  <!-- Auth guard + session listener (module) -->
-  <script type="module">
-    import { protegerPagina, onAuthStateChange } from './js/auth.js';
-
-    protegerPagina();
-
-    onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-        window.location.href = 'login.html';
+      // If module already loaded supabase, load data now
+      if (window._supabaseReady) {
+        carregarDadosSupabase();
       }
     });
+  </script>
+
+  <!-- Supabase loader: module that exposes supabase to window, then loads data -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const supabase = createClient(
+      'https://hcngacohwiwphcbroint.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
+      { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
+    );
+
+    // Auth guard
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      window.location.href = 'login.html';
+    }
+
+    // Listen for auth changes
+    supabase.auth.onAuthStateChange((event, sess) => {
+      if (event === 'SIGNED_OUT') window.location.href = 'login.html';
+    });
+
+    // Expose to window for the main script
+    window._supabase = supabase;
+    window._userId = session ? window._userId : null;
+    window._userEmail = session ? session.user.email : null;
+    window._userName = session ? (session.user.user_metadata?.nome || session.user.email.split('@')[0]) : null;
+
+    console.log('[Module] Supabase pronto, user:', window._userId);
+
+    // Trigger dashboard load now that supabase is ready
+    if (typeof window.carregarDadosSupabase === 'function') {
+      window.carregarDadosSupabase();
+    } else {
+      // Main script hasn't loaded yet, set a flag
+      window._supabaseReady = true;
+    }
   </script>
 </body>
 </html>
