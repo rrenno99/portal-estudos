@@ -2565,12 +2565,15 @@
           links.forEach(l => {
             mapa[l.materia] = { url: l.url, titulo: l.titulo, concluido: !!l.concluido, id: l.id };
           });
+
+          // Also update plan materias so calendar/schedule work
+          const plan = getPlanData();
+          if (plan) {
+            plan.materias = links.map(l => ({ nome: l.materia, link: l.url }));
+            localStorage.setItem('studyplan_plan', JSON.stringify(plan));
+          }
         }
         saveLinksStorage(mapa);
-        renderSubjectsList();
-        buildDynamicSchedule();
-        renderCalendar();
-        calcularEstatisticas();
       } catch (e) { /* Sem Supabase, usa localStorage */ }
     }
 
@@ -3199,18 +3202,43 @@
             document.getElementById('dropdownPlanDate').textContent = d;
           }
 
-          if (perfil.horas_semanais) {
-            document.getElementById('statHorasRecomendadas').textContent = perfil.horas_semanais + 'h/sem';
+          if (perfil.concurso) {
+            document.getElementById('progressConcurso').textContent = 'Concurso: ' + perfil.concurso;
+          }
+
+          // Reconstruct plan data from perfil (survives login/logout)
+          const existingPlan = getPlanData();
+          if (!existingPlan || !existingPlan.materias || existingPlan.materias.length === 0) {
+            // Build plan from Supabase perfil data
+            const horasSemanais = perfil.horas_semanais || 0;
+            const turno = perfil.turno_preferido || 'Manhã';
+            // Estimate hours per day from total
+            const horasUteis = Math.max(1, Math.round(horasSemanais / 5));
+            const horasFds = perfil.dia_descanso === 'Nenhum' ? horasUteis : 0;
+
+            const reconstructedPlan = {
+              concurso: perfil.concurso || '',
+              nivel: perfil.nivel || '',
+              turno: turno,
+              horasUteis: horasUteis,
+              horasFds: horasFds,
+              horasSemanais: horasSemanais,
+              dias: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'],
+              materias: [] // will be filled by carregarLinksSupabase
+            };
+
+            if (perfil.dia_descanso !== 'Domingo' && perfil.dia_descanso !== 'Nenhum') {
+              reconstructedPlan.dias.push('Sábado');
+            }
+            if (perfil.dia_descanso === 'Nenhum') {
+              reconstructedPlan.dias.push('Sábado', 'Domingo');
+            }
+
+            localStorage.setItem('studyplan_plan', JSON.stringify(reconstructedPlan));
           }
         } else {
           loadFromLocalStorage();
         }
-
-        // Reload subjects and calendar with fresh Supabase data
-        renderSubjectsList();
-        buildDynamicSchedule();
-        renderCalendar();
-        calcularEstatisticas();
 
       } catch (e) {
         loadFromLocalStorage();
@@ -3300,22 +3328,36 @@
     }
 
     // =============================================
-    //  INIT
+    //  INIT — load everything from Supabase
     // =============================================
-    window.addEventListener('load', () => {
-      // 1. Load local data immediately
+    async function initDashboard() {
+      // 1. Show local data immediately (may be empty after login)
       loadFromLocalStorage();
       renderSubjectsList();
       buildDynamicSchedule();
       renderCalendar();
       calcularEstatisticas();
 
-      // 2. Then try Supabase for fresh data
-      carregarPerfilSupabase();
-      carregarLinksSupabase();
-      carregarAulasSupabase();
-      carregarSessoesSupabase();
-    });
+      // 2. Load from Supabase sequentially (source of truth)
+      try {
+        await carregarPerfilSupabase();
+        await carregarLinksSupabase();
+        await carregarAulasSupabase();
+        await carregarSessoesSupabase();
+
+        // 3. Re-render with complete data
+        renderSubjectsList();
+        buildDynamicSchedule();
+        renderCalendar();
+        calcularEstatisticas();
+
+        console.log('[Init] Dashboard carregado com sucesso');
+      } catch (e) {
+        console.error('[Init] Erro ao carregar dados:', e);
+      }
+    }
+
+    window.addEventListener('load', initDashboard);
   </script>
 
   <!-- Auth guard + session listener (module) -->
