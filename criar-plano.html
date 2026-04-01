@@ -1070,23 +1070,41 @@
     // =============================================
     async function gerarPlano() {
       const btn = document.getElementById('btnGerar');
-      btn.innerHTML = '⏳ Gerando seu plano...';
+      btn.innerHTML = '⏳ Salvando seu plano...';
       btn.disabled = true;
       btn.style.opacity = '0.7';
 
+      // -----------------------------------------------
+      //  1. GET USER FROM SESSION (mandatory)
+      // -----------------------------------------------
+      let user = null;
+      try {
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        user = session?.user || null;
+
+        if (!user) {
+          const { data: { user: fallbackUser } } = await supabase.auth.getUser();
+          user = fallbackUser;
+        }
+      } catch (e) {
+        console.error('[Auth] Erro ao buscar sessão:', e);
+      }
+
+      if (!user) {
+        alert('Você precisa estar logado para salvar o plano. Redirecionando para o login...');
+        window.location.href = 'login.html';
+        return;
+      }
+
+      console.log('[Auth] Usuário logado:', user.id, user.email);
+
+      // -----------------------------------------------
+      //  2. COLLECT FORM DATA
+      // -----------------------------------------------
       const subjects = getSelectedSubjects();
       const linksComLink = subjects.filter(s => s.link).length;
 
-      // Save links to localStorage for dashboard
-      const linksMap = {};
-      subjects.forEach(s => {
-        if (s.link) {
-          linksMap[s.nome] = { url: s.link, titulo: s.nome };
-        }
-      });
-      localStorage.setItem('studyplan_links', JSON.stringify(linksMap));
-
-      // Save full plan data to localStorage for dashboard
       const selectedDays = [];
       document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
 
@@ -1100,29 +1118,121 @@
       });
 
       const dataProva = document.getElementById('dataProva').value || null;
-
-      // Get name/email from Supabase Auth (not from form fields)
-      let nome = '';
-      let email = '';
-      try {
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
-        if (user) {
-          nome = user.user_metadata?.nome || user.email.split('@')[0];
-          email = user.email;
-        }
-      } catch (e) {}
+      const nome = user.user_metadata?.nome || user.email.split('@')[0];
+      const email = user.email;
       const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
       const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
       const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
       const diasFdsCount = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFdsCount * horasFds);
 
-      // Calculate estimate: 50h per subject
       const HORAS_POR_MATERIA = 50;
       const totalHoras = subjects.length * HORAS_POR_MATERIA;
       const semanas = horasSemanais > 0 ? totalHoras / horasSemanais : 0;
       const metaMeses = horasSemanais > 0 ? Math.max(1, Math.ceil(semanas / 4.3)) : 0;
+
+      // -----------------------------------------------
+      //  3. SAVE TO SUPABASE (await each step)
+      // -----------------------------------------------
+      let savedToSupabase = false;
+
+      try {
+        const { supabase } = await import('./js/supabase.js');
+
+        // 3a. Upsert perfil_aluno
+        btn.innerHTML = '⏳ Salvando perfil...';
+
+        const perfilData = {
+          user_id: user.id,
+          nome: nome,
+          email: email,
+          concurso: selectedConcurso || 'Personalizado',
+          nivel: selectedNivel || '',
+          data_prova: dataProva,
+          horas_semanais: horasSemanais,
+          turno_preferido: turnoText,
+          dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo'
+        };
+
+        console.log('[Supabase] Salvando perfil_aluno:', JSON.stringify(perfilData));
+
+        const { data: perfilResult, error: perfilError } = await supabase
+          .from('perfil_aluno')
+          .upsert(perfilData, { onConflict: 'user_id' })
+          .select();
+
+        if (perfilError) {
+          console.error('[Supabase] ERRO perfil_aluno:', perfilError.code, perfilError.message, perfilError.details, perfilError.hint);
+          alert('Erro ao salvar perfil: ' + perfilError.message);
+          btn.innerHTML = '🚀 Gerar Meu Plano de Estudos';
+          btn.disabled = false;
+          btn.style.opacity = '1';
+          return;
+        }
+
+        console.log('[Supabase] perfil_aluno salvo:', perfilResult);
+
+        // 3b. Delete old links
+        btn.innerHTML = '⏳ Salvando matérias...';
+
+        const { error: deleteError } = await supabase
+          .from('links_materias')
+          .delete()
+          .eq('user_id', user.id);
+
+        if (deleteError) {
+          console.error('[Supabase] ERRO ao deletar links antigos:', deleteError.code, deleteError.message);
+        }
+
+        // 3c. Insert each subject link one by one
+        let linksSalvos = 0;
+        for (let i = 0; i < subjects.length; i++) {
+          const s = subjects[i];
+          if (!s.link) continue;
+
+          const linkData = {
+            user_id: user.id,
+            materia: s.nome,
+            titulo: s.nome,
+            url: s.link,
+            tipo: 'curso'
+          };
+
+          console.log('[Supabase] Salvando link ' + (i+1) + ':', s.nome);
+
+          const { error: linkError } = await supabase
+            .from('links_materias')
+            .insert([linkData]);
+
+          if (linkError) {
+            console.error('[Supabase] ERRO link "' + s.nome + '":', linkError.code, linkError.message, linkError.details);
+          } else {
+            linksSalvos++;
+          }
+        }
+
+        console.log('[Supabase] ' + linksSalvos + ' links salvos de ' + linksComLink + ' total.');
+        savedToSupabase = true;
+
+      } catch (e) {
+        console.error('[Supabase] Exceção geral:', e);
+        alert('Erro de conexão com o banco de dados: ' + e.message);
+        btn.innerHTML = '🚀 Gerar Meu Plano de Estudos';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        return;
+      }
+
+      // -----------------------------------------------
+      //  4. SAVE TO LOCALSTORAGE (backup + dashboard)
+      // -----------------------------------------------
+      const linksMap = {};
+      subjects.forEach(s => {
+        if (s.link) {
+          linksMap[s.nome] = { url: s.link, titulo: s.nome };
+        }
+      });
+      localStorage.setItem('studyplan_links', JSON.stringify(linksMap));
 
       const planData = {
         concurso: selectedConcurso || 'Personalizado',
@@ -1139,91 +1249,30 @@
         criadoEm: new Date().toISOString()
       };
       localStorage.setItem('studyplan_plan', JSON.stringify(planData));
-
       localStorage.setItem('studyplan_perfil', JSON.stringify({
-        nome, email, concurso: planData.concurso
+        nome, email, concurso: planData.concurso, _uid: user.id
       }));
 
-      // =============================================
-      //  SAVE TO SUPABASE (perfil_aluno + links_materias)
-      // =============================================
-      try {
-        const { supabase } = await import('./js/supabase.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
+      // -----------------------------------------------
+      //  5. SHOW SUCCESS (only after Supabase save)
+      // -----------------------------------------------
+      document.getElementById('step4').style.display = 'none';
+      document.getElementById('stepSuccess').style.display = 'block';
 
-        if (user) {
-          // Upsert perfil_aluno (update if exists, insert if not)
-          const perfilData = {
-            user_id: user.id,
-            nome: nome || user.user_metadata?.nome || 'Aluno',
-            email: email || user.email,
-            concurso: planData.concurso,
-            nivel: planData.nivel,
-            data_prova: dataProva,
-            horas_semanais: horasSemanais,
-            turno_preferido: turnoText,
-            dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo'
-          };
+      document.getElementById('successConcurso').textContent = selectedConcurso || 'Personalizado';
+      document.getElementById('successMaterias').textContent = subjects.length + ' disciplinas';
+      document.getElementById('successHoras').textContent = document.getElementById('resumoHoras').textContent;
+      document.getElementById('successLinks').textContent = linksComLink + ' de ' + subjects.length;
 
-          const { error: perfilError } = await supabase
-            .from('perfil_aluno')
-            .upsert(perfilData, { onConflict: 'user_id' });
+      document.querySelectorAll('.wizard-step').forEach(s => {
+        s.classList.remove('active');
+        s.classList.add('completed');
+      });
+      document.querySelectorAll('.wizard-step-line').forEach(l => l.classList.add('completed'));
 
-          if (perfilError) console.error('Erro ao salvar perfil:', perfilError.message);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
-          // Delete old links and insert new ones
-          await supabase
-            .from('links_materias')
-            .delete()
-            .eq('user_id', user.id);
-
-          const linksToInsert = subjects
-            .filter(s => s.link)
-            .map(s => ({
-              user_id: user.id,
-              materia: s.nome,
-              titulo: s.nome,
-              url: s.link,
-              tipo: 'curso'
-            }));
-
-          if (linksToInsert.length > 0) {
-            const { error: linksError } = await supabase
-              .from('links_materias')
-              .insert(linksToInsert);
-
-            if (linksError) console.error('Erro ao salvar links:', linksError.message);
-          }
-
-          console.log('Plano salvo no Supabase com user_id:', user.id);
-        } else {
-          console.warn('Nenhum usuário logado — plano salvo apenas no localStorage.');
-        }
-      } catch (e) {
-        console.error('Erro ao salvar no Supabase:', e);
-      }
-
-      // =============================================
-      //  SHOW SUCCESS
-      // =============================================
-      setTimeout(() => {
-        document.getElementById('step4').style.display = 'none';
-        document.getElementById('stepSuccess').style.display = 'block';
-
-        document.getElementById('successConcurso').textContent = selectedConcurso || 'Personalizado';
-        document.getElementById('successMaterias').textContent = subjects.length + ' disciplinas';
-        document.getElementById('successHoras').textContent = document.getElementById('resumoHoras').textContent;
-        document.getElementById('successLinks').textContent = linksComLink + ' de ' + subjects.length;
-
-        document.querySelectorAll('.wizard-step').forEach(s => {
-          s.classList.remove('active');
-          s.classList.add('completed');
-        });
-        document.querySelectorAll('.wizard-step-line').forEach(l => l.classList.add('completed'));
-
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 2000);
+      console.log('[Plano] Concluído! Salvo no Supabase:', savedToSupabase);
     }
   </script>
 
