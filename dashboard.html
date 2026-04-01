@@ -2544,12 +2544,36 @@
 
     async function salvarLinkSupabase(materia, url, titulo) {
       try {
-        const { criarLink } = await import('./js/database.js');
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
-        if (!user) return;
-        await criarLink({ user_id: user.id, materia, titulo: titulo || materia, url, tipo: 'curso' });
-      } catch (e) { /* localStorage fallback */ }
+        const { supabase } = await import('./js/supabase.js');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Try UPDATE first (materia already exists from wizard)
+        const { data: updated, error: updateErr } = await supabase
+          .from('links_materias')
+          .update({ url: url, titulo: titulo || materia, tipo: 'curso' })
+          .eq('user_id', session.user.id)
+          .eq('materia', materia)
+          .select();
+
+        if (updateErr) {
+          console.error('[Link] Erro UPDATE:', updateErr.message);
+        }
+
+        // If no row was updated, INSERT new one
+        if (!updated || updated.length === 0) {
+          const { error: insertErr } = await supabase
+            .from('links_materias')
+            .insert([{ user_id: session.user.id, materia, titulo: titulo || materia, url, tipo: 'curso' }]);
+
+          if (insertErr) console.error('[Link] Erro INSERT:', insertErr.message);
+          else console.log('[Link] Novo link inserido:', materia);
+        } else {
+          console.log('[Link] Link atualizado:', materia);
+        }
+      } catch (e) {
+        console.error('[Link] Erro:', e);
+      }
     }
 
     function iniciarEstudos(materia) {
