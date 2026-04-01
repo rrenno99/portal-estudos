@@ -411,7 +411,7 @@
 
       <div class="form-group">
         <label>Quais dias você pode estudar?</label>
-        <div class="chips">
+        <div class="chips" id="diasEstudo">
           <div class="chip selected" onclick="toggleDay(this)">Segunda</div>
           <div class="chip selected" onclick="toggleDay(this)">Terça</div>
           <div class="chip selected" onclick="toggleDay(this)">Quarta</div>
@@ -1035,7 +1035,7 @@
     async function buildReview() {
       const subjects = getSelectedSubjects();
       const selectedDays = [];
-      document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
+      document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
 
       const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
       const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
@@ -1150,7 +1150,7 @@
       const linksComLink = subjects.filter(s => s.link).length;
 
       const selectedDays = [];
-      document.querySelectorAll('#step3 .chips')[1]?.querySelectorAll('.chip.selected').forEach(c => selectedDays.push(c.textContent));
+      document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
 
       let turnoText = 'Manhã';
       document.querySelectorAll('#step3 .chips').forEach(chipsGroup => {
