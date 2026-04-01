@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Teste Supabase</title></head>
+<body>
+<h2>Teste de Conexão</h2>
+<pre id="log" style="background:#111;color:#0f0;padding:20px;font-size:14px;white-space:pre-wrap;"></pre>
+
+<script type="module">
+  const el = document.getElementById('log');
+  function log(msg) { el.textContent += msg + '\n'; console.log(msg); }
+
+  try {
+    log('1. Importando Supabase...');
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    log('   OK');
+
+    log('2. Criando client...');
+    const supabase = createClient(
+      'https://hcngacohwiwphcbroint.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
+      { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
+    );
+    log('   OK');
+
+    log('3. Buscando sessão...');
+    const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) log('   ERRO: ' + sessErr.message);
+    else if (!session) log('   SEM SESSÃO — precisa logar primeiro');
+    else {
+      log('   Sessão ativa!');
+      log('   user_id: ' + session.user.id);
+      log('   email: ' + session.user.email);
+
+      log('4. Buscando perfil_aluno...');
+      const { data: perfil, error: pErr } = await supabase
+        .from('perfil_aluno').select('*').eq('user_id', session.user.id).single();
+      if (pErr) log('   ERRO: ' + pErr.code + ' ' + pErr.message);
+      else if (!perfil) log('   Nenhum perfil encontrado');
+      else log('   Perfil: ' + perfil.nome + ' | ' + perfil.concurso + ' | ' + perfil.horas_semanais + 'h/sem');
+
+      log('5. Buscando links_materias...');
+      const { data: links, error: lErr } = await supabase
+        .from('links_materias').select('materia, url, concluido').eq('user_id', session.user.id);
+      if (lErr) log('   ERRO: ' + lErr.code + ' ' + lErr.message);
+      else {
+        log('   ' + (links||[]).length + ' matérias encontradas:');
+        (links||[]).forEach(l => log('   - ' + l.materia + (l.url ? ' [link]' : ' [sem link]')));
+      }
+
+      log('6. Buscando aulas_materia...');
+      const { data: aulas, error: aErr } = await supabase
+        .from('aulas_materia').select('materia, numero, status').eq('user_id', session.user.id);
+      if (aErr) log('   ERRO: ' + aErr.code + ' ' + aErr.message);
+      else log('   ' + (aulas||[]).length + ' aulas encontradas');
+
+      log('7. Buscando sessoes_estudo...');
+      const { data: sessoes, error: sErr } = await supabase
+        .from('sessoes_estudo').select('materia, tempo_segundos').eq('user_id', session.user.id);
+      if (sErr) log('   ERRO: ' + sErr.code + ' ' + sErr.message);
+      else log('   ' + (sessoes||[]).length + ' sessões encontradas');
+
+      log('\n8. Testando window._supabase...');
+      window._supabase = supabase;
+      window._userId = session.user.id;
+      log('   window._supabase: ' + (window._supabase ? 'OK' : 'FALHOU'));
+      log('   window._userId: ' + window._userId);
+    }
+
+    log('\n=== TESTE CONCLUÍDO ===');
+  } catch (e) {
+    log('ERRO FATAL: ' + e.message);
+    log(e.stack);
+  }
+</script>
+</body>
+</html>
