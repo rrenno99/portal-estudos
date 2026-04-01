@@ -2397,6 +2397,7 @@
     function buildDynamicSchedule() {
       const plan = getPlanData();
       const links = getLinksStorage();
+      const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
 
       let subjects = [];
       if (plan && plan.materias && plan.materias.length > 0) {
@@ -2410,37 +2411,68 @@
         return;
       }
 
-      // Determine study days (1=Mon..6=Sat, 0=Sun)
-      let studyDays = [1, 2, 3, 4, 5]; // default Mon-Fri
+      const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
+
+      // Hours per day: plan data > derive from perfil > defaults
+      let horasUteis = 3;
+      let horasFds = 0;
+      let studyDays = [1, 2, 3, 4, 5];
+      let startHour = 8;
+
+      if (plan && plan.horasUteis) {
+        horasUteis = plan.horasUteis;
+        horasFds = plan.horasFds || 0;
+      } else if (perfil.horas_semanais) {
+        // Derive from weekly total: assume 5 weekdays
+        horasUteis = Math.round(perfil.horas_semanais / 5);
+        if (horasUteis < 1) horasUteis = 1;
+      }
+
+      // Study days from plan
       if (plan && plan.dias) {
         const dayMap = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
         studyDays = plan.dias.map(d => dayMap[d]).filter(d => d !== undefined);
       }
 
-      // Determine time slots based on turno
-      let times = ['08:00','09:00','10:00','11:00','14:00','15:00'];
-      if (plan && plan.turno) {
-        if (plan.turno.includes('Manhã'))   times = ['07:00','08:00','09:00','10:00','11:00'];
-        if (plan.turno.includes('Tarde'))   times = ['13:00','14:00','15:00','16:00','17:00'];
-        if (plan.turno.includes('Noite'))   times = ['19:00','20:00','21:00','22:00'];
-        if (plan.turno.includes('Flexível') || plan.turno.includes('Flexivel'))
-          times = ['08:00','09:00','10:00','14:00','15:00','19:00','20:00'];
+      // Turno from plan or perfil
+      const turno = (plan && plan.turno) || perfil.turno_preferido || 'Manhã';
+      if (turno.includes('Tarde'))   startHour = 13;
+      if (turno.includes('Noite'))   startHour = 19;
+
+      // Generate time slots based on actual hours per day
+      function gerarSlots(numHoras) {
+        const slots = [];
+        for (let i = 0; i < numHoras; i++) {
+          const h = startHour + i;
+          if (h >= 24) break;
+          slots.push(String(h).padStart(2, '0') + ':00');
+        }
+        return slots;
       }
+
+      const slotsUteis = gerarSlots(horasUteis);
+      const slotsFds = gerarSlots(horasFds);
+
+      // Collect all unique time slots for table rendering
+      const allTimesSet = new Set();
+      studyDays.forEach(day => {
+        const isFds = day === 0 || day === 6;
+        (isFds ? slotsFds : slotsUteis).forEach(t => allTimesSet.add(t));
+      });
+      const allTimes = Array.from(allTimesSet).sort();
 
       // Distribute subjects across days and time slots
       dynamicSchedule = {};
       let subjectIdx = 0;
 
       studyDays.forEach(day => {
+        const isFds = day === 0 || day === 6;
+        const slots = isFds ? slotsFds : slotsUteis;
         dynamicSchedule[day] = {};
-        times.forEach((time, ti) => {
-          // Last slot on some days = Revisão
-          const isSaturday = day === 6;
-          if (isSaturday && ti >= times.length - 2) {
-            dynamicSchedule[day][time] = ['subject-revisao', 'Revisão'];
-            return;
-          }
-          if (!isSaturday && ti === times.length - 1 && times.length > 3) {
+
+        slots.forEach((time, ti) => {
+          // Last slot = Revisão (if more than 2 slots)
+          if (ti === slots.length - 1 && slots.length > 2) {
             dynamicSchedule[day][time] = ['subject-revisao', 'Revisão'];
             return;
           }
@@ -2454,7 +2486,7 @@
       });
 
       // Store times globally for rendering
-      window._calendarTimes = times;
+      window._calendarTimes = allTimes;
     }
 
     function getWeekDates(offset) {
@@ -3232,9 +3264,15 @@
         return aulas.length > 0 && aulas.every(a => a.status === 'concluido');
       }).length;
 
-      // Calculate recommended weekly hours
+      // Calculate recommended weekly hours (Supabase perfil > plan localStorage)
+      const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
       let horasRecomendadas = 0;
-      if (plan) {
+
+      if (perfil.horas_semanais) {
+        horasRecomendadas = perfil.horas_semanais;
+      } else if (plan && plan.horasSemanais) {
+        horasRecomendadas = plan.horasSemanais;
+      } else if (plan) {
         const diasUteis = (plan.dias || []).filter(d => !['Sábado','Domingo'].includes(d)).length;
         const diasFds = (plan.dias || []).filter(d => ['Sábado','Domingo'].includes(d)).length;
         horasRecomendadas = (diasUteis * (plan.horasUteis || 3)) + (diasFds * (plan.horasFds || 0));
