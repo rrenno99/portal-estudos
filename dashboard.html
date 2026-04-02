@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <style>
     /* =========================================
        DASHBOARD LAYOUT
@@ -1233,6 +1234,85 @@
       font-weight: 600;
     }
 
+    /* Streak fire pulse animation */
+    .streak-fire.pulse {
+      animation: firePulse 1.5s ease-in-out infinite;
+    }
+    @keyframes firePulse {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.2); filter: brightness(1.3); }
+    }
+
+    /* Celebration modal */
+    .celebration-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .celebration-overlay.show { display: flex; }
+
+    .celebration-modal {
+      background: var(--bg-card);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 400px;
+      margin: 16px;
+      text-align: center;
+      padding: 40px 32px;
+      animation: celebrationPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes celebrationPop {
+      0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .celebration-emoji {
+      font-size: 4rem;
+      margin-bottom: 16px;
+      animation: celebrationBounce 0.6s ease 0.3s;
+    }
+    @keyframes celebrationBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .celebration-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--secondary);
+      margin-bottom: 10px;
+    }
+
+    .celebration-text {
+      font-size: 0.92rem;
+      color: var(--text-light);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .celebration-btn {
+      padding: 14px 32px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .celebration-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+
+    @media (max-width: 600px) {
+      .celebration-modal { max-width: 100%; margin: 16px; padding: 32px 20px; }
+    }
+
     /* =========================================
        FLOATING DRAGGABLE TIMER
     ========================================= */
@@ -2066,6 +2146,16 @@
     </div>
   </div>
 
+  <!-- Celebration Modal -->
+  <div class="celebration-overlay" id="celebrationOverlay" onclick="if(event.target===this)fecharCelebracao()">
+    <div class="celebration-modal">
+      <div class="celebration-emoji" id="celebrationEmoji">🎉</div>
+      <div class="celebration-title" id="celebrationTitle">Parabéns!</div>
+      <div class="celebration-text" id="celebrationText">Você conseguiu!</div>
+      <button class="celebration-btn" onclick="fecharCelebracao()">Continuar estudando</button>
+    </div>
+  </div>
+
   <!-- Supabase UMD (no ES module needed) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
@@ -2698,8 +2788,13 @@
     }
 
     async function salvarSessao() {
+      // Capture streak before saving
+      var streakAntes = 0;
+      var streakEl = document.getElementById('streakCount');
+      if (streakEl) { var sm = streakEl.textContent.match(/(\d+)/); if (sm) streakAntes = parseInt(sm[1]); }
+
       try {
-        const supabase = window._supabase;
+        var supabase = window._supabase;
         if (!supabase || !window._userId) return;
 
         const { error } = await supabase
@@ -2731,6 +2826,8 @@
       await carregarSessoesSupabase();
       await carregarDiasEstudados();
       calcularEstatisticas();
+      atualizarPulsoFogo();
+      verificarCelebracoes(streakAntes);
     }
 
     // Feedback: Concluí a aula
@@ -2995,6 +3092,96 @@
     }
 
     // =============================================
+    //  CELEBRAÇÕES (confetes + modal + som)
+    // =============================================
+
+    function playSuccessSound() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // Rising chord: C5, E5, G5
+        [523.25, 659.25, 783.99].forEach(function(freq, i) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = freq;
+          osc.type = 'sine';
+          gain.gain.value = 0.12;
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1 * i + 0.5);
+          osc.start(ctx.currentTime + 0.1 * i);
+          osc.stop(ctx.currentTime + 0.1 * i + 0.6);
+        });
+      } catch (e) { /* audio unavailable */ }
+    }
+
+    function dispararConfetes() {
+      if (typeof confetti !== 'function') return;
+      // Burst from both sides
+      confetti({ particleCount: 80, spread: 70, origin: { x: 0.2, y: 0.6 }, colors: ['#1E88E5', '#FF9800', '#38A169', '#805AD5'] });
+      confetti({ particleCount: 80, spread: 70, origin: { x: 0.8, y: 0.6 }, colors: ['#1E88E5', '#FF9800', '#38A169', '#805AD5'] });
+      // Extra burst from center
+      setTimeout(function() {
+        confetti({ particleCount: 50, spread: 100, origin: { x: 0.5, y: 0.4 }, colors: ['#1E88E5', '#FF9800', '#38A169'] });
+      }, 300);
+    }
+
+    function celebrar(emoji, titulo, texto) {
+      document.getElementById('celebrationEmoji').textContent = emoji;
+      document.getElementById('celebrationTitle').textContent = titulo;
+      document.getElementById('celebrationText').innerHTML = texto;
+      document.getElementById('celebrationOverlay').classList.add('show');
+      dispararConfetes();
+      playSuccessSound();
+    }
+
+    function fecharCelebracao() {
+      document.getElementById('celebrationOverlay').classList.remove('show');
+    }
+
+    // Called after saving session + calculating streak
+    function verificarCelebracoes(streakAntes) {
+      var nome = window._userName || 'Aluno';
+
+      // Milestone streaks
+      var streakAgora = 0;
+      var el = document.getElementById('streakCount');
+      if (el) {
+        var m = el.textContent.match(/(\d+)/);
+        if (m) streakAgora = parseInt(m[1]);
+      }
+
+      var milestones = [3, 7, 14, 21, 30];
+      for (var i = 0; i < milestones.length; i++) {
+        if (streakAgora >= milestones[i] && streakAntes < milestones[i]) {
+          var msgs = {
+            3: 'Você está criando o hábito! 3 dias seguidos é só o começo.',
+            7: 'Incrível, ' + nome + '! 7 dias sem furar! Você está construindo o hábito da aprovação.',
+            14: '2 semanas seguidas! Sua constância é admirável, ' + nome + '.',
+            21: '21 dias! O hábito já está consolidado. Aprovação à vista!',
+            30: 'UM MÊS seguido estudando! Você é uma inspiração, ' + nome + '!'
+          };
+          celebrar('🔥', milestones[i] + ' dias em sequência!', msgs[milestones[i]]);
+          return;
+        }
+      }
+
+      // Weekly goal check handled by verificarMetaSemanal
+    }
+
+    // Update streak fire pulse
+    function atualizarPulsoFogo() {
+      var el = document.querySelector('.streak-fire');
+      if (!el) return;
+      var m = (document.getElementById('streakCount').textContent || '').match(/(\d+)/);
+      var count = m ? parseInt(m[1]) : 0;
+      if (count >= 3) {
+        el.classList.add('pulse');
+      } else {
+        el.classList.remove('pulse');
+      }
+    }
+
+    // =============================================
     //  ATIVIDADES DO ALUNO
     // =============================================
     var ACTIVITY_ICONS = {
@@ -3168,6 +3355,8 @@
           if (!existing || existing.length === 0) {
             await registrarAtividade('meta_atingida',
               '🏆 Meta semanal de <strong>' + metaHoras + 'h</strong> atingida! Parabéns!');
+            celebrar('🎯', 'Meta da semana batida!',
+              'Você completou <strong>' + metaHoras + 'h</strong> de estudo esta semana! 🎯 Agora é hora de descansar ou fazer aquele ajuste fino.');
           }
         }
       } catch (e) {
@@ -3663,6 +3852,7 @@
         try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
         try { await carregarDiasEstudados(); } catch (e) { console.error('[Init] dias:', e); }
         try { await carregarAtividadesSupabase(); } catch (e) { console.error('[Init] atividades:', e); }
+        atualizarPulsoFogo();
 
         // 4. Final render
         renderSubjectsList();
