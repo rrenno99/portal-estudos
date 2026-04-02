@@ -29,7 +29,8 @@ export async function cadastrar(email, senha, nome) {
     email,
     password: senha,
     options: {
-      data: { nome }
+      data: { nome },
+      emailRedirectTo: window.location.origin + '/criar-plano.html'
     }
   });
 
