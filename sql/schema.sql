@@ -38,6 +38,26 @@ CREATE TABLE links_materias (
 );
 
 -- =============================================
+--  TABELA: atividades_aluno
+--  Feed de atividades recentes do aluno
+-- =============================================
+CREATE TABLE atividades_aluno (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  tipo_evento TEXT NOT NULL CHECK (tipo_evento IN ('aula_concluida', 'tempo_estudo', 'meta_atingida', 'plano_criado', 'aula_iniciada')),
+  descricao TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_atividades_user_id ON atividades_aluno(user_id);
+CREATE INDEX idx_atividades_created ON atividades_aluno(user_id, created_at DESC);
+
+ALTER TABLE atividades_aluno ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Aluno lê próprias atividades" ON atividades_aluno FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Aluno cria próprias atividades" ON atividades_aluno FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- =============================================
 --  TABELA: sessoes_estudo
 --  Cronômetro de tempo por sessão de estudo
 -- =============================================

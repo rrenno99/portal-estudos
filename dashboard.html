@@ -1899,47 +1899,8 @@
 
           <div class="card">
             <h3>🕐 Atividade Recente</h3>
-            <div class="activity-item">
-              <div class="activity-dot orange"></div>
-              <div>
-                <div class="activity-text">Concluiu aula de <strong>Dir. Administrativo</strong> — Atos Administrativos</div>
-                <div class="activity-time">Hoje, 10:30</div>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot green"></div>
-              <div>
-                <div class="activity-text">Acertou <strong>85%</strong> das questões de Português</div>
-                <div class="activity-time">Hoje, 09:15</div>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot blue"></div>
-              <div>
-                <div class="activity-text">Revisão de <strong>Dir. Constitucional</strong> concluída</div>
-                <div class="activity-time">Ontem, 16:00</div>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot orange"></div>
-              <div>
-                <div class="activity-text">Novo resumo de <strong>RLM</strong> disponível</div>
-                <div class="activity-time">Ontem, 14:20</div>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot green"></div>
-              <div>
-                <div class="activity-text">🏆 Meta semanal de 10h atingida!</div>
-                <div class="activity-time">27/03/2026</div>
-              </div>
-            </div>
-            <div class="activity-item">
-              <div class="activity-dot blue"></div>
-              <div>
-                <div class="activity-text">Simulado de <strong>Informática</strong> — Nota 7.5</div>
-                <div class="activity-time">26/03/2026</div>
-              </div>
+            <div id="activityFeed">
+              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando atividades...</p>
             </div>
           </div>
         </div>
@@ -2749,8 +2710,19 @@
             status: 'concluido'
           }]);
 
-        if (error) console.error('[Timer] Erro ao salvar sessão:', error.message);
-        else console.log('[Timer] Sessão salva:', timerMateria, timerSeconds + 's');
+        if (error) {
+          console.error('[Timer] Erro ao salvar sessão:', error.message);
+        } else {
+          console.log('[Timer] Sessão salva:', timerMateria, timerSeconds + 's');
+          // Log activity
+          var h = Math.floor(timerSeconds / 3600);
+          var m = Math.floor((timerSeconds % 3600) / 60);
+          var tempoStr = h > 0 ? h + 'h ' + m + 'min' : m + 'min';
+          await registrarAtividade('tempo_estudo',
+            '⏱ Estudou <strong>' + tempoStr + '</strong> de <strong>' + timerMateria + '</strong>');
+          // Check weekly goal
+          await verificarMetaSemanal();
+        }
       } catch (e) {
         console.error('[Timer] Erro:', e);
       }
@@ -2761,19 +2733,20 @@
     // Feedback: Concluí a aula
     async function feedbackConcluiu() {
       await salvarSessao();
-      // Find first non-concluida aula and mark as concluido
-      const aulas = getAulasMateria(timerMateria);
-      const aula = aulas.find(a => a.status !== 'concluido');
+      var aulas = getAulasMateria(timerMateria);
+      var aula = aulas.find(function(a) { return a.status !== 'concluido'; });
       if (aula) {
         aula.status = 'concluido';
         renderSubjectsList();
         calcularEstatisticas();
         try {
-          const supabase = window._supabase;
+          var supabase = window._supabase;
           if (supabase && window._userId) {
             await supabase.from('aulas_materia').update({ status: 'concluido' })
               .eq('user_id', window._userId).eq('materia', timerMateria).eq('numero', aula.numero);
           }
+          await registrarAtividade('aula_concluida',
+            '✓ Concluiu <strong>Aula ' + aula.numero + '</strong> de <strong>' + timerMateria + '</strong>');
         } catch (e) {}
       }
       fecharTimer();
@@ -2782,19 +2755,20 @@
     // Feedback: Ainda estou estudando
     async function feedbackEstudando() {
       await salvarSessao();
-      // Find first pendente aula and mark as estudando
-      const aulas = getAulasMateria(timerMateria);
-      const aula = aulas.find(a => a.status === 'pendente');
+      var aulas = getAulasMateria(timerMateria);
+      var aula = aulas.find(function(a) { return a.status === 'pendente'; });
       if (aula) {
         aula.status = 'estudando';
         renderSubjectsList();
         calcularEstatisticas();
         try {
-          const supabase = window._supabase;
+          var supabase = window._supabase;
           if (supabase && window._userId) {
             await supabase.from('aulas_materia').update({ status: 'estudando' })
               .eq('user_id', window._userId).eq('materia', timerMateria).eq('numero', aula.numero);
           }
+          await registrarAtividade('aula_iniciada',
+            '▶ Iniciou estudo da <strong>Aula ' + aula.numero + '</strong> de <strong>' + timerMateria + '</strong>');
         } catch (e) {}
       }
       fecharTimer();
@@ -2906,6 +2880,187 @@
         console.log('[Sessões] Total:', Math.round(totalHorasEstudadas * 10) / 10, 'horas');
       } catch (e) {
         console.error('[Sessões] Erro:', e);
+      }
+    }
+
+    // =============================================
+    //  ATIVIDADES DO ALUNO
+    // =============================================
+    var ACTIVITY_ICONS = {
+      'aula_concluida': { icon: '✓', color: 'green' },
+      'tempo_estudo':   { icon: '⏱', color: 'blue' },
+      'meta_atingida':  { icon: '🏆', color: 'green' },
+      'plano_criado':   { icon: '📋', color: 'blue' },
+      'aula_iniciada':  { icon: '▶', color: 'orange' }
+    };
+
+    async function registrarAtividade(tipoEvento, descricao) {
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
+
+        var result = await sb.from('atividades_aluno').insert([{
+          user_id: window._userId,
+          tipo_evento: tipoEvento,
+          descricao: descricao
+        }]);
+
+        if (result.error) console.error('[Atividade] Erro:', result.error.message);
+        else console.log('[Atividade]', tipoEvento, descricao);
+
+        // Refresh feed
+        await carregarAtividadesSupabase();
+      } catch (e) {
+        console.error('[Atividade] Erro:', e);
+      }
+    }
+
+    async function carregarAtividadesSupabase() {
+      var feed = document.getElementById('activityFeed');
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) {
+          feed.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Nenhuma atividade ainda</p>';
+          return;
+        }
+
+        var { data, error } = await sb
+          .from('atividades_aluno')
+          .select('*')
+          .eq('user_id', window._userId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) { console.error('[Atividades] Erro:', error.message); return; }
+
+        // Also check yesterday's study hours
+        var yesterdayText = await calcularHorasOntem();
+
+        if ((!data || data.length === 0) && !yesterdayText) {
+          feed.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Nenhuma atividade registrada ainda.<br>Comece a estudar para ver seu histórico aqui!</p>';
+          return;
+        }
+
+        var html = '';
+
+        // Yesterday summary (always first if exists)
+        if (yesterdayText) {
+          html += '<div class="activity-item"><div class="activity-dot blue"></div><div>'
+            + '<div class="activity-text">📊 ' + yesterdayText + '</div>'
+            + '<div class="activity-time">Ontem</div></div></div>';
+        }
+
+        (data || []).forEach(function(a) {
+          var info = ACTIVITY_ICONS[a.tipo_evento] || { icon: '•', color: 'blue' };
+          var timeStr = formatActivityTime(a.created_at);
+          html += '<div class="activity-item">'
+            + '<div class="activity-dot ' + info.color + '"></div>'
+            + '<div>'
+            + '<div class="activity-text">' + a.descricao + '</div>'
+            + '<div class="activity-time">' + timeStr + '</div>'
+            + '</div></div>';
+        });
+
+        feed.innerHTML = html;
+        console.log('[Atividades] Carregadas:', (data || []).length);
+      } catch (e) {
+        console.error('[Atividades] Erro:', e);
+      }
+    }
+
+    function formatActivityTime(isoDate) {
+      var d = new Date(isoDate);
+      var now = new Date();
+      var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+      var actDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+      var time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      if (actDay.getTime() === today.getTime()) return 'Hoje, ' + time;
+      if (actDay.getTime() === yesterday.getTime()) return 'Ontem, ' + time;
+      return d.toLocaleDateString('pt-BR') + ', ' + time;
+    }
+
+    async function calcularHorasOntem() {
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return null;
+
+        var now = new Date();
+        var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        yesterday.setDate(yesterday.getDate() - 1);
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        var { data, error } = await sb
+          .from('sessoes_estudo')
+          .select('tempo_segundos')
+          .eq('user_id', window._userId)
+          .eq('status', 'concluido')
+          .gte('data_inicio', yesterday.toISOString())
+          .lt('data_inicio', todayStart.toISOString());
+
+        if (error || !data || data.length === 0) return null;
+
+        var totalSeg = data.reduce(function(acc, s) { return acc + s.tempo_segundos; }, 0);
+        var horas = Math.floor(totalSeg / 3600);
+        var minutos = Math.floor((totalSeg % 3600) / 60);
+
+        if (totalSeg < 60) return null;
+
+        if (horas > 0) return 'Estudou <strong>' + horas + 'h ' + minutos + 'min</strong> ontem';
+        return 'Estudou <strong>' + minutos + 'min</strong> ontem';
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Check weekly goal after saving a session
+    async function verificarMetaSemanal() {
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
+
+        var perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
+        var metaHoras = perfil.horas_semanais || 0;
+        if (metaHoras <= 0) return;
+
+        // Get start of current week (Monday)
+        var now = new Date();
+        var dayOfWeek = now.getDay();
+        var monday = new Date(now);
+        monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        monday.setHours(0, 0, 0, 0);
+
+        var { data, error } = await sb
+          .from('sessoes_estudo')
+          .select('tempo_segundos')
+          .eq('user_id', window._userId)
+          .eq('status', 'concluido')
+          .gte('data_inicio', monday.toISOString());
+
+        if (error || !data) return;
+
+        var totalHoras = data.reduce(function(acc, s) { return acc + s.tempo_segundos; }, 0) / 3600;
+
+        // Check if goal reached and not already logged this week
+        if (totalHoras >= metaHoras) {
+          // Check if we already have a meta_atingida this week
+          var { data: existing } = await sb
+            .from('atividades_aluno')
+            .select('id')
+            .eq('user_id', window._userId)
+            .eq('tipo_evento', 'meta_atingida')
+            .gte('created_at', monday.toISOString())
+            .limit(1);
+
+          if (!existing || existing.length === 0) {
+            await registrarAtividade('meta_atingida',
+              '🏆 Meta semanal de <strong>' + metaHoras + 'h</strong> atingida! Parabéns!');
+          }
+        }
+      } catch (e) {
+        console.error('[Meta] Erro:', e);
       }
     }
 
@@ -3395,6 +3550,7 @@
         try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
         try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
         try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
+        try { await carregarAtividadesSupabase(); } catch (e) { console.error('[Init] atividades:', e); }
 
         // 4. Final render
         renderSubjectsList();
