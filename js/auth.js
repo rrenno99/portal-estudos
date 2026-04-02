@@ -116,11 +116,8 @@ export async function protegerPagina() {
 // =============================================
 
 export async function enviarResetSenha(email) {
-  const redirectUrl = window.location.origin + '/reset-password.html';
-  console.log('[auth] reset redirectTo:', redirectUrl);
-
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: redirectUrl
+    redirectTo: window.location.origin + '/reset-password.html'
   });
 
   if (error) throw error;
