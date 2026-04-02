@@ -2103,11 +2103,26 @@
     </div>
   </div>
 
+  <!-- Debug banner -->
+  <div id="debugBanner" style="position:fixed;top:0;left:0;right:0;background:#E53E3E;color:white;padding:8px 16px;font-size:13px;font-family:monospace;z-index:9999;white-space:pre-wrap;">Carregando módulo...</div>
+
   <script type="module">
+    const dbg = document.getElementById('debugBanner');
+    function debugLog(msg, isError) {
+      console.log(msg);
+      if (dbg) {
+        dbg.textContent += '\n' + msg;
+        if (!isError) dbg.style.background = '#2196F3';
+      }
+    }
+
+    try {
     // =============================================
     //  SUPABASE INIT (runs first in module)
     // =============================================
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    debugLog('1. Importando Supabase CDN...');
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    debugLog('2. Criando client...');
 
     const _supabase = createClient(
       'https://hcngacohwiwphcbroint.supabase.co',
@@ -2136,10 +2151,7 @@
     window._userEmail = _session.user.email;
     window._userName = _session.user.user_metadata?.nome || _session.user.email.split('@')[0];
 
-    console.log('[Init] Supabase OK, user:', window._userId);
-
-    // Visual confirmation that module loaded
-    document.title = 'Dashboard | ' + window._userName;
+    debugLog('3. Sessão OK: ' + window._userId + ' / ' + window._userEmail);
 
     // =============================================
     //  SIDEBAR TOGGLE
@@ -3381,7 +3393,7 @@
     // =============================================
     //  LOAD ALL DATA FROM SUPABASE
     // =============================================
-    console.log('[Init] Carregando dados do Supabase...');
+    debugLog('4. Carregando dados do Supabase...');
 
     try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
     try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
@@ -3394,7 +3406,18 @@
     renderCalendar();
     calcularEstatisticas();
 
-    console.log('[Init] Dashboard completo');
+    debugLog('5. Dashboard completo! Dados carregados.');
+    dbg.style.background = '#38A169';
+    setTimeout(() => { if(dbg) dbg.style.display = 'none'; }, 5000);
+
+    } catch(fatalError) {
+      const dbg = document.getElementById('debugBanner');
+      if (dbg) {
+        dbg.style.background = '#E53E3E';
+        dbg.textContent = 'ERRO FATAL: ' + fatalError.message + '\n' + fatalError.stack;
+      }
+      console.error('FATAL:', fatalError);
+    }
 
     // =============================================
     //  EXPOSE FUNCTIONS TO WINDOW (for onclick handlers)
