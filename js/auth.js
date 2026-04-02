@@ -112,6 +112,28 @@ export async function protegerPagina() {
 }
 
 // =============================================
+//  RECUPERAÇÃO DE SENHA
+// =============================================
+
+export async function enviarResetSenha(email) {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password.html'
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function atualizarSenha(novaSenha) {
+  const { data, error } = await supabase.auth.updateUser({
+    password: novaSenha
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+// =============================================
 //  AUTH STATE LISTENER
 //  Call this on page load to handle session
 //  changes (login, logout, token refresh, expiry)

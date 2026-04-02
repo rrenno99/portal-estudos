@@ -215,6 +215,24 @@
           </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block" id="btnLogin">Entrar</button>
+        <div style="text-align:center; margin-top:12px;">
+          <a href="#" id="linkEsqueciSenha" style="font-size:0.83rem; color:var(--primary); font-weight:500;">Esqueci minha senha</a>
+        </div>
+      </form>
+
+      <!-- ESQUECI SENHA FORM -->
+      <form class="login-form hidden" id="formEsqueciSenha" onsubmit="handleEsqueciSenha(event)">
+        <p style="font-size:0.88rem; color:var(--text-light); margin-bottom:20px; text-align:center;">
+          Digite seu e-mail e enviaremos um link para redefinir sua senha.
+        </p>
+        <div class="form-group">
+          <label for="resetEmail">E-mail</label>
+          <input type="email" class="form-control" id="resetEmail" placeholder="seu@email.com" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="btnReset">Enviar link de recuperação</button>
+        <div style="text-align:center; margin-top:12px;">
+          <a href="#" id="linkVoltarLogin" style="font-size:0.83rem; color:var(--text-light);">← Voltar para o login</a>
+        </div>
       </form>
 
       <!-- CADASTRO FORM -->
@@ -242,7 +260,45 @@
   </div>
 
   <script type="module">
-    import { login, cadastrar } from './js/auth.js';
+    import { login, cadastrar, enviarResetSenha } from './js/auth.js';
+
+    // Esqueci senha links
+    document.getElementById('linkEsqueciSenha').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('formLogin').classList.add('hidden');
+      document.getElementById('formCadastro').classList.add('hidden');
+      document.getElementById('formEsqueciSenha').classList.remove('hidden');
+      document.querySelector('.login-tabs').style.display = 'none';
+      document.getElementById('pageTitle').textContent = 'Recuperar senha';
+      document.getElementById('pageSubtitle').textContent = 'Enviaremos um link para seu e-mail';
+      hideAlerts();
+    });
+
+    document.getElementById('linkVoltarLogin').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('formEsqueciSenha').classList.add('hidden');
+      document.querySelector('.login-tabs').style.display = '';
+      showTab('login');
+    });
+
+    window.handleEsqueciSenha = async function(e) {
+      e.preventDefault();
+      hideAlerts();
+      const btn = document.getElementById('btnReset');
+      btn.classList.add('loading');
+      btn.textContent = 'Enviando...';
+
+      try {
+        const email = document.getElementById('resetEmail').value;
+        await enviarResetSenha(email);
+        showAlert('success', 'Link enviado! Verifique sua caixa de entrada e spam.');
+        btn.textContent = 'Link enviado!';
+      } catch (err) {
+        showAlert('error', 'Erro ao enviar link. Verifique o e-mail e tente novamente.');
+        btn.classList.remove('loading');
+        btn.textContent = 'Enviar link de recuperação';
+      }
+    };
 
     // Expose to global scope for inline handlers
     window.handleLogin = async function(e) {
