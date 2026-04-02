@@ -179,6 +179,16 @@
   </style>
 </head>
 <body>
+  <!-- Detect password recovery tokens and redirect to reset page -->
+  <script>
+    (function() {
+      var hash = window.location.hash;
+      if (hash && hash.indexOf('type=recovery') !== -1) {
+        window.location.replace('reset-password.html' + hash);
+      }
+    })();
+  </script>
+
   <div class="login-page">
     <div class="login-card">
 
