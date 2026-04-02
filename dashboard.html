@@ -3548,11 +3548,11 @@
         var filePath = window._userId + '/avatar.' + ext;
 
         // Try to create bucket if it doesn't exist
-        await sb.storage.createBucket('avatars', { public: true }).catch(function() {});
+        await sb.storage.createBucket('Avatars', { public: true }).catch(function() {});
 
         // Upload (upsert)
         var uploadResult = await sb.storage
-          .from('avatars')
+          .from('Avatars')
           .upload(filePath, file, { upsert: true, contentType: file.type });
 
         if (uploadResult.error) {
@@ -3562,7 +3562,7 @@
         }
 
         // Get public URL
-        var urlData = sb.storage.from('avatars').getPublicUrl(filePath);
+        var urlData = sb.storage.from('Avatars').getPublicUrl(filePath);
         var fotoUrl = urlData.data.publicUrl + '?t=' + Date.now();
 
         // Save to perfil_aluno
@@ -3602,11 +3602,11 @@
         var sb = window._supabase;
         if (!sb || !window._userId) return;
 
-        var { data: files } = await sb.storage.from('avatars').list(window._userId);
+        var { data: files } = await sb.storage.from('Avatars').list(window._userId);
 
         if (files && files.length > 0) {
           var paths = files.map(function(f) { return window._userId + '/' + f.name; });
-          await sb.storage.from('avatars').remove(paths);
+          await sb.storage.from('Avatars').remove(paths);
         }
 
         await sb.from('perfil_aluno').update({ foto_url: null }).eq('user_id', window._userId);
