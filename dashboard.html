@@ -2107,49 +2107,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
   <script>
-    // =============================================
-    //  SUPABASE INIT (synchronous UMD)
-    // =============================================
-    (function() {
-      var sb = window.supabase.createClient(
-        'https://hcngacohwiwphcbroint.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
-        { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
-      );
-      window._supabase = sb;
-      window._userId = null;
-      window._userEmail = null;
-      window._userName = null;
-
-      sb.auth.getSession().then(function(result) {
-        var session = result.data.session;
-        if (!session) {
-          window.location.href = 'login.html';
-          return;
-        }
-        window._userId = session.user.id;
-        window._userEmail = session.user.email;
-        window._userName = session.user.user_metadata && session.user.user_metadata.nome
-          ? session.user.user_metadata.nome
-          : session.user.email.split('@')[0];
-
-        console.log('[Init] Supabase OK:', window._userId, window._userEmail);
-
-        // Load data now that session is confirmed
-        if (typeof window._loadDashboardData === 'function') {
-          window._loadDashboardData();
-        }
-      }).catch(function(e) {
-        console.error('[Init] Erro sessão:', e);
-      });
-
-      sb.auth.onAuthStateChange(function(ev) {
-        if (ev === 'SIGNED_OUT') window.location.href = 'login.html';
-      });
-    })();
-  </script>
-
-  <script>
 
     // =============================================
     //  SIDEBAR TOGGLE
@@ -3389,35 +3346,69 @@
     calcularEstatisticas();
 
     // =============================================
-    //  LOAD ALL DATA FROM SUPABASE
+    //  INIT: setup Supabase + load data
     // =============================================
-    async function _loadDashboardData() {
-      console.log('[Init] Carregando dados para:', window._userId);
-      try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
-      try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
-      try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
-      try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
 
-      renderSubjectsList();
-      buildDynamicSchedule();
-      renderCalendar();
-      calcularEstatisticas();
-      console.log('[Init] Dashboard completo');
-    }
-
-    window._loadDashboardData = _loadDashboardData;
-
-    // Show local state immediately
+    // 1. Show local data immediately
     loadFromLocalStorage();
     renderSubjectsList();
     buildDynamicSchedule();
     renderCalendar();
     calcularEstatisticas();
 
-    // If session already available (fast connection), load now
-    if (window._userId) {
-      _loadDashboardData();
-    }
+    // 2. Create Supabase client and load data
+    (async function() {
+      try {
+        // Create client from UMD global
+        var sb = window.supabase.createClient(
+          'https://hcngacohwiwphcbroint.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
+          { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
+        );
+
+        window._supabase = sb;
+        console.log('[Init] Supabase client criado');
+
+        // Get session
+        var result = await sb.auth.getSession();
+        var session = result.data.session;
+
+        if (!session) {
+          console.log('[Init] Sem sessão, redirecionando...');
+          window.location.href = 'login.html';
+          return;
+        }
+
+        window._userId = session.user.id;
+        window._userEmail = session.user.email;
+        window._userName = (session.user.user_metadata && session.user.user_metadata.nome)
+          ? session.user.user_metadata.nome
+          : session.user.email.split('@')[0];
+
+        console.log('[Init] Sessão OK:', window._userId, window._userEmail);
+
+        // Auth listener
+        sb.auth.onAuthStateChange(function(ev) {
+          if (ev === 'SIGNED_OUT') window.location.href = 'login.html';
+        });
+
+        // 3. Load all data
+        try { await carregarPerfilSupabase(); } catch (e) { console.error('[Init] perfil:', e); }
+        try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
+        try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
+        try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
+
+        // 4. Final render
+        renderSubjectsList();
+        buildDynamicSchedule();
+        renderCalendar();
+        calcularEstatisticas();
+
+        console.log('[Init] Dashboard completo');
+      } catch (e) {
+        console.error('[Init] ERRO FATAL:', e);
+      }
+    })();
   </script>
 </body>
 </html>
