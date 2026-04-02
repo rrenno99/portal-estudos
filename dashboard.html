@@ -1801,10 +1801,12 @@
         <div class="stats-row">
           <div class="stat-card">
             <div class="stat-card-header">
-              <div class="stat-card-icon orange">📖</div>
+              <div class="stat-card-icon orange">📅</div>
+              <span id="streakBadge" style="display:none;font-size:0.75rem;font-weight:700;color:#E65100;background:#FFF3E0;padding:2px 8px;border-radius:10px">🔥 Sequência!</span>
             </div>
-            <div class="stat-value" id="statDiasEstudados">0/0</div>
-            <div class="stat-label">Aulas Concluídas</div>
+            <div class="stat-value" id="statDiasEstudados">0</div>
+            <div class="stat-label">Dias Estudados</div>
+            <div id="diasSemanaProgress" style="margin-top:8px;font-size:0.72rem;color:var(--text-lighter)"></div>
           </div>
           <div class="stat-card">
             <div class="stat-card-header">
@@ -2727,6 +2729,7 @@
         console.error('[Timer] Erro:', e);
       }
       await carregarSessoesSupabase();
+      await carregarDiasEstudados();
       calcularEstatisticas();
     }
 
@@ -2880,6 +2883,114 @@
         console.log('[Sessões] Total:', Math.round(totalHorasEstudadas * 10) / 10, 'horas');
       } catch (e) {
         console.error('[Sessões] Erro:', e);
+      }
+    }
+
+    // =============================================
+    //  DIAS ESTUDADOS + STREAK
+    // =============================================
+    var diasEstudadosTotal = 0;
+    var streakAtivo = false;
+    var diasEstudadosSemana = 0;
+    var metaDiasSemana = 5;
+
+    async function carregarDiasEstudados() {
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
+
+        // Get all sessions to count distinct days
+        var { data, error } = await sb
+          .from('sessoes_estudo')
+          .select('data_inicio')
+          .eq('user_id', window._userId)
+          .eq('status', 'concluido');
+
+        if (error || !data) { console.error('[Dias] Erro:', error); return; }
+
+        // Count distinct days
+        var diasSet = new Set();
+        data.forEach(function(s) {
+          var d = new Date(s.data_inicio);
+          diasSet.add(d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate());
+        });
+        diasEstudadosTotal = diasSet.size;
+
+        // Check streak: did the student study today AND yesterday?
+        var now = new Date();
+        var hoje = now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
+        var ontem = new Date(now);
+        ontem.setDate(ontem.getDate() - 1);
+        var ontemStr = ontem.getFullYear() + '-' + (ontem.getMonth()+1) + '-' + ontem.getDate();
+
+        var estudouHoje = diasSet.has(hoje);
+        var estudouOntem = diasSet.has(ontemStr);
+        streakAtivo = estudouHoje && estudouOntem;
+
+        // Count streak length (consecutive days backwards from today)
+        var streakCount = 0;
+        if (estudouHoje) {
+          var checkDate = new Date(now);
+          while (true) {
+            var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
+            if (diasSet.has(key)) {
+              streakCount++;
+              checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+              break;
+            }
+          }
+        }
+
+        // Count days studied this week (Monday to now)
+        var dayOfWeek = now.getDay();
+        var monday = new Date(now);
+        monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        monday.setHours(0, 0, 0, 0);
+
+        diasEstudadosSemana = 0;
+        diasSet.forEach(function(dateKey) {
+          var parts = dateKey.split('-');
+          var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+          if (d >= monday) diasEstudadosSemana++;
+        });
+
+        // Get meta from plan
+        var plan = getPlanData();
+        if (plan && plan.dias) {
+          metaDiasSemana = plan.dias.length;
+        }
+
+        // Update UI
+        document.getElementById('statDiasEstudados').textContent = diasEstudadosTotal;
+
+        var badge = document.getElementById('streakBadge');
+        if (streakCount >= 2) {
+          badge.textContent = '🔥 ' + streakCount + ' dias!';
+          badge.style.display = '';
+        } else if (estudouHoje) {
+          badge.textContent = '✓ Estudou hoje';
+          badge.style.display = '';
+          badge.style.color = '#38A169';
+          badge.style.background = '#E8F5E9';
+        } else {
+          badge.style.display = 'none';
+        }
+
+        var weekEl = document.getElementById('diasSemanaProgress');
+        if (weekEl) {
+          var pct = metaDiasSemana > 0 ? Math.min(100, Math.round((diasEstudadosSemana / metaDiasSemana) * 100)) : 0;
+          weekEl.innerHTML = diasEstudadosSemana + ' de ' + metaDiasSemana + ' dias esta semana'
+            + '<div style="height:4px;background:var(--border);border-radius:4px;margin-top:4px;overflow:hidden">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + (diasEstudadosSemana >= metaDiasSemana ? 'var(--success)' : 'var(--primary)') + ';border-radius:4px;transition:width 0.5s"></div></div>';
+        }
+
+        // Update streak in welcome area
+        document.getElementById('streakCount').textContent = streakCount > 0 ? streakCount + ' dias' : '0 dias';
+
+        console.log('[Dias] Total:', diasEstudadosTotal, '| Streak:', streakCount, '| Semana:', diasEstudadosSemana + '/' + metaDiasSemana);
+      } catch (e) {
+        console.error('[Dias] Erro:', e);
       }
     }
 
@@ -3469,7 +3580,7 @@
       }
 
       // Update UI
-      document.getElementById('statDiasEstudados').textContent = aulasConcluidas + '/' + totalAulas;
+      // statDiasEstudados is managed by carregarDiasEstudados()
       document.getElementById('statHorasEstudadas').textContent = Math.round(totalHorasEstudadas * 10) / 10 + 'h';
       document.getElementById('statHorasRecomendadas').textContent = horasRecomendadas + 'h/sem';
       document.getElementById('statTotalMaterias').textContent = progresso + '%';
@@ -3550,6 +3661,7 @@
         try { await carregarLinksSupabase(); } catch (e) { console.error('[Init] links:', e); }
         try { await carregarAulasSupabase(); } catch (e) { console.error('[Init] aulas:', e); }
         try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
+        try { await carregarDiasEstudados(); } catch (e) { console.error('[Init] dias:', e); }
         try { await carregarAtividadesSupabase(); } catch (e) { console.error('[Init] atividades:', e); }
 
         // 4. Final render
