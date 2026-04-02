@@ -3541,42 +3541,44 @@
 
       // Upload to Supabase Storage
       try {
-        const supabase = window._supabase;
-        const sb = window._supabase;
-        const user = window._userId ? { id: window._userId } : null;
-        if (!sb || !user) { alert('Faça login para enviar a foto.'); return; }
+        var sb = window._supabase;
+        if (!sb || !window._userId) { alert('Faça login para enviar a foto.'); return; }
 
-        const ext = file.name.split('.').pop();
-        const filePath = `${user.id}/avatar.${ext}`;
+        var ext = file.name.split('.').pop().toLowerCase();
+        var filePath = window._userId + '/avatar.' + ext;
+
+        // Try to create bucket if it doesn't exist
+        await sb.storage.createBucket('avatars', { public: true }).catch(function() {});
 
         // Upload (upsert)
-        const { error: uploadError } = await sb.storage
+        var uploadResult = await sb.storage
           .from('avatars')
-          .upload(filePath, file, { upsert: true });
+          .upload(filePath, file, { upsert: true, contentType: file.type });
 
-        if (uploadError) throw uploadError;
+        if (uploadResult.error) {
+          console.error('[Foto] Upload error:', uploadResult.error);
+          alert('Erro no upload: ' + uploadResult.error.message);
+          return;
+        }
 
         // Get public URL
-        const { data: urlData } = sb.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-
-        const fotoUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
+        var urlData = sb.storage.from('avatars').getPublicUrl(filePath);
+        var fotoUrl = urlData.data.publicUrl + '?t=' + Date.now();
 
         // Save to perfil_aluno
-        await sb.from('perfil_aluno').update({ foto_url: fotoUrl }).eq('user_id', user.id);
+        await sb.from('perfil_aluno').update({ foto_url: fotoUrl }).eq('user_id', window._userId);
 
         // Update localStorage and UI
-        const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
+        var perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
         perfil.foto_url = fotoUrl;
         localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
 
         setUserUI(perfil.nome, perfil.email, perfil.concurso, fotoUrl);
         document.getElementById('btnRemoverFotoModal').style.display = '';
+        console.log('[Foto] Upload OK:', fotoUrl);
 
       } catch (e) {
-        console.error('Erro no upload:', e);
-        alert('Erro ao enviar foto. Verifique se o bucket "avatars" existe no Supabase Storage.');
+        console.error('[Foto] Erro:', e);
       }
 
       // Reset input
@@ -3589,34 +3591,25 @@
     async function removerFoto() {
       closeAllDropdowns();
 
-      const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
+      var perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
 
-      // Update UI immediately (back to initials)
       setUserUI(perfil.nome, perfil.email, perfil.concurso, null);
 
-      // Update localStorage
       perfil.foto_url = null;
       localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
 
-      // Try Supabase
       try {
-        const supabase = window._supabase;
-        const sb = window._supabase;
-        const user = window._userId ? { id: window._userId } : null;
-        if (!sb || !user) return;
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
 
-        // Delete from storage
-        const { data: files } = await sb.storage
-          .from('avatars')
-          .list(user.id);
+        var { data: files } = await sb.storage.from('avatars').list(window._userId);
 
         if (files && files.length > 0) {
-          const paths = files.map(f => `${user.id}/${f.name}`);
+          var paths = files.map(function(f) { return window._userId + '/' + f.name; });
           await sb.storage.from('avatars').remove(paths);
         }
 
-        // Clear from perfil_aluno
-        await sb.from('perfil_aluno').update({ foto_url: null }).eq('user_id', user.id);
+        await sb.from('perfil_aluno').update({ foto_url: null }).eq('user_id', window._userId);
 
       } catch (e) {
         console.error('Erro ao remover foto:', e);
