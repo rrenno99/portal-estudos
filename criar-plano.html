@@ -704,6 +704,15 @@
         <button class="btn btn-primary" onclick="aplicarMateriasResumo()" style="margin-top:8px;width:100%">Usar estas materias e continuar</button>
       </div>
 
+      <!-- Data da Prova -->
+      <div style="background:linear-gradient(135deg,#EBF5FF,#fff);border:1px solid rgba(30,136,229,0.15);border-radius:var(--radius-sm);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label style="font-size:0.8rem;font-weight:600;color:var(--text-light);display:block;margin-bottom:4px">Data da Prova *</label>
+          <input type="date" class="form-control" id="resumoDataProva" onchange="atualizarContagem()" style="max-width:200px">
+        </div>
+        <div id="resumoContagem" style="font-size:0.88rem;font-weight:700;color:var(--primary)"></div>
+      </div>
+
       <!-- Main summary grid -->
       <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 24px;">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -758,7 +767,7 @@
 
       <div class="wizard-actions">
         <button class="btn btn-ghost" onclick="prevStep(4)">← Voltar</button>
-        <button class="btn btn-primary btn-lg" onclick="gerarPlano()" id="btnGerar">
+        <button class="btn btn-primary btn-lg" onclick="gerarPlano()" id="btnGerar" disabled style="opacity:0.5">
           🚀 Gerar Meu Plano de Estudos
         </button>
       </div>
@@ -1735,7 +1744,15 @@
       var trilhaNames = { 'agil': 'Agil (Iniciante)', 'consistente': 'Consistente (Intermediario)', 'blindada': 'Blindada (Avancado)' };
       document.getElementById('resumoTrilha').textContent = trilhaNames[selectedTrilha] || selectedTrilha;
 
-      // === MATERIAS LIST with perfil ===
+      // === DATA DA PROVA ===
+      var resumoDataInput = document.getElementById('resumoDataProva');
+      var step1Data = document.getElementById('dataProva').value;
+      if (step1Data && !resumoDataInput.value) {
+        resumoDataInput.value = step1Data;
+      }
+      atualizarContagem();
+
+      // === MATERIAS LIST with perfil + delete ===
       var materiasHeader = document.getElementById('resumoMateriasHeader');
       var materiasList = document.getElementById('resumoMateriasList');
       materiasHeader.textContent = subjects.length + ' Materias do Plano';
@@ -1753,15 +1770,21 @@
               nivelLabel = '<span style="font-size:0.68rem;font-weight:600;color:' + (nivelColors[perfil.nivel] || 'var(--text-light)') + ';background:rgba(30,136,229,0.08);padding:1px 6px;border-radius:4px;margin-left:6px">' + perfil.nivel.charAt(0).toUpperCase() + perfil.nivel.slice(1) + '</span>';
             }
           }
-          html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;align-items:center;justify-content:space-between">';
+          var escapedNome = s.nome.replace(/'/g, "\\'");
+          html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;align-items:center;justify-content:space-between" data-resumo-materia="' + s.nome + '">';
           html += '<span><strong style="color:var(--secondary)">' + s.nome + '</strong>' + nivelLabel + '</span>';
+          html += '<span style="display:flex;align-items:center;gap:8px">';
           html += '<span style="font-size:0.75rem;color:var(--text-lighter)">' + s.aulas + ' aulas</span>';
-          html += '</div>';
+          html += '<button onclick="removerMateriaResumo(\'' + escapedNome + '\')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text-lighter);padding:2px 4px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.color=\'#E53E3E\'" onmouseout="this.style.color=\'var(--text-lighter)\'" title="Remover materia">🗑</button>';
+          html += '</span></div>';
         });
         materiasList.innerHTML = html;
       } else {
         materiasList.innerHTML = '<em style="color:var(--text-lighter);font-size:0.85rem">Nenhuma materia selecionada</em>';
       }
+
+      // === VALIDATE BUTTON ===
+      validarBtnGerar();
 
       // === LINKS ===
       var linksDiv = document.getElementById('resumoLinks');
@@ -1819,9 +1842,99 @@
       });
       _materiasExtraidasEdital = linhas.map(function(n) { return { nome: n, topicos: '' }; });
 
-      // Rebuild review
       document.getElementById('resumoErro').style.display = 'none';
       buildReview();
+    }
+
+    function atualizarContagem() {
+      var input = document.getElementById('resumoDataProva');
+      var display = document.getElementById('resumoContagem');
+      if (!input || !input.value) {
+        display.innerHTML = '<span style="color:var(--text-lighter);font-size:0.82rem">Preencha a data para ver a contagem</span>';
+        // Also sync back to step 1
+        validarBtnGerar();
+        return;
+      }
+      var dataProva = new Date(input.value + 'T00:00:00');
+      var hoje = new Date();
+      hoje.setHours(0,0,0,0);
+      var diff = Math.ceil((dataProva - hoje) / (1000 * 60 * 60 * 24));
+
+      if (diff > 0) {
+        display.innerHTML = '📅 Faltam <strong style="font-size:1.1rem">' + diff + '</strong> dias para a prova';
+      } else if (diff === 0) {
+        display.innerHTML = '🔥 <strong>Hoje e o dia!</strong> Boa prova!';
+      } else {
+        display.innerHTML = '<span style="color:var(--text-lighter)">Data no passado</span>';
+      }
+
+      // Sync to step 1
+      document.getElementById('dataProva').value = input.value;
+      validarBtnGerar();
+    }
+
+    function removerMateriaResumo(nome) {
+      // Uncheck in step 2
+      document.querySelectorAll('.subject-card.selected').forEach(function(card) {
+        if (card.getAttribute('data-subject') === nome) {
+          card.classList.remove('selected');
+          var cb = card.querySelector('input[type="checkbox"]');
+          if (cb) cb.checked = false;
+        }
+      });
+
+      // Remove from DOM in review
+      var row = document.querySelector('[data-resumo-materia="' + nome + '"]');
+      if (row) row.remove();
+
+      // Recalculate and update
+      var remainingSubjects = getSelectedSubjects();
+      document.getElementById('resumoMateriasHeader').textContent = remainingSubjects.length + ' Materias do Plano';
+
+      // Recalculate hours (redistribution: same total hours, fewer subjects)
+      recalcularEstimativa();
+      validarBtnGerar();
+    }
+
+    function recalcularEstimativa() {
+      var subjects = getSelectedSubjects();
+      var selectedDays = [];
+      document.querySelectorAll('#diasEstudo .chip.selected').forEach(function(c) { selectedDays.push(c.textContent); });
+      var horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
+      var horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
+      var diasUteis = selectedDays.filter(function(d) { return !['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var diasFds = selectedDays.filter(function(d) { return ['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
+
+      var HORAS_POR_MATERIA = 50;
+      var totalHoras = subjects.length * HORAS_POR_MATERIA;
+      var semanas = horasSemanais > 0 ? totalHoras / horasSemanais : 0;
+      var meses = horasSemanais > 0 ? Math.max(1, Math.ceil(semanas / 4.3)) : 0;
+
+      var horasDisplay = horasSemanais % 1 === 0 ? horasSemanais + 'h' : horasSemanais.toFixed(1) + 'h';
+
+      if (horasSemanais > 0 && subjects.length > 0) {
+        // Show redistribution info
+        var horasPorMateria = Math.round((horasSemanais / subjects.length) * 10) / 10;
+        document.getElementById('resumoEstimativa').innerHTML =
+          subjects.length + ' materias x ' + HORAS_POR_MATERIA + 'h = <strong>' + totalHoras + 'h</strong> total.<br>' +
+          'Com <strong>' + horasDisplay + '/semana</strong> (~' + horasPorMateria + 'h por materia), conclusao em <strong>' + meses + ' ' + (meses === 1 ? 'mes' : 'meses') + '</strong>.';
+      } else {
+        document.getElementById('resumoEstimativa').textContent = 'Adicione materias para ver a estimativa.';
+      }
+
+      // Update materias header
+      document.getElementById('resumoMateriasHeader').textContent = subjects.length + ' Materias do Plano';
+    }
+
+    function validarBtnGerar() {
+      var btn = document.getElementById('btnGerar');
+      var dataPreenchida = !!document.getElementById('resumoDataProva').value;
+      var temMaterias = getSelectedSubjects().length > 0;
+      var habilitado = dataPreenchida && temMaterias;
+
+      btn.disabled = !habilitado;
+      btn.style.opacity = habilitado ? '1' : '0.5';
     }
 
     // =============================================
@@ -1869,7 +1982,7 @@
 
       var turnoText = 'Flexivel';
 
-      const dataProva = document.getElementById('dataProva').value || null;
+      const dataProva = document.getElementById('resumoDataProva').value || document.getElementById('dataProva').value || null;
       const editalLink = document.getElementById('editalLink') ? document.getElementById('editalLink').value.trim() : '';
       const materiaPerfis = getMateriaPerfis();
       const nome = user.user_metadata?.nome || user.email.split('@')[0];
