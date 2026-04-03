@@ -298,11 +298,83 @@ function filtrarTextoPorCargo(textoCompleto, cargoSelecionado) {
 }
 
 // =============================================
-//  2. EXTRACAO DE MATERIAS DO EDITAL
-//  Anti-hallucination: only returns what's IN the text
+//  2. STRUCTURE-BASED PARSING ENGINE
+//  Hierarchy detection, boundary logic, cleaning
 // =============================================
 
-// Dicionario de materias comuns (used for MATCHING, not invention)
+// Verb phrases to strip from topics (instructional noise)
+var VERB_NOISE = [
+  /^o\s+(?:aluno|candidato)\s+dever/i,
+  /^ser[aá]\s+necess[aá]rio/i,
+  /^(?:dever[aá]|poder[aá])\s+/i,
+  /^(?:conhecer|compreender|analisar|identificar|avaliar|aplicar|interpretar|demonstrar|resolver)\s+/i,
+  /^(?:capacidade|habilidade|compet[eê]ncia)\s+(?:de|para)\s+/i,
+  /^(?:nesta\s+prova|neste\s+conte[uú]do|conforme|de\s+acordo)\s+/i,
+  /^(?:os\s+seguintes\s+t[oó]picos|as\s+seguintes\s+mat[eé]rias)\s*/i,
+];
+
+// Detect hierarchy level from a numbered pattern
+// Returns { level: 1|2|3, number: "1"|"1.2"|"1.2.3", text: "..." } or null
+function parseHierarchyLine(linha) {
+  var trimmed = linha.trim();
+  // Pattern: 1. / 1.1 / 1.1.1 / 1) / I. / a)
+  var m = trimmed.match(/^(\d{1,2}(?:\.\d{1,2}){0,3})[\.\)\s]+[-–]?\s*(.+)$/);
+  if (m) {
+    var parts = m[1].split('.');
+    return { level: parts.length, number: m[1], text: m[2].trim() };
+  }
+  // Roman numerals: I. II. III.
+  var roman = trimmed.match(/^([IVX]{1,4})[\.\)]\s+(.+)$/);
+  if (roman) {
+    return { level: 1, number: roman[1], text: roman[2].trim() };
+  }
+  // Letters: a) b) c)
+  var letter = trimmed.match(/^([a-z])\)\s+(.+)$/);
+  if (letter) {
+    return { level: 3, number: letter[1], text: letter[2].trim() };
+  }
+  return null;
+}
+
+// Clean a topic string: remove verb noise, trim, extract terms
+function limparTopico(texto) {
+  var limpo = texto.trim();
+  // Remove trailing periods, semicolons
+  limpo = limpo.replace(/[.;:]+$/, '').trim();
+  // Remove verb noise
+  VERB_NOISE.forEach(function(r) { limpo = limpo.replace(r, '').trim(); });
+  // Remove leading articles/prepositions
+  limpo = limpo.replace(/^(?:os?|as?|dos?|das?|nos?|nas?|de|em|para|com)\s+/i, '').trim();
+  // Capitalize first letter
+  if (limpo.length > 0) limpo = limpo.charAt(0).toUpperCase() + limpo.slice(1);
+  return limpo;
+}
+
+// Calculate confidence for an extracted materia
+function calcularConfianca(materia) {
+  var score = 50; // base
+
+  // Has clean topics
+  if (materia.topicos && materia.topicos.length > 5) score += 20;
+  // Name is reasonable length
+  if (materia.nome.length >= 5 && materia.nome.length <= 40) score += 10;
+  // Name has <= 5 words
+  if (materia.nome.split(/\s+/).length <= 5) score += 10;
+  // Matched by dictionary
+  if (materia.fonte === 'dicionario' || materia.fonte === 'analise_renno') score += 15;
+  // Topics are clean (no long sentences)
+  if (materia.topicos) {
+    var topList = materia.topicos.split(',');
+    var longTopics = topList.filter(function(t) { return t.trim().split(/\s+/).length > 8; });
+    if (longTopics.length > topList.length * 0.3) score -= 20;
+  }
+  // Name contains suspicious words
+  if (/edital|prova|candidato|inscri|requisito/i.test(materia.nome)) score -= 30;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+// Known subject dictionary (for matching/normalization)
 var MATERIAS_CONHECIDAS = [
   { padrao: /l[ií]ngua\s+portugu[eê]sa|portugu[eê]s/i, nome: 'Lingua Portuguesa' },
   { padrao: /l[ií]ngua\s+inglesa|ingl[eê]s/i, nome: 'Lingua Inglesa' },
@@ -321,94 +393,170 @@ var MATERIAS_CONHECIDAS = [
   { padrao: /economia|macroeconomia|microeconomia/i, nome: 'Economia' },
   { padrao: /inform[aá]tica|computa[cç][aã]o|tecnologia\s+da\s+informa/i, nome: 'Informatica' },
   { padrao: /controle\s+externo/i, nome: 'Controle Externo' },
-  { padrao: /auditoria\s+(?:governamental|p[uú]blica)/i, nome: 'Auditoria Governamental' },
-  { padrao: /auditoria(?!\s+govern|\s+p[uú]b)/i, nome: 'Auditoria' },
+  { padrao: /auditoria/i, nome: 'Auditoria' },
   { padrao: /legisla[cç][aã]o\s+(?:penal\s+)?especial/i, nome: 'Legislacao Especial' },
   { padrao: /administra[cç][aã]o\s+financeira|AFO|or[cç]ament[aá]ria/i, nome: 'AFO' },
   { padrao: /estat[ií]stica/i, nome: 'Estatistica' },
   { padrao: /atualidades|conhecimentos?\s+gerais/i, nome: 'Atualidades' },
   { padrao: /regimento\s+interno/i, nome: 'Regimento Interno' },
-  { padrao: /[eé]tica\s+(?:no\s+servi[cç]o|p[uú]blica)|c[oó]digo\s+de\s+[eé]tica/i, nome: 'Etica no Servico Publico' },
+  { padrao: /[eé]tica/i, nome: 'Etica no Servico Publico' },
   { padrao: /reda[cç][aã]o\s+oficial|discursiva/i, nome: 'Redacao Oficial' },
   { padrao: /direito\s+financeiro/i, nome: 'Direito Financeiro' },
   { padrao: /direito\s+ambiental/i, nome: 'Direito Ambiental' },
   { padrao: /direito\s+previdenci[aá]rio/i, nome: 'Direito Previdenciario' },
   { padrao: /seguran[cç]a\s+p[uú]blica/i, nome: 'Seguranca Publica' },
-  { padrao: /medicina\s+legal|criminalistica/i, nome: 'Medicina Legal' },
+  { padrao: /medicina\s+legal|criminal[ií]stica/i, nome: 'Medicina Legal' },
 ];
+
+// Normalize a subject name using the dictionary
+function normalizarNomeMateria(nome) {
+  var lower = nome.toLowerCase();
+  for (var i = 0; i < MATERIAS_CONHECIDAS.length; i++) {
+    if (MATERIAS_CONHECIDAS[i].padrao.test(nome)) {
+      return MATERIAS_CONHECIDAS[i].nome;
+    }
+  }
+  // Capitalize first letter of each word
+  return nome.replace(/\w\S*/g, function(t) {
+    return t.charAt(0).toUpperCase() + t.substr(1).toLowerCase();
+  });
+}
+
+// =============================================
+//  2a. MAIN EXTRACTION — Structure-based
+// =============================================
 
 function extrairMateriasDoTexto(texto) {
   if (!texto || texto.length < 20) return [];
 
-  var encontradas = [];
-  var nomesJaAdicionados = new Set();
-
-  // STRATEGY 1: Match known subjects that EXIST in the text
-  MATERIAS_CONHECIDAS.forEach(function(m) {
-    if (m.padrao.test(texto) && !nomesJaAdicionados.has(m.nome)) {
-      // ANTI-HALLUCINATION: extract the ACTUAL topic list from surrounding text
-      var topicosExtraidos = extrairTopicosProximos(texto, m.padrao);
-      encontradas.push({ nome: m.nome, topicos: topicosExtraidos, fonte: 'dicionario' });
-      nomesJaAdicionados.add(m.nome);
-    }
-  });
-
-  // STRATEGY 2: Find numbered hierarchy items (1.1, 2.3, etc.)
-  // These are often subject headers in "conteudo programatico"
   var linhas = texto.split(/\n/);
-  linhas.forEach(function(linha) {
-    // Pattern: "1. LINGUA PORTUGUESA" or "2 - Direito Administrativo"
-    var m = linha.match(/^\s*(\d{1,2})[\.\)\s]+[-–]?\s*([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú\s]{3,50}?)(?:\s*[:.\-–]|$)/);
-    if (m) {
-      var nome = m[2].trim();
-      // Only accept if it looks like a subject name (not too long, starts with uppercase)
-      if (nome.length >= 4 && nome.length <= 50 && nome.split(/\s+/).length <= 6) {
-        var normalizado = nome.charAt(0).toUpperCase() + nome.slice(1).toLowerCase();
-        // Check it's not already found and is actually IN the text
-        if (!nomesJaAdicionados.has(normalizado) && !nomesJaAdicionados.has(nome)) {
-          var topicos = extrairSubitensHierarquicos(linhas, parseInt(m[1]));
-          encontradas.push({ nome: normalizado, topicos: topicos, fonte: 'hierarquia' });
-          nomesJaAdicionados.add(normalizado);
+  var materias = [];
+  var nomesVistos = new Set();
+
+  // PASS 1: Build hierarchy tree from numbered lines
+  var arvore = []; // [{level, number, text, lineIdx, children:[]}]
+
+  for (var i = 0; i < linhas.length; i++) {
+    var parsed = parseHierarchyLine(linhas[i]);
+    if (parsed && parsed.text.length >= 3 && parsed.text.length <= 80) {
+      parsed.lineIdx = i;
+      arvore.push(parsed);
+    }
+  }
+
+  // PASS 2: Identify level-1 items as subjects, level-2+ as topics
+  var level1Items = arvore.filter(function(n) { return n.level === 1; });
+
+  if (level1Items.length > 0) {
+    level1Items.forEach(function(item, idx) {
+      var nome = normalizarNomeMateria(item.text);
+      if (nomesVistos.has(nome.toLowerCase())) return;
+
+      // Find boundary: from this item to the next level-1 item
+      var startLine = item.lineIdx;
+      var endLine = (idx + 1 < level1Items.length) ? level1Items[idx + 1].lineIdx : Math.min(startLine + 100, linhas.length);
+
+      // Collect sub-items (level 2+) between boundaries
+      var topicosRaw = [];
+      for (var j = 0; j < arvore.length; j++) {
+        if (arvore[j].lineIdx > startLine && arvore[j].lineIdx < endLine && arvore[j].level >= 2) {
+          topicosRaw.push(arvore[j].text);
         }
       }
+
+      // Also collect non-numbered content lines between boundaries as potential topics
+      for (var j = startLine + 1; j < endLine; j++) {
+        var line = linhas[j].trim();
+        if (line.length > 3 && line.length < 120 && !parseHierarchyLine(linhas[j])) {
+          // Check it's not a verb phrase or instructional text
+          var isNoise = VERB_NOISE.some(function(r) { return r.test(line); });
+          if (!isNoise && !/^\s*$/.test(line)) {
+            // Split by semicolons (common topic separator)
+            line.split(/[;]/).forEach(function(part) {
+              var cleaned = limparTopico(part);
+              if (cleaned.length > 2 && cleaned.length < 80) {
+                topicosRaw.push(cleaned);
+              }
+            });
+          }
+        }
+      }
+
+      // Clean and deduplicate topics
+      var topicosLimpos = [];
+      var topicosVistos = new Set();
+      topicosRaw.forEach(function(t) {
+        var limpo = limparTopico(t);
+        if (limpo.length > 2 && limpo.length < 80 && !topicosVistos.has(limpo.toLowerCase())) {
+          topicosVistos.add(limpo.toLowerCase());
+          topicosLimpos.push(limpo);
+        }
+      });
+
+      var materia = {
+        nome: nome,
+        topicos: topicosLimpos.slice(0, 15).join(', '),
+        topicosArray: topicosLimpos.slice(0, 15),
+        fonte: 'hierarquia',
+        confianca: 0,
+        needsReview: false,
+        textoOriginal: ''
+      };
+
+      materia.confianca = calcularConfianca(materia);
+      // Flag for review if confidence is low or topics are messy
+      if (materia.confianca < 50 || topicosLimpos.length === 0) {
+        materia.needsReview = true;
+        materia.textoOriginal = linhas.slice(startLine, Math.min(startLine + 20, endLine)).join('\n');
+      }
+
+      nomesVistos.add(nome.toLowerCase());
+      materias.push(materia);
+    });
+  }
+
+  // PASS 3: Dictionary matching for subjects not found by hierarchy
+  MATERIAS_CONHECIDAS.forEach(function(m) {
+    if (m.padrao.test(texto) && !nomesVistos.has(m.nome.toLowerCase())) {
+      // Extract nearby content for topics
+      var match = m.padrao.exec(texto);
+      m.padrao.lastIndex = 0;
+      if (!match) return;
+
+      var nearby = texto.substring(match.index, match.index + 600);
+      var topicos = [];
+      // Look for sub-items in nearby text
+      var subItems = nearby.match(/(?:\d+\.\d+\.?\d*|[a-z]\))\s*([^;\n]{3,60})/g);
+      if (subItems) {
+        subItems.slice(0, 10).forEach(function(s) {
+          var cleaned = limparTopico(s.replace(/^\d+\.\d+\.?\d*\s*/, '').replace(/^[a-z]\)\s*/, ''));
+          if (cleaned.length > 2) topicos.push(cleaned);
+        });
+      }
+
+      var materia = {
+        nome: m.nome,
+        topicos: topicos.join(', '),
+        topicosArray: topicos,
+        fonte: 'dicionario',
+        confianca: 0,
+        needsReview: false,
+        textoOriginal: ''
+      };
+      materia.confianca = calcularConfianca(materia);
+
+      nomesVistos.add(m.nome.toLowerCase());
+      materias.push(materia);
     }
   });
 
-  return encontradas;
-}
+  // Sort: highest confidence first
+  materias.sort(function(a, b) { return b.confianca - a.confianca; });
 
-// Extract topics from text NEAR a subject mention (within 300 chars)
-function extrairTopicosProximos(texto, padrao) {
-  var match = padrao.exec(texto);
-  if (!match) { padrao.lastIndex = 0; return ''; }
-  padrao.lastIndex = 0;
+  console.log('[Parser] Extraidas:', materias.length, 'materias.',
+    'Precisam revisao:', materias.filter(function(m) { return m.needsReview; }).length);
 
-  var startIdx = match.index;
-  var nearby = texto.substring(startIdx, startIdx + 500);
-
-  // Look for sub-items: "1.1 Topico; 1.2 Topico" or "a) Topico; b) Topico"
-  var subitens = nearby.match(/(?:\d+\.\d+\.?\d*|[a-z]\))\s*([^;\n\d]{3,60})/g);
-  if (subitens && subitens.length > 0) {
-    var topicos = subitens.slice(0, 5).map(function(s) {
-      return s.replace(/^\d+\.\d+\.?\d*\s*/, '').replace(/^[a-z]\)\s*/, '').trim();
-    }).filter(function(t) { return t.length > 2; });
-    return topicos.join(', ');
-  }
-  return '';
-}
-
-// Extract sub-items from numbered hierarchy (e.g., 1.1, 1.2 under item 1)
-function extrairSubitensHierarquicos(linhas, numPai) {
-  var prefixo = numPai + '.';
-  var topicos = [];
-  for (var i = 0; i < linhas.length; i++) {
-    var m = linhas[i].match(new RegExp('^\\s*' + numPai + '\\.(\\d+)\\s+(.{3,60})'));
-    if (m) {
-      topicos.push(m[2].trim());
-      if (topicos.length >= 5) break;
-    }
-  }
-  return topicos.join(', ');
+  return materias;
 }
 
 // Tenta extrair data da prova do texto

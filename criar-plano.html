@@ -1817,6 +1817,33 @@
         _materiasExtraidasEdital.length + ' materias (editadas pelo aluno)';
     }
 
+    function expandirRevisao(btn) {
+      var area = btn.parentElement.querySelector('.review-edit-area');
+      if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
+    }
+
+    function salvarRevisaoTopico(btn) {
+      var textarea = btn.previousElementSibling;
+      var nome = textarea.getAttribute('data-review-for');
+      var novoTexto = textarea.value.trim();
+
+      // Update the materia in _materiasExtraidasEdital
+      var materia = _materiasExtraidasEdital.find(function(m) { return m.nome === nome; });
+      if (materia) {
+        // Parse: split by newlines or semicolons as topics
+        var topicos = novoTexto.split(/[\n;]/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 2; });
+        materia.topicos = topicos.join(', ');
+        materia.topicosArray = topicos;
+        materia.needsReview = false;
+        materia.confianca = 80; // User validated
+      }
+
+      // Re-render
+      var pesos = {};
+      _materiasExtraidasEdital.forEach(function(m) { if (m.peso) pesos[m.nome] = m.peso; });
+      renderTabelaTriangulada(_materiasExtraidasEdital, pesos, window._triangulacao || null);
+    }
+
     function renderTabelaMaterias(materias, pesos) {
       var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
       html += '<tr style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-light)">';
@@ -1866,8 +1893,20 @@
           badgeHtml = '<span style="font-size:0.65rem;font-weight:600;color:#FF9800;background:rgba(255,152,0,0.08);padding:2px 6px;border-radius:4px">Web</span>';
         }
 
+        // Confidence / review flag
+        var reviewHtml = '';
+        if (m.needsReview) {
+          var escaped = (m.textoOriginal || m.topicos || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          reviewHtml = '<div style="margin-top:4px"><span style="font-size:0.65rem;color:#E65100;background:rgba(255,152,0,0.08);padding:1px 6px;border-radius:4px">⚠ Revisar</span>'
+            + ' <button onclick="expandirRevisao(this)" style="font-size:0.65rem;color:var(--primary);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline">Editar</button>'
+            + '<div class="review-edit-area" style="display:none;margin-top:6px">'
+            + '<textarea class="form-control" rows="3" style="font-size:0.75rem;font-family:monospace" data-review-for="' + m.nome.replace(/"/g, '&quot;') + '">' + (m.textoOriginal || m.topicos || '') + '</textarea>'
+            + '<button onclick="salvarRevisaoTopico(this)" style="font-size:0.72rem;margin-top:4px;padding:4px 10px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer">Salvar</button>'
+            + '</div></div>';
+        }
+
         html += '<tr style="border-bottom:1px solid var(--border)">';
-        html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
+        html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + reviewHtml + '</td>';
         html += '<td style="padding:8px;color:var(--text-light);font-size:0.75rem">' + (m.topicos || '—') + '</td>';
         html += '<td style="padding:8px;text-align:center;font-weight:700;color:' + pesoColor + '">' + pesoLabel + '</td>';
         html += '<td style="padding:8px;text-align:center">' + badgeHtml + '</td>';
