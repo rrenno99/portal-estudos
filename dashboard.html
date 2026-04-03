@@ -880,16 +880,27 @@
 
     /* Calendario: materia concluida (estudada nesse dia) */
     .cal-slot.cal-done {
-      opacity: 0.45;
-      text-decoration: line-through;
+      opacity: 0.5;
       position: relative;
+    }
+    .cal-slot.cal-done .cal-slot-name {
+      text-decoration: line-through;
     }
     .cal-slot.cal-done::after {
       content: '✓';
       position: absolute;
       top: 4px;
       right: 6px;
-      font-size: 0.65rem;
+      font-size: 0.7rem;
+      font-weight: 800;
+    }
+    .cal-slot.cal-done-anim {
+      animation: calDonePop 0.5s ease;
+    }
+    @keyframes calDonePop {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.08); background: rgba(56,161,105,0.3); }
+      100% { transform: scale(1); }
     }
 
     /* Calendario: proxima materia (slot de hoje) */
@@ -898,22 +909,32 @@
       outline-offset: -2px;
       animation: pulseBorder 2s ease-in-out infinite;
       position: relative;
+      box-shadow: 0 0 8px rgba(30,136,229,0.3);
     }
     .cal-slot.cal-next::before {
-      content: 'AGORA';
+      content: 'ESTUDAR AGORA';
       position: absolute;
       top: 3px;
       right: 4px;
-      font-size: 0.5rem;
+      font-size: 0.45rem;
       font-weight: 800;
       background: white;
       color: var(--primary);
       padding: 1px 4px;
       border-radius: 3px;
       line-height: 1.2;
+      letter-spacing: 0.3px;
     }
 
-    /* Calendario: dia passado sem sessao (nao estudado) */
+    /* Calendario: dia de descanso ou sem aula */
+    .cal-slot.cal-rest {
+      background: var(--bg) !important;
+      color: var(--text-lighter) !important;
+      font-weight: 400;
+      font-style: italic;
+    }
+
+    /* Calendario: dia passado sem sessao registrada */
     .cal-slot.cal-missed {
       opacity: 0.25;
       background: var(--border) !important;
@@ -2711,97 +2732,44 @@
     let weekOffset = 0;
     let dynamicSchedule = {};
 
-    function buildDynamicSchedule() {
+    // Calendar config (extracted from plan/perfil)
+    var _calConfig = { studyDays: [1,2,3,4,5], slotsPerDay: 3, slotsFds: 0, startHour: 8, hasRevisao: false };
+
+    function buildCalendarConfig() {
       const plan = getPlanData();
-      const links = getLinksStorage();
       const perfil = JSON.parse(localStorage.getItem('studyplan_perfil') || '{}');
 
-      let subjects = [];
-      if (plan && plan.materias && plan.materias.length > 0) {
-        subjects = plan.materias.map(s => s.nome || s);
-      } else {
-        subjects = Object.keys(links);
-      }
-
-      if (subjects.length === 0) {
-        dynamicSchedule = {};
-        return;
-      }
-
-      // Hours per day: plan data > derive from perfil > defaults
-      let horasUteis = 3;
-      let horasFds = 0;
-      let studyDays = [1, 2, 3, 4, 5];
-      let startHour = 8;
+      var horasUteis = 3, horasFds = 0, studyDays = [1,2,3,4,5], startHour = 8;
 
       if (plan && plan.horasUteis) {
         horasUteis = plan.horasUteis;
         horasFds = plan.horasFds || 0;
       } else if (perfil.horas_semanais) {
-        // Derive from weekly total: assume 5 weekdays
-        horasUteis = Math.round(perfil.horas_semanais / 5);
-        if (horasUteis < 1) horasUteis = 1;
+        horasUteis = Math.max(1, Math.round(perfil.horas_semanais / 5));
       }
 
-      // Study days from plan
       if (plan && plan.dias) {
         const dayMap = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
         studyDays = plan.dias.map(d => dayMap[d]).filter(d => d !== undefined);
       }
 
-      // Turno from plan or perfil
       const turno = (plan && plan.turno) || perfil.turno_preferido || 'Manhã';
-      if (turno.includes('Tarde'))   startHour = 13;
-      if (turno.includes('Noite'))   startHour = 19;
+      if (turno.includes('Tarde')) startHour = 13;
+      if (turno.includes('Noite')) startHour = 19;
 
-      // Generate time slots based on actual hours per day
-      function gerarSlots(numHoras) {
-        const slots = [];
-        for (let i = 0; i < numHoras; i++) {
-          const h = startHour + i;
-          if (h >= 24) break;
-          slots.push(String(h).padStart(2, '0') + ':00');
-        }
-        return slots;
-      }
+      _calConfig = {
+        studyDays: studyDays,
+        slotsPerDay: horasUteis,
+        slotsFds: horasFds,
+        startHour: startHour,
+        hasRevisao: horasUteis > 2
+      };
+    }
 
-      const slotsUteis = gerarSlots(horasUteis);
-      const slotsFds = gerarSlots(horasFds);
-
-      // Collect all unique time slots for table rendering
-      const allTimesSet = new Set();
-      studyDays.forEach(day => {
-        const isFds = day === 0 || day === 6;
-        (isFds ? slotsFds : slotsUteis).forEach(t => allTimesSet.add(t));
-      });
-      const allTimes = Array.from(allTimesSet).sort();
-
-      // Distribute subjects across days using cycle queue position
+    function buildDynamicSchedule() {
+      buildCalendarConfig();
+      // dynamicSchedule kept for backwards compat but renderCalendar now drives itself
       dynamicSchedule = {};
-      let subjectIdx = _cicloPosicao;
-
-      studyDays.forEach(day => {
-        const isFds = day === 0 || day === 6;
-        const slots = isFds ? slotsFds : slotsUteis;
-        dynamicSchedule[day] = {};
-
-        slots.forEach((time, ti) => {
-          // Last slot = Revisão (if more than 2 slots)
-          if (ti === slots.length - 1 && slots.length > 2) {
-            dynamicSchedule[day][time] = ['subject-revisao', 'Revisão'];
-            return;
-          }
-
-          const sName = subjects[subjectIdx % subjects.length];
-          const colorIdx = subjects.indexOf(sName) % SUBJECT_COLORS.length;
-          const shortName = sName.length > 16 ? sName.substring(0, 14) + '…' : sName;
-          dynamicSchedule[day][time] = [SUBJECT_COLORS[colorIdx].cls, shortName];
-          subjectIdx++;
-        });
-      });
-
-      // Store times globally for rendering
-      window._calendarTimes = allTimes;
     }
 
     function getWeekDates(offset) {
@@ -2822,69 +2790,184 @@
       return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
     }
 
+    // Helper: match materia name (handles truncation)
+    function matchMateria(slotName, fullName) {
+      if (slotName === fullName) return true;
+      if (fullName.length > 16 && slotName === fullName.substring(0,14) + '…') return true;
+      return false;
+    }
+
     function renderCalendar() {
       const days = getWeekDates(weekOffset);
       const today = new Date();
       today.setHours(0,0,0,0);
-      const times = window._calendarTimes || ['08:00','09:00','10:00','11:00','14:00','15:00'];
-
-      // Current "next" subject from the cycle queue
       const subjects = getCicloSubjects();
-      const proximaMateria = subjects.length > 0 ? subjects[_cicloPosicao % subjects.length] : '';
 
-      document.getElementById('weekLabel').textContent = `${formatDate(days[0])} — ${formatDate(days[6])}`;
+      if (subjects.length === 0) {
+        document.getElementById('weeklyCalendar').innerHTML = '<p style="padding:20px;color:var(--text-lighter);text-align:center;grid-column:1/-1">Crie um plano para ver o cronograma</p>';
+        return;
+      }
 
-      const grid = document.getElementById('weeklyCalendar');
+      // Build time slots
+      var maxSlots = Math.max(_calConfig.slotsPerDay, _calConfig.slotsFds || 0);
+      var times = [];
+      for (var ti = 0; ti < maxSlots; ti++) {
+        var h = _calConfig.startHour + ti;
+        if (h >= 24) break;
+        times.push(String(h).padStart(2,'0') + ':00');
+      }
+      if (times.length === 0) times = ['08:00','09:00','10:00'];
+
+      // Current "next" subject from cycle
+      var proximaMateria = subjects[_cicloPosicao % subjects.length];
+
+      document.getElementById('weekLabel').textContent = formatDate(days[0]) + ' — ' + formatDate(days[6]);
+
+      var grid = document.getElementById('weeklyCalendar');
       grid.innerHTML = '';
 
+      // Headers
       grid.appendChild(el('div','cal-time',''));
-      days.forEach((d, i) => {
-        const isToday = d.toDateString() === today.toDateString();
-        const h = el('div', 'cal-day-header' + (isToday ? ' today' : ''), '');
-        h.innerHTML = `<span>${DAYS_PT[(i+1)%7]}</span>${formatDate(d)}`;
+      days.forEach(function(d, i) {
+        var isToday = d.toDateString() === today.toDateString();
+        var h = el('div', 'cal-day-header' + (isToday ? ' today' : ''), '');
+        h.innerHTML = '<span>' + DAYS_PT[(i+1)%7] + '</span>' + formatDate(d);
         grid.appendChild(h);
       });
 
-      times.forEach(time => {
-        grid.appendChild(el('div','cal-time', time));
-        days.forEach((d, i) => {
-          const dayOfWeek = (i + 1) % 7;
-          const slot = dynamicSchedule[dayOfWeek] && dynamicSchedule[dayOfWeek][time];
+      // For future projection: track cycle index starting from current position
+      var futureIdx = _cicloPosicao;
+      // Count how many study slots are TODAY before the current time slot (already studied today)
+      var todayStudiedSet = _sessoesHistorico[today.getFullYear() + '-' + (today.getMonth()+1) + '-' + today.getDate()] || new Set();
 
-          if (!slot) {
+      // Render rows
+      times.forEach(function(time, timeIdx) {
+        grid.appendChild(el('div','cal-time', time));
+
+        days.forEach(function(d, dayIdx) {
+          var dayOfWeek = (dayIdx + 1) % 7;
+          var isStudyDay = _calConfig.studyDays.indexOf(dayOfWeek) !== -1;
+          var isFds = dayOfWeek === 0 || dayOfWeek === 6;
+          var slotsForDay = isFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
+          var isToday = d.toDateString() === today.toDateString();
+          var dayDate = new Date(d); dayDate.setHours(0,0,0,0);
+          var isPast = dayDate < today;
+          var isFuture = dayDate > today;
+          var dateKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+          var sessoesNoDia = _sessoesHistorico[dateKey] || new Set();
+
+          // If not a study day or slot beyond day's limit
+          if (!isStudyDay || timeIdx >= slotsForDay) {
             grid.appendChild(el('div', 'cal-slot empty', ''));
             return;
           }
 
-          const slotMateria = slot[1];
-          const slotClass = slot[0];
-          const isToday = d.toDateString() === today.toDateString();
-          const dayDate = new Date(d);
-          dayDate.setHours(0,0,0,0);
-          const isPast = dayDate < today;
-          const dateKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-          const sessoesNoDia = _sessoesHistorico[dateKey];
+          // Check if this is the Revisao slot (last slot of the day)
+          var isRevisao = _calConfig.hasRevisao && timeIdx === slotsForDay - 1;
 
-          // Determine if this subject was studied on this day
-          const foiEstudada = sessoesNoDia && (sessoesNoDia.has(slotMateria) ||
-            // Check truncated name match
-            Array.from(sessoesNoDia).some(function(m) {
-              return slotMateria.length > 14 && m.startsWith(slotMateria.replace('…', ''));
-            }));
-
-          let extraClass = '';
-          if (isPast && foiEstudada) {
-            extraClass = ' cal-done';
-          } else if (isPast && !foiEstudada && slotMateria !== 'Revisão') {
-            extraClass = ' cal-missed';
-          } else if (isToday && slotMateria === (proximaMateria.length > 16 ? proximaMateria.substring(0,14) + '…' : proximaMateria)) {
-            extraClass = ' cal-next';
-          } else if (isToday && foiEstudada) {
-            extraClass = ' cal-done';
+          // === PAST DAYS: show actual history ===
+          if (isPast) {
+            var materias = Array.from(sessoesNoDia);
+            if (materias.length > 0 && !isRevisao) {
+              // Show the actual subject studied in this slot
+              var mat = materias[timeIdx] || materias[materias.length - 1];
+              var colorIdx = subjects.indexOf(mat);
+              if (colorIdx === -1) colorIdx = 0;
+              var cls = SUBJECT_COLORS[colorIdx % SUBJECT_COLORS.length].cls;
+              var shortName = mat.length > 16 ? mat.substring(0,14) + '…' : mat;
+              var cell = document.createElement('div');
+              cell.className = 'cal-slot ' + cls + ' cal-done';
+              cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>';
+              grid.appendChild(cell);
+            } else if (isRevisao) {
+              grid.appendChild(el('div', 'cal-slot subject-revisao' + (sessoesNoDia.size > 0 ? ' cal-done' : ' cal-missed'), 'Revisão'));
+            } else {
+              // No session this slot -> missed
+              grid.appendChild(el('div', 'cal-slot cal-missed', '—'));
+            }
+            return;
           }
 
-          const cell = el('div', 'cal-slot ' + slotClass + extraClass, slotMateria);
-          grid.appendChild(cell);
+          // === TODAY: mix of history + next from cycle ===
+          if (isToday) {
+            if (isRevisao) {
+              grid.appendChild(el('div', 'cal-slot subject-revisao', 'Revisão'));
+              return;
+            }
+
+            // Check if this slot's cycle subject was already studied today
+            var slotSubject = proximaMateria;
+            // For today's multiple slots, project from cycle
+            var todaySlotIdx = _cicloPosicao + timeIdx;
+            // But subtract revisao slots before this
+            var studySlotsBeforeThis = _calConfig.hasRevisao ? Math.min(timeIdx, slotsForDay - 1) : timeIdx;
+            var projected = subjects[((_cicloPosicao + studySlotsBeforeThis) % subjects.length)];
+            var colorIdx = subjects.indexOf(projected) % SUBJECT_COLORS.length;
+            var cls = SUBJECT_COLORS[colorIdx].cls;
+            var shortName = projected.length > 16 ? projected.substring(0,14) + '…' : projected;
+
+            var wasStudied = false;
+            todayStudiedSet.forEach(function(m) { if (matchMateria(shortName, m)) wasStudied = true; });
+
+            var cell = document.createElement('div');
+            if (wasStudied) {
+              cell.className = 'cal-slot ' + cls + ' cal-done';
+              cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>';
+            } else if (studySlotsBeforeThis === 0) {
+              // First unstudied slot = NEXT
+              cell.className = 'cal-slot ' + cls + ' cal-next';
+              cell.textContent = shortName;
+            } else {
+              cell.className = 'cal-slot ' + cls;
+              cell.textContent = shortName;
+            }
+            grid.appendChild(cell);
+            return;
+          }
+
+          // === FUTURE DAYS: project from cycle ===
+          if (isRevisao) {
+            grid.appendChild(el('div', 'cal-slot subject-revisao', 'Revisão'));
+            return;
+          }
+
+          var studySlotsBeforeThis = _calConfig.hasRevisao ? Math.min(timeIdx, slotsForDay - 1) : timeIdx;
+          // Calculate how many study slots between today and this future date
+          var slotsFromToday = 0;
+          var scanDate = new Date(today);
+          scanDate.setDate(scanDate.getDate() + 1);
+          while (scanDate <= dayDate) {
+            var scanDow = scanDate.getDay();
+            if (_calConfig.studyDays.indexOf(scanDow) !== -1) {
+              var scanFds = scanDow === 0 || scanDow === 6;
+              var scanSlots = scanFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
+              var studySlots = _calConfig.hasRevisao && scanSlots > 2 ? scanSlots - 1 : scanSlots;
+              if (scanDate.toDateString() === dayDate.toDateString()) {
+                slotsFromToday += studySlotsBeforeThis;
+              } else {
+                slotsFromToday += studySlots;
+              }
+            }
+            scanDate.setDate(scanDate.getDate() + 1);
+          }
+
+          // Also count remaining slots from today
+          var todayDow = today.getDay();
+          var todayInStudy = _calConfig.studyDays.indexOf(todayDow) !== -1;
+          var todaySlots = 0;
+          if (todayInStudy) {
+            var todayFds = todayDow === 0 || todayDow === 6;
+            var todayTotalSlots = todayFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
+            todaySlots = _calConfig.hasRevisao && todayTotalSlots > 2 ? todayTotalSlots - 1 : todayTotalSlots;
+          }
+
+          var projectedIdx = (_cicloPosicao + todaySlots + slotsFromToday) % subjects.length;
+          var projected = subjects[projectedIdx];
+          var colorIdx = subjects.indexOf(projected) % SUBJECT_COLORS.length;
+          var cls = SUBJECT_COLORS[colorIdx].cls;
+          var shortName = projected.length > 16 ? projected.substring(0,14) + '…' : projected;
+
+          grid.appendChild(el('div', 'cal-slot ' + cls, shortName));
         });
       });
     }
@@ -3148,6 +3231,11 @@
       calcularEstatisticas();
       atualizarPulsoFogo();
       renderCalendar();
+      // Animate newly completed slots on today
+      document.querySelectorAll('.cal-slot.cal-done').forEach(function(slot) {
+        slot.classList.add('cal-done-anim');
+        setTimeout(function() { slot.classList.remove('cal-done-anim'); }, 600);
+      });
       verificarCelebracoes(streakAntes);
     }
 
