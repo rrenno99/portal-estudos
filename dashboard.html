@@ -923,7 +923,41 @@
     .mini-bar { height: 5px; background: var(--bg); border-radius: 10px; overflow: hidden; }
     .mini-fill { height: 100%; border-radius: 10px; }
 
-    /* Subject completed state */
+    /* Ciclo: materia atual (proxima a estudar) */
+    .subject-item.ciclo-atual {
+      border-left: 3px solid var(--primary);
+      padding-left: 10px;
+      background: rgba(30,136,229,0.04);
+      border-radius: 8px;
+      margin: 4px 0;
+    }
+    .subject-item.ciclo-atual .subject-color {
+      animation: pulseBorder 2s ease-in-out infinite;
+    }
+    @keyframes pulseBorder {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+    .subject-item.ciclo-atual .btn-iniciar {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      font-weight: 700;
+    }
+
+    /* Ciclo: materia concluida no ciclo atual */
+    .subject-item.ciclo-concluida {
+      opacity: 0.5;
+    }
+    .subject-item.ciclo-concluida .subject-info strong {
+      text-decoration: line-through;
+      color: var(--text-light);
+    }
+    .subject-item.ciclo-concluida .btn-iniciar {
+      display: none;
+    }
+
+    /* Subject completed state (legacy) */
     .subject-item.concluida {
       opacity: 0.65;
     }
@@ -1966,7 +2000,11 @@
         <!-- Two Col: Subjects + Activity -->
         <div class="dashboard-two-col">
           <div class="card">
-            <h3>📚 Progresso por Matéria</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <h3>📚 Fila de Estudos</h3>
+              <button onclick="reiniciarCiclo()" class="btn-ghost" style="font-size:0.72rem;color:var(--text-lighter);padding:4px 8px" title="Reiniciar o ciclo do zero">↻ Reiniciar Ciclo</button>
+            </div>
+            <p id="cicloInfo" style="font-size:0.75rem;color:var(--text-light);margin-bottom:8px"></p>
             <div id="subjectsListDynamic">
               <!-- Rendered by JS from plan data -->
               <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando matérias...</p>
@@ -2372,6 +2410,56 @@
     }
 
     // =============================================
+    //  CICLO DE ESTUDOS ADAPTATIVO
+    // =============================================
+    var _cicloPosicao = 0;
+
+    async function carregarCiclo() {
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+      var { data } = await sb.from('perfil_aluno').select('ciclo_posicao').eq('user_id', window._userId).single();
+      if (data) _cicloPosicao = data.ciclo_posicao || 0;
+    }
+
+    async function salvarCicloPosicao(pos) {
+      _cicloPosicao = pos;
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+      await sb.from('perfil_aluno').update({ ciclo_posicao: pos }).eq('user_id', window._userId);
+    }
+
+    async function avancarCiclo() {
+      var subjects = getCicloSubjects();
+      if (subjects.length === 0) return;
+      var novaPosicao = (_cicloPosicao + 1) % subjects.length;
+      await salvarCicloPosicao(novaPosicao);
+      renderSubjectsList();
+      buildDynamicSchedule();
+      renderCalendar();
+    }
+
+    async function reiniciarCiclo() {
+      await salvarCicloPosicao(0);
+      await criarNotificacao('🔄 Ciclo de estudos reiniciado! Hora de girar o edital novamente.');
+      renderSubjectsList();
+      buildDynamicSchedule();
+      renderCalendar();
+    }
+
+    function getCicloSubjects() {
+      var plan = getPlanData();
+      var links = getLinksStorage();
+      var subjects = [];
+      var linkKeys = Object.keys(links);
+      if (linkKeys.length > 0) {
+        subjects = linkKeys;
+      } else if (plan && plan.materias && plan.materias.length > 0) {
+        subjects = plan.materias.map(function(s) { return s.nome || s; });
+      }
+      return subjects;
+    }
+
+    // =============================================
     //  RENDER SUBJECTS LIST (DYNAMIC)
     // =============================================
     // Global aulas cache
@@ -2411,13 +2499,32 @@
             <p style="color:var(--text-light);font-size:0.88rem;margin-bottom:12px">Nenhum plano criado ainda.</p>
             <a href="criar-plano.html" class="btn btn-primary" style="font-size:0.85rem">Criar Meu Plano</a>
           </div>`;
+        document.getElementById('cicloInfo').textContent = '';
         return;
       }
 
+      // Reorder subjects as a cycle queue starting from _cicloPosicao
+      const totalSubjects = subjects.length;
+      const pos = _cicloPosicao % totalSubjects;
+      const ordered = [];
+      for (let i = 0; i < totalSubjects; i++) {
+        ordered.push({ original: (pos + i) % totalSubjects, subject: subjects[(pos + i) % totalSubjects] });
+      }
+
+      // Update cycle info
+      const cicloInfo = document.getElementById('cicloInfo');
+      if (cicloInfo) {
+        const cicloNum = Math.floor(_cicloPosicao / totalSubjects) + 1;
+        const posNoCiclo = (_cicloPosicao % totalSubjects) + 1;
+        cicloInfo.textContent = 'Ciclo ' + cicloNum + ' · Matéria ' + posNoCiclo + ' de ' + totalSubjects;
+      }
+
       container.innerHTML = '';
-      subjects.forEach((s, i) => {
+      ordered.forEach((entry, queueIdx) => {
+        const s = entry.subject;
+        const origIdx = entry.original;
         const nome = s.nome || s;
-        const color = SUBJECT_COLORS[i % SUBJECT_COLORS.length];
+        const color = SUBJECT_COLORS[origIdx % SUBJECT_COLORS.length];
         const linkData = links[nome];
         const hasLink = linkData && linkData.url;
         const pct = calcProgressoMateria(nome);
@@ -2431,7 +2538,8 @@
         const statusText = total > 0 ? concluidas + '/' + total + ' aulas concluídas' + (estudando > 0 ? ', ' + estudando + ' em andamento' : '') : 'Sem aulas cadastradas';
 
         const item = document.createElement('div');
-        item.className = 'subject-item';
+        const isAtual = queueIdx === 0;
+        item.className = 'subject-item' + (isAtual ? ' ciclo-atual' : '');
         item.setAttribute('data-materia', nome);
 
         let aulasHtml = '';
@@ -2453,11 +2561,17 @@
           aulasHtml += '</div>';
         }
 
+        const queueLabel = isAtual
+          ? '<span style="font-size:0.68rem;font-weight:700;color:var(--primary);background:rgba(30,136,229,0.1);padding:2px 6px;border-radius:4px;margin-left:6px">PRÓXIMA</span>'
+          : '<span style="font-size:0.68rem;color:var(--text-lighter);margin-left:6px">#' + (queueIdx + 1) + '</span>';
+
+        const btnLabel = isAtual ? 'Estudar Agora' : 'Iniciar Estudos';
+
         item.innerHTML = `
           <span class="subject-expand-icon" onclick="toggleExpandSubject(this.closest('.subject-item'))">▶</span>
           <div class="subject-color" style="background:${color.bg}"></div>
           <div class="subject-info" onclick="toggleExpandSubject(this.closest('.subject-item'))">
-            <strong>${nome}</strong>
+            <strong>${nome}${queueLabel}</strong>
             <span>${statusText}</span>
             ${hasLink ? '<span class="link-saved-badge">✓ ' + (linkData.titulo || 'Link salvo') + '</span>' : ''}
           </div>
@@ -2465,7 +2579,7 @@
             <span>${pct}%</span>
             <div class="mini-bar"><div class="mini-fill" style="width:${pct}%;background:${color.bg}"></div></div>
           </div>
-          <button class="btn-iniciar" onclick="event.stopPropagation(); iniciarEstudos('${escapedName}')">Iniciar Estudos</button>
+          <button class="btn-iniciar" onclick="event.stopPropagation(); iniciarEstudos('${escapedName}')">${btnLabel}</button>
           ${aulasHtml}
         `;
         container.appendChild(item);
@@ -2620,9 +2734,9 @@
       });
       const allTimes = Array.from(allTimesSet).sort();
 
-      // Distribute subjects across days and time slots
+      // Distribute subjects across days using cycle queue position
       dynamicSchedule = {};
-      let subjectIdx = 0;
+      let subjectIdx = _cicloPosicao;
 
       studyDays.forEach(day => {
         const isFds = day === 0 || day === 6;
@@ -2942,6 +3056,9 @@
 
           // Check weekly goal
           await verificarMetaSemanal();
+
+          // Advance cycle queue
+          await avancarCiclo();
         }
       } catch (e) {
         console.error('[Timer] Erro:', e);
@@ -4002,6 +4119,7 @@
         try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
         try { await carregarDiasEstudados(); } catch (e) { console.error('[Init] dias:', e); }
         try { await carregarAtividadesSupabase(); } catch (e) { console.error('[Init] atividades:', e); }
+        try { await carregarCiclo(); } catch (e) { console.error('[Init] ciclo:', e); }
         try { await carregarPontos(); } catch (e) { console.error('[Init] pontos:', e); }
         try { await carregarNotificacoes(); } catch (e) { console.error('[Init] notificações:', e); }
         atualizarPulsoFogo();
