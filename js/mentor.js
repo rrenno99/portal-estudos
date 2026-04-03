@@ -29,6 +29,130 @@ async function extrairTextoPDF(file) {
 }
 
 // =============================================
+//  1b. EXTRACAO DE CARGOS DO PDF
+// =============================================
+
+// Common patterns for cargo/specialty sections in Brazilian editais
+var CARGO_PATTERNS = [
+  /cargo\s*(?:\d+)?[:\s-]+\s*([^\n\r.;]{5,80})/gi,
+  /especialidade[:\s-]+\s*([^\n\r.;]{5,80})/gi,
+  /(?:area|[aá]rea)\s*(?:de\s+)?(?:atua[cç][aã]o|conhecimento)[:\s-]+\s*([^\n\r.;]{5,80})/gi,
+  /(?:analista|t[eé]cnico|agente|auditor|fiscal|inspetor|delegado|perito|escrivao|assessor|consultor)\s+(?:de\s+)?([^\n\r.;,]{3,60})/gi,
+  /(?:CARGO|ESPECIALIDADE|FUN[CÇ][AÃ]O)\s*[:\s-]+\s*([^\n\r.;]{5,80})/g,
+];
+
+// Words that are NOT cargo names (false positives)
+var CARGO_STOPWORDS = [
+  /edital/i, /inscri/i, /prova/i, /resultado/i, /convoca/i,
+  /remunera/i, /vencimento/i, /requisito/i, /escolaridade/i,
+  /vagas?\s+/i, /total\s+de/i, /quadro\s+de/i, /anexo/i,
+  /cronograma/i, /publica[cç]/i, /diario\s+oficial/i,
+  /carga\s+hor/i, /jornada/i, /atribui[cç]/i
+];
+
+function extrairCargos(texto) {
+  var cargosSet = new Map(); // nome normalizado -> original
+
+  CARGO_PATTERNS.forEach(function(pattern) {
+    var match;
+    var regex = new RegExp(pattern.source, pattern.flags);
+    while ((match = regex.exec(texto)) !== null) {
+      var cargo = match[1].trim();
+
+      // Clean up
+      cargo = cargo.replace(/\s+/g, ' ').replace(/[–—]+$/, '').trim();
+
+      // Skip if too short, too long, or is a stopword
+      if (cargo.length < 4 || cargo.length > 80) continue;
+      var isStop = CARGO_STOPWORDS.some(function(sw) { return sw.test(cargo); });
+      if (isStop) continue;
+
+      // Skip if mostly numbers
+      if ((cargo.match(/\d/g) || []).length > cargo.length * 0.3) continue;
+
+      var normalizado = cargo.toLowerCase().replace(/\s+/g, ' ');
+      if (!cargosSet.has(normalizado)) {
+        cargosSet.set(normalizado, cargo);
+      }
+    }
+  });
+
+  // Also look for structured table-like patterns: "1. Analista - Area X"
+  var linhas = texto.split(/\n/);
+  linhas.forEach(function(linha) {
+    var m = linha.match(/^\s*\d+[\.\)]\s*(.{5,80}?)(?:\s*[-–]\s*|\s{2,})/);
+    if (m) {
+      var cargo = m[1].trim();
+      if (cargo.length >= 4 && cargo.length <= 80) {
+        var isStop = CARGO_STOPWORDS.some(function(sw) { return sw.test(cargo); });
+        if (!isStop) {
+          var normalizado = cargo.toLowerCase().replace(/\s+/g, ' ');
+          if (!cargosSet.has(normalizado)) {
+            cargosSet.set(normalizado, cargo);
+          }
+        }
+      }
+    }
+  });
+
+  return Array.from(cargosSet.values());
+}
+
+// =============================================
+//  1c. EXTRAIR TEXTO POR SECAO DE CARGO
+//  Filtra o texto do PDF para a secao do cargo
+// =============================================
+
+function filtrarTextoPorCargo(textoCompleto, cargoSelecionado) {
+  var linhas = textoCompleto.split(/\n/);
+  var cargoLower = cargoSelecionado.toLowerCase();
+  var dentroDoBloco = false;
+  var textoFiltrado = '';
+  var linhasCapturadas = 0;
+  var maxLinhas = 500; // Capture up to 500 lines after the cargo header
+
+  for (var i = 0; i < linhas.length; i++) {
+    var linha = linhas[i].toLowerCase();
+
+    if (!dentroDoBloco) {
+      // Look for the cargo name in the text
+      if (linha.indexOf(cargoLower) !== -1) {
+        dentroDoBloco = true;
+        textoFiltrado += linhas[i] + '\n';
+        linhasCapturadas = 1;
+      }
+    } else {
+      // Check if we hit a DIFFERENT cargo section (end of our block)
+      var isNewCargoSection = /^\s*(?:cargo|especialidade|area)\s*(?:\d+)?[:\s-]/i.test(linhas[i]);
+      if (isNewCargoSection && linhasCapturadas > 10) {
+        // Check it's not the same cargo repeated
+        if (linha.indexOf(cargoLower) === -1) break;
+      }
+
+      textoFiltrado += linhas[i] + '\n';
+      linhasCapturadas++;
+      if (linhasCapturadas >= maxLinhas) break;
+    }
+  }
+
+  // If filtered text is too short, fall back to searching around the cargo mention
+  if (textoFiltrado.length < 200) {
+    textoFiltrado = '';
+    for (var i = 0; i < linhas.length; i++) {
+      if (linhas[i].toLowerCase().indexOf(cargoLower) !== -1) {
+        var start = Math.max(0, i - 5);
+        var end = Math.min(linhas.length, i + 200);
+        textoFiltrado = linhas.slice(start, end).join('\n');
+        break;
+      }
+    }
+  }
+
+  // If still too short, return the full text (better than nothing)
+  return textoFiltrado.length > 100 ? textoFiltrado : textoCompleto;
+}
+
+// =============================================
 //  2. EXTRACAO DE MATERIAS DO EDITAL
 // =============================================
 
@@ -328,24 +452,18 @@ async function gerarPlanoInteligente(params) {
   var materiaPerfis = params.materiaPerfis;  // [{materia, nivel, fechada}]
   var trilha = params.trilha;               // 'agil' | 'consistente' | 'blindada'
   var horasSemanais = params.horasSemanais;
-  var editalFile = params.editalFile;       // File object or null
+  var textoEdital = params.textoEdital;     // pre-parsed text (filtered by cargo)
   var pesosEdital = {};
 
-  // 1. Parse PDF if available
-  if (editalFile && window.pdfjsLib) {
+  // 1. Use pre-parsed and cargo-filtered text if available
+  if (textoEdital && textoEdital.length > 100) {
     try {
-      console.log('[Mentor] Processando PDF:', editalFile.name);
-      var texto = await extrairTextoPDF(editalFile);
-
-      if (texto.length > 100) {
-        // Extract subject weights from edital
-        var materiasDoEdital = extrairMateriasDoTexto(texto);
-        pesosEdital = extrairPesosPorMateria(texto, materiasDoEdital);
-        console.log('[Mentor] Materias encontradas no PDF:', materiasDoEdital.length);
-        console.log('[Mentor] Pesos extraidos:', JSON.stringify(pesosEdital));
-      }
+      var materiasDoEdital = extrairMateriasDoTexto(textoEdital);
+      pesosEdital = extrairPesosPorMateria(textoEdital, materiasDoEdital);
+      console.log('[Mentor] Materias do texto filtrado:', materiasDoEdital.length);
+      console.log('[Mentor] Pesos extraidos:', JSON.stringify(pesosEdital));
     } catch (e) {
-      console.error('[Mentor] Erro ao processar PDF:', e);
+      console.error('[Mentor] Erro ao extrair do texto:', e);
     }
   }
 
@@ -377,7 +495,10 @@ async function gerarPlanoInteligente(params) {
 window.MentorIA = {
   gerarPlanoInteligente: gerarPlanoInteligente,
   extrairTextoPDF: extrairTextoPDF,
+  extrairCargos: extrairCargos,
+  filtrarTextoPorCargo: filtrarTextoPorCargo,
   extrairMateriasDoTexto: extrairMateriasDoTexto,
+  extrairPesosPorMateria: extrairPesosPorMateria,
   extrairDataProva: extrairDataProva,
   classificarMaterias: classificarMaterias,
   distribuirHoras: distribuirHoras,
