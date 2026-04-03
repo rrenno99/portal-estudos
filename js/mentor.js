@@ -302,16 +302,33 @@ function filtrarTextoPorCargo(textoCompleto, cargoSelecionado) {
 //  Hierarchy detection, boundary logic, cleaning
 // =============================================
 
-// Verb phrases to strip from topics (instructional noise)
+// Noise patterns: full sentences with verbs = instructional text, not topics
 var VERB_NOISE = [
   /^o\s+(?:aluno|candidato)\s+dever/i,
   /^ser[aá]\s+necess[aá]rio/i,
-  /^(?:dever[aá]|poder[aá])\s+/i,
-  /^(?:conhecer|compreender|analisar|identificar|avaliar|aplicar|interpretar|demonstrar|resolver)\s+/i,
+  /^(?:dever[aá]|poder[aá]|ter[aá]|haver[aá]|estar[aá]|far[aá])\s+/i,
+  /^(?:conhecer|compreender|analisar|identificar|avaliar|aplicar|interpretar|demonstrar|resolver|entender|saber|dominar)\s+/i,
   /^(?:capacidade|habilidade|compet[eê]ncia)\s+(?:de|para)\s+/i,
-  /^(?:nesta\s+prova|neste\s+conte[uú]do|conforme|de\s+acordo)\s+/i,
-  /^(?:os\s+seguintes\s+t[oó]picos|as\s+seguintes\s+mat[eé]rias)\s*/i,
+  /^(?:nesta\s+prova|neste\s+conte[uú]do|conforme|de\s+acordo|nos\s+termos)\s+/i,
+  /^(?:os\s+seguintes|as\s+seguintes|abaixo\s+relacion|a\s+seguir)\s*/i,
+  /^(?:no\s+[aâ]mbito|no\s+contexto|com\s+base|segundo|mediante)\s+/i,
 ];
+
+// A line is "noise" if it's a full sentence (has conjugated verb + subject pattern)
+function isLinhaNoise(linha) {
+  var l = linha.trim();
+  // Too short or too long
+  if (l.length < 4 || l.length > 200) return true;
+  // Explicit verb noise
+  if (VERB_NOISE.some(function(r) { return r.test(l); })) return true;
+  // Contains "shall/must" style verbs (Portuguese conjugations)
+  if (/\b(?:dever[aá]|ser[aá]|estar[aá]|poder[aá]|haver[aá]|far[aá]|realizar[aá])\b/i.test(l)) return true;
+  // Looks like a full instruction sentence (long with period)
+  if (l.length > 80 && /\.\s*$/.test(l)) return true;
+  // Administrative noise
+  if (/^\s*(?:obs|nota|observa|aten[cç]|import)/i.test(l)) return true;
+  return false;
+}
 
 // Detect hierarchy level from a numbered pattern
 // Returns { level: 1|2|3, number: "1"|"1.2"|"1.2.3", text: "..." } or null
@@ -408,22 +425,45 @@ var MATERIAS_CONHECIDAS = [
   { padrao: /medicina\s+legal|criminal[ií]stica/i, nome: 'Medicina Legal' },
 ];
 
-// Normalize a subject name using the dictionary
+// Normalize a subject name: dictionary match for canonical form, otherwise title-case
+// NEVER blocks a name — any name from the document is accepted
 function normalizarNomeMateria(nome) {
-  var lower = nome.toLowerCase();
+  if (!nome) return '';
+  var limpo = nome.trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[.;:]+$/, '')
+    .replace(/^\d+[\.\)]\s*/, '') // strip leading numbering
+    .trim();
+
+  // Try dictionary for canonical spelling
   for (var i = 0; i < MATERIAS_CONHECIDAS.length; i++) {
-    if (MATERIAS_CONHECIDAS[i].padrao.test(nome)) {
+    if (MATERIAS_CONHECIDAS[i].padrao.test(limpo)) {
       return MATERIAS_CONHECIDAS[i].nome;
     }
   }
-  // Capitalize first letter of each word
-  return nome.replace(/\w\S*/g, function(t) {
-    return t.charAt(0).toUpperCase() + t.substr(1).toLowerCase();
-  });
+
+  // Not in dictionary — still accept it, just title-case
+  return limpo.replace(/\b\w/g, function(c) { return c.toUpperCase(); })
+    .replace(/\b(De|Do|Da|Dos|Das|No|Na|Nos|Nas|Em|Para|Com|Por|Ao|E|Ou)\b/g, function(w) { return w.toLowerCase(); });
+}
+
+// Check if a name looks like a valid subject (not a sentence or noise)
+function isNomeMateriaValido(nome) {
+  if (!nome || nome.length < 3 || nome.length > 60) return false;
+  if (nome.split(/\s+/).length > 8) return false; // too many words = sentence
+  // Must not be a known noise section
+  if (SECOES_DESCARTAVEIS.some(function(p) { return p.test(nome); })) return false;
+  // Must not look like an instruction
+  if (isLinhaNoise(nome)) return false;
+  // Should have at least one capitalized word (proper noun / subject name)
+  if (!/[A-ZÀ-Ú]/.test(nome)) return false;
+  return true;
 }
 
 // =============================================
-//  2a. MAIN EXTRACTION — Structure-based
+//  2a. UNIVERSAL PARSER — Structure-based
+//  Accepts ANY numbered title as a materia.
+//  Dictionary only used for normalization.
 // =============================================
 
 function extrairMateriasDoTexto(texto) {
@@ -433,128 +473,132 @@ function extrairMateriasDoTexto(texto) {
   var materias = [];
   var nomesVistos = new Set();
 
-  // PASS 1: Build hierarchy tree from numbered lines
-  var arvore = []; // [{level, number, text, lineIdx, children:[]}]
-
+  // PASS 1: Build hierarchy tree from ALL numbered lines
+  var arvore = [];
   for (var i = 0; i < linhas.length; i++) {
     var parsed = parseHierarchyLine(linhas[i]);
-    if (parsed && parsed.text.length >= 3 && parsed.text.length <= 80) {
+    if (parsed && parsed.text.length >= 3) {
       parsed.lineIdx = i;
       arvore.push(parsed);
     }
   }
 
-  // PASS 2: Identify level-1 items as subjects, level-2+ as topics
+  // PASS 2: Level-1 items = materias, level-2+ = topics
+  // Accept ANY name that follows numbering (flexible)
   var level1Items = arvore.filter(function(n) { return n.level === 1; });
 
-  if (level1Items.length > 0) {
-    level1Items.forEach(function(item, idx) {
-      var nome = normalizarNomeMateria(item.text);
-      if (nomesVistos.has(nome.toLowerCase())) return;
+  level1Items.forEach(function(item, idx) {
+    var nomeRaw = item.text;
+    var nome = normalizarNomeMateria(nomeRaw);
 
-      // Find boundary: from this item to the next level-1 item
-      var startLine = item.lineIdx;
-      var endLine = (idx + 1 < level1Items.length) ? level1Items[idx + 1].lineIdx : Math.min(startLine + 100, linhas.length);
+    // Validate: is this a real subject name or noise?
+    if (!isNomeMateriaValido(nome) && !isNomeMateriaValido(nomeRaw)) return;
+    if (nomesVistos.has(nome.toLowerCase())) return;
 
-      // Collect sub-items (level 2+) between boundaries
-      var topicosRaw = [];
-      for (var j = 0; j < arvore.length; j++) {
-        if (arvore[j].lineIdx > startLine && arvore[j].lineIdx < endLine && arvore[j].level >= 2) {
-          topicosRaw.push(arvore[j].text);
-        }
+    // Boundary: from this item to the next level-1
+    var startLine = item.lineIdx;
+    var endLine = (idx + 1 < level1Items.length)
+      ? level1Items[idx + 1].lineIdx
+      : Math.min(startLine + 150, linhas.length);
+
+    // Collect ALL content between boundaries
+    var topicosRaw = [];
+    var textoBloco = [];
+
+    for (var j = startLine + 1; j < endLine; j++) {
+      var line = linhas[j].trim();
+      if (!line) continue;
+      textoBloco.push(line);
+
+      // Numbered sub-items (level 2+) → direct topic
+      var sub = parseHierarchyLine(linhas[j]);
+      if (sub && sub.level >= 2) {
+        var cleaned = limparTopico(sub.text);
+        if (cleaned.length > 2) topicosRaw.push(cleaned);
+        continue;
       }
 
-      // Also collect non-numbered content lines between boundaries as potential topics
-      for (var j = startLine + 1; j < endLine; j++) {
-        var line = linhas[j].trim();
-        if (line.length > 3 && line.length < 120 && !parseHierarchyLine(linhas[j])) {
-          // Check it's not a verb phrase or instructional text
-          var isNoise = VERB_NOISE.some(function(r) { return r.test(line); });
-          if (!isNoise && !/^\s*$/.test(line)) {
-            // Split by semicolons (common topic separator)
-            line.split(/[;]/).forEach(function(part) {
-              var cleaned = limparTopico(part);
-              if (cleaned.length > 2 && cleaned.length < 80) {
-                topicosRaw.push(cleaned);
-              }
-            });
+      // Non-numbered content → split by semicolons, filter noise
+      if (!isLinhaNoise(line)) {
+        line.split(/[;]/).forEach(function(part) {
+          var cleaned = limparTopico(part);
+          if (cleaned.length > 2 && cleaned.length < 80) {
+            topicosRaw.push(cleaned);
           }
-        }
+        });
       }
+    }
 
-      // Clean and deduplicate topics
-      var topicosLimpos = [];
-      var topicosVistos = new Set();
-      topicosRaw.forEach(function(t) {
-        var limpo = limparTopico(t);
-        if (limpo.length > 2 && limpo.length < 80 && !topicosVistos.has(limpo.toLowerCase())) {
-          topicosVistos.add(limpo.toLowerCase());
-          topicosLimpos.push(limpo);
-        }
-      });
-
-      var materia = {
-        nome: nome,
-        topicos: topicosLimpos.slice(0, 15).join(', '),
-        topicosArray: topicosLimpos.slice(0, 15),
-        fonte: 'hierarquia',
-        confianca: 0,
-        needsReview: false,
-        textoOriginal: ''
-      };
-
-      materia.confianca = calcularConfianca(materia);
-      // Flag for review if confidence is low or topics are messy
-      if (materia.confianca < 50 || topicosLimpos.length === 0) {
-        materia.needsReview = true;
-        materia.textoOriginal = linhas.slice(startLine, Math.min(startLine + 20, endLine)).join('\n');
+    // Deduplicate topics
+    var topicosLimpos = [];
+    var topicosVistos = new Set();
+    topicosRaw.forEach(function(t) {
+      var key = t.toLowerCase().replace(/\s+/g, ' ');
+      if (!topicosVistos.has(key) && t.length > 2) {
+        topicosVistos.add(key);
+        topicosLimpos.push(t);
       }
+    });
 
-      nomesVistos.add(nome.toLowerCase());
-      materias.push(materia);
+    var materia = {
+      nome: nome,
+      topicos: topicosLimpos.slice(0, 20).join(', '),
+      topicosArray: topicosLimpos.slice(0, 20),
+      fonte: 'universal',
+      confianca: 0,
+      needsReview: false,
+      textoOriginal: ''
+    };
+
+    materia.confianca = calcularConfianca(materia);
+
+    // Flag for review if low confidence
+    if (materia.confianca < 50 || topicosLimpos.length === 0) {
+      materia.needsReview = true;
+      materia.textoOriginal = textoBloco.slice(0, 20).join('\n');
+    }
+
+    nomesVistos.add(nome.toLowerCase());
+    materias.push(materia);
+  });
+
+  // PASS 3: If hierarchy found nothing, try dictionary as last resort
+  if (materias.length === 0) {
+    MATERIAS_CONHECIDAS.forEach(function(m) {
+      if (m.padrao.test(texto) && !nomesVistos.has(m.nome.toLowerCase())) {
+        var match = m.padrao.exec(texto);
+        m.padrao.lastIndex = 0;
+        if (!match) return;
+
+        var nearby = texto.substring(match.index, match.index + 600);
+        var topicos = [];
+        var subItems = nearby.match(/(?:\d+\.\d+\.?\d*|[a-z]\))\s*([^;\n]{3,60})/g);
+        if (subItems) {
+          subItems.slice(0, 10).forEach(function(s) {
+            var cleaned = limparTopico(s.replace(/^\d+\.\d+\.?\d*\s*/, '').replace(/^[a-z]\)\s*/, ''));
+            if (cleaned.length > 2) topicos.push(cleaned);
+          });
+        }
+
+        materias.push({
+          nome: m.nome,
+          topicos: topicos.join(', '),
+          topicosArray: topicos,
+          fonte: 'dicionario_fallback',
+          confianca: 55,
+          needsReview: topicos.length === 0
+        });
+        nomesVistos.add(m.nome.toLowerCase());
+      }
     });
   }
 
-  // PASS 3: Dictionary matching for subjects not found by hierarchy
-  MATERIAS_CONHECIDAS.forEach(function(m) {
-    if (m.padrao.test(texto) && !nomesVistos.has(m.nome.toLowerCase())) {
-      // Extract nearby content for topics
-      var match = m.padrao.exec(texto);
-      m.padrao.lastIndex = 0;
-      if (!match) return;
-
-      var nearby = texto.substring(match.index, match.index + 600);
-      var topicos = [];
-      // Look for sub-items in nearby text
-      var subItems = nearby.match(/(?:\d+\.\d+\.?\d*|[a-z]\))\s*([^;\n]{3,60})/g);
-      if (subItems) {
-        subItems.slice(0, 10).forEach(function(s) {
-          var cleaned = limparTopico(s.replace(/^\d+\.\d+\.?\d*\s*/, '').replace(/^[a-z]\)\s*/, ''));
-          if (cleaned.length > 2) topicos.push(cleaned);
-        });
-      }
-
-      var materia = {
-        nome: m.nome,
-        topicos: topicos.join(', '),
-        topicosArray: topicos,
-        fonte: 'dicionario',
-        confianca: 0,
-        needsReview: false,
-        textoOriginal: ''
-      };
-      materia.confianca = calcularConfianca(materia);
-
-      nomesVistos.add(m.nome.toLowerCase());
-      materias.push(materia);
-    }
-  });
-
-  // Sort: highest confidence first
+  // Sort by confidence descending
   materias.sort(function(a, b) { return b.confianca - a.confianca; });
 
-  console.log('[Parser] Extraidas:', materias.length, 'materias.',
-    'Precisam revisao:', materias.filter(function(m) { return m.needsReview; }).length);
+  console.log('[Parser Universal]', materias.length, 'materias.',
+    'Revisao:', materias.filter(function(m) { return m.needsReview; }).length,
+    'Fontes:', materias.map(function(m) { return m.fonte; }).filter(function(v, i, a) { return a.indexOf(v) === i; }).join('+'));
 
   return materias;
 }
@@ -580,15 +624,21 @@ function extrairPesosPorMateria(texto, materias) {
   var encontrouAlgumPeso = false;
 
   materias.forEach(function(m) {
+    // If materia already has pontos from Renno analysis, use that
+    if (m.pontos && m.pontos > 0) {
+      pesos[m.nome] = m.pontos;
+      encontrouAlgumPeso = true;
+      return;
+    }
+
     var escapedName = m.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // Try multiple patterns in order of specificity
     var patterns = [
-      new RegExp(escapedName + '[^\\d]{0,40}?(\\d{1,3})\\s*quest[oõ]', 'i'),
-      new RegExp(escapedName + '[^\\d]{0,40}?peso\\s*[:\\-]?\\s*(\\d{1,2})', 'i'),
-      new RegExp(escapedName + '[^\\d]{0,40}?(\\d{1,3})\\s*ponto', 'i'),
-      new RegExp(escapedName + '[^\\d]{0,40}?valor\\s*[:\\-]?\\s*(\\d{1,3})', 'i'),
-      // Reverse: "10 questões de Direito Administrativo"
-      new RegExp('(\\d{1,3})\\s*quest[oõ][^\\n]{0,20}' + escapedName, 'i'),
+      new RegExp(escapedName + '[^\\d]{0,50}?(\\d{1,3})\\s*quest[oõ]', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,50}?peso\\s*[:\\-]?\\s*(\\d{1,2})', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,50}?(\\d{1,3})\\s*ponto', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,50}?valor\\s*[:\\-]?\\s*(\\d{1,3})', 'i'),
+      new RegExp('(\\d{1,3})\\s*quest[oõ][^\\n]{0,30}' + escapedName, 'i'),
+      new RegExp('(\\d{1,3})\\s*ponto[^\\n]{0,30}' + escapedName, 'i'),
     ];
 
     for (var i = 0; i < patterns.length; i++) {
@@ -604,7 +654,22 @@ function extrairPesosPorMateria(texto, materias) {
     }
   });
 
-  // Flag to let the UI know if weights were found
+  // Calculate relative weights (percentage of total)
+  if (encontrouAlgumPeso) {
+    var total = 0;
+    Object.keys(pesos).forEach(function(k) {
+      if (k !== '_encontrouPesos' && k !== '_relativos') total += pesos[k];
+    });
+    if (total > 0) {
+      pesos._relativos = {};
+      Object.keys(pesos).forEach(function(k) {
+        if (k !== '_encontrouPesos' && k !== '_relativos') {
+          pesos._relativos[k] = Math.round((pesos[k] / total) * 100);
+        }
+      });
+    }
+  }
+
   pesos._encontrouPesos = encontrouAlgumPeso;
   return pesos;
 }
