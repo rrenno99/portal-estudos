@@ -878,6 +878,48 @@
       font-weight: 400;
     }
 
+    /* Calendario: materia concluida (estudada nesse dia) */
+    .cal-slot.cal-done {
+      opacity: 0.45;
+      text-decoration: line-through;
+      position: relative;
+    }
+    .cal-slot.cal-done::after {
+      content: '✓';
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 0.65rem;
+    }
+
+    /* Calendario: proxima materia (slot de hoje) */
+    .cal-slot.cal-next {
+      outline: 2.5px solid var(--primary);
+      outline-offset: -2px;
+      animation: pulseBorder 2s ease-in-out infinite;
+      position: relative;
+    }
+    .cal-slot.cal-next::before {
+      content: 'AGORA';
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      font-size: 0.5rem;
+      font-weight: 800;
+      background: white;
+      color: var(--primary);
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.2;
+    }
+
+    /* Calendario: dia passado sem sessao (nao estudado) */
+    .cal-slot.cal-missed {
+      opacity: 0.25;
+      background: var(--border) !important;
+      color: var(--text-lighter) !important;
+    }
+
     .subject-dir-admin  { background: var(--primary); }
     .subject-portugues  { background: var(--info); }
     .subject-dir-const  { background: var(--success); }
@@ -2783,7 +2825,12 @@
     function renderCalendar() {
       const days = getWeekDates(weekOffset);
       const today = new Date();
+      today.setHours(0,0,0,0);
       const times = window._calendarTimes || ['08:00','09:00','10:00','11:00','14:00','15:00'];
+
+      // Current "next" subject from the cycle queue
+      const subjects = getCicloSubjects();
+      const proximaMateria = subjects.length > 0 ? subjects[_cicloPosicao % subjects.length] : '';
 
       document.getElementById('weekLabel').textContent = `${formatDate(days[0])} — ${formatDate(days[6])}`;
 
@@ -2803,7 +2850,40 @@
         days.forEach((d, i) => {
           const dayOfWeek = (i + 1) % 7;
           const slot = dynamicSchedule[dayOfWeek] && dynamicSchedule[dayOfWeek][time];
-          const cell = el('div', 'cal-slot ' + (slot ? slot[0] : 'empty'), slot ? slot[1] : '');
+
+          if (!slot) {
+            grid.appendChild(el('div', 'cal-slot empty', ''));
+            return;
+          }
+
+          const slotMateria = slot[1];
+          const slotClass = slot[0];
+          const isToday = d.toDateString() === today.toDateString();
+          const dayDate = new Date(d);
+          dayDate.setHours(0,0,0,0);
+          const isPast = dayDate < today;
+          const dateKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+          const sessoesNoDia = _sessoesHistorico[dateKey];
+
+          // Determine if this subject was studied on this day
+          const foiEstudada = sessoesNoDia && (sessoesNoDia.has(slotMateria) ||
+            // Check truncated name match
+            Array.from(sessoesNoDia).some(function(m) {
+              return slotMateria.length > 14 && m.startsWith(slotMateria.replace('…', ''));
+            }));
+
+          let extraClass = '';
+          if (isPast && foiEstudada) {
+            extraClass = ' cal-done';
+          } else if (isPast && !foiEstudada && slotMateria !== 'Revisão') {
+            extraClass = ' cal-missed';
+          } else if (isToday && slotMateria === (proximaMateria.length > 16 ? proximaMateria.substring(0,14) + '…' : proximaMateria)) {
+            extraClass = ' cal-next';
+          } else if (isToday && foiEstudada) {
+            extraClass = ' cal-done';
+          }
+
+          const cell = el('div', 'cal-slot ' + slotClass + extraClass, slotMateria);
           grid.appendChild(cell);
         });
       });
@@ -3067,6 +3147,7 @@
       await carregarDiasEstudados();
       calcularEstatisticas();
       atualizarPulsoFogo();
+      renderCalendar();
       verificarCelebracoes(streakAntes);
     }
 
@@ -3223,6 +3304,9 @@
     // =============================================
     let totalHorasEstudadas = 0;
 
+    // Historico de sessoes por data (chave: 'YYYY-M-D', valor: Set de materias)
+    var _sessoesHistorico = {};
+
     async function carregarSessoesSupabase() {
       try {
         const supabase = window._supabase;
@@ -3230,7 +3314,7 @@
 
         const { data, error } = await supabase
           .from('sessoes_estudo')
-          .select('tempo_segundos')
+          .select('tempo_segundos, materia, data_inicio')
           .eq('user_id', window._userId)
           .eq('status', 'concluido');
 
@@ -3238,7 +3322,17 @@
 
         const totalSegundos = (data || []).reduce((acc, s) => acc + s.tempo_segundos, 0);
         totalHorasEstudadas = totalSegundos / 3600;
-        console.log('[Sessões] Total:', Math.round(totalHorasEstudadas * 10) / 10, 'horas');
+
+        // Build history map: date -> Set of subjects studied
+        _sessoesHistorico = {};
+        (data || []).forEach(function(s) {
+          var d = new Date(s.data_inicio);
+          var key = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+          if (!_sessoesHistorico[key]) _sessoesHistorico[key] = new Set();
+          _sessoesHistorico[key].add(s.materia);
+        });
+
+        console.log('[Sessões] Total:', Math.round(totalHorasEstudadas * 10) / 10, 'horas |', Object.keys(_sessoesHistorico).length, 'dias com sessões');
       } catch (e) {
         console.error('[Sessões] Erro:', e);
       }
