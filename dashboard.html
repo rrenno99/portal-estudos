@@ -3052,12 +3052,30 @@
       }
     }
 
+    var _timerPopup = null;
+
     function iniciarEstudos(materia) {
       const links = getLinksStorage();
       if (links[materia] && links[materia].url) {
         window.open(links[materia].url, '_blank');
       }
-      abrirTimer(materia);
+
+      // Open timer as pop-out window
+      var w = 420, h = 560;
+      var left = window.screenX + window.outerWidth - w - 40;
+      var top = window.screenY + 60;
+      var features = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top;
+      features += ',resizable=yes,scrollbars=no,menubar=no,toolbar=no,location=no,status=no';
+
+      if (_timerPopup && !_timerPopup.closed) {
+        _timerPopup.close();
+      }
+      _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
+
+      // Fallback: if popup blocked, use internal timer
+      if (!_timerPopup || _timerPopup.closed) {
+        abrirTimer(materia);
+      }
     }
 
     // =============================================
@@ -3240,7 +3258,9 @@
     }
 
     function disableFeedbackButtons() {
-      document.querySelectorAll('#timerFeedbackView .feedback-option').forEach(function(btn) {
+      var view = document.getElementById('timerFeedbackView');
+      if (!view) return;
+      view.querySelectorAll('.feedback-option').forEach(function(btn) {
         btn.disabled = true;
         btn.style.opacity = '0.5';
         btn.style.pointerEvents = 'none';
@@ -4250,6 +4270,36 @@
     // =============================================
     //  INIT: setup Supabase + load data
     // =============================================
+
+    // 0. BroadcastChannel: listen for timer pop-out messages
+    var _timerChannel = new BroadcastChannel('planejador-timer');
+    _timerChannel.onmessage = async function(e) {
+      var msg = e.data;
+      if (msg.type === 'tick') {
+        // Optional: could show a mini indicator on dashboard
+        return;
+      }
+      if (msg.type === 'finished') {
+        // Timer pop-out finished - save session from dashboard (has Supabase context)
+        timerMateria = msg.materia;
+        timerSeconds = msg.seconds;
+        timerStartTime = new Date(msg.startTime);
+
+        if (msg.feedback === 'concluiu') {
+          await feedbackConcluiu();
+        } else if (msg.feedback === 'estudando') {
+          await feedbackEstudando();
+        } else {
+          await feedbackApenasMarcar();
+        }
+
+        // Confirm save to pop-out so it can close
+        _timerChannel.postMessage({ type: 'saved' });
+      }
+      if (msg.type === 'cancelled') {
+        fecharTimer();
+      }
+    };
 
     // 1. Show local data immediately
     loadFromLocalStorage();

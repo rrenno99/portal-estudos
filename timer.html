@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cronômetro — Planejador Rennó</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱</text></svg>">
+  <style>
+    :root {
+      --primary: #1E88E5;
+      --primary-dark: #1565C0;
+      --secondary: #1A1A2E;
+      --bg: #F5F6FA;
+      --bg-card: #FFFFFF;
+      --text: #2D3748;
+      --text-light: #718096;
+      --text-lighter: #A0AEC0;
+      --border: #E2E8F0;
+      --success: #38A169;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --transition: all 0.2s ease;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .timer-header {
+      padding: 14px 20px;
+      background: var(--secondary);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .timer-header h1 { font-size: 0.88rem; font-weight: 600; }
+    .timer-header .materia { font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 2px; }
+
+    .timer-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+    }
+
+    .timer-ring {
+      width: 180px; height: 180px;
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .timer-ring svg { transform: rotate(-90deg); width: 180px; height: 180px; }
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 5; }
+    .ring-fill { fill: none; stroke: var(--primary); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .ring-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .timer-display {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: var(--secondary);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 1px;
+    }
+    .timer-status {
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .timer-status.running { color: var(--success); }
+    .timer-status.paused  { color: #FF9800; }
+    .timer-status.stopped { color: var(--text-lighter); }
+
+    .timer-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .btn {
+      padding: 12px 22px; border-radius: var(--radius-sm);
+      font-size: 0.88rem; font-weight: 600; border: none;
+      cursor: pointer; transition: var(--transition);
+      font-family: inherit;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.start  { background: var(--success); color: white; }
+    .btn.pause  { background: #FF9800; color: white; }
+    .btn.finish { background: var(--primary); color: white; }
+    .btn.cancel { background: var(--bg-card); color: var(--text-light); border: 1.5px solid var(--border); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .timer-footer {
+      padding: 10px 20px;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      color: var(--text-lighter);
+      text-align: center;
+    }
+
+    /* Feedback view */
+    .feedback { display: none; padding: 24px 20px; }
+    .feedback.show { display: block; }
+    .feedback h4 { font-size: 0.95rem; font-weight: 700; color: var(--secondary); margin-bottom: 16px; text-align: center; }
+    .feedback-option {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border); background: var(--bg-card);
+      cursor: pointer; margin-bottom: 10px; transition: var(--transition);
+      width: 100%; text-align: left; font-family: inherit; font-size: 0.88rem;
+    }
+    .feedback-option:hover { border-color: var(--primary); background: rgba(30,136,229,0.04); }
+    .feedback-option:disabled { opacity: 0.5; pointer-events: none; }
+    .fb-icon {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; flex-shrink: 0;
+    }
+    .fb-icon.green  { background: #E8F5E9; }
+    .fb-icon.orange { background: #FFF3E0; }
+    .fb-icon.gray   { background: var(--bg); }
+    .fb-text strong { display: block; font-size: 0.85rem; color: var(--text); }
+    .fb-text span   { font-size: 0.75rem; color: var(--text-light); }
+
+    /* Pomodoro flash */
+    .pomodoro-flash { animation: pomFlash 0.5s ease 3; }
+    @keyframes pomFlash {
+      0%, 100% { background: var(--bg); }
+      50% { background: rgba(30,136,229,0.1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="timer-header">
+    <div>
+      <h1>Cronometro de Estudo</h1>
+      <div class="materia" id="timerMateria">—</div>
+    </div>
+  </div>
+
+  <div class="timer-body" id="timerBodyView">
+    <div class="timer-ring">
+      <svg viewBox="0 0 180 180">
+        <circle class="ring-bg" cx="90" cy="90" r="80"></circle>
+        <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="80"
+          stroke-dasharray="502.65" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="timer-display" id="timerDisplay">00:00:00</div>
+        <div class="timer-status stopped" id="timerStatus">Pronto</div>
+      </div>
+    </div>
+    <div class="timer-controls">
+      <button class="btn start" id="btnStart" onclick="timerStart()">▶ Iniciar</button>
+      <button class="btn pause" id="btnPause" onclick="timerPause()" style="display:none">⏸ Pausar</button>
+      <button class="btn finish" id="btnFinish" onclick="timerFinish()" style="display:none">✓ Finalizar</button>
+      <button class="btn cancel" id="btnCancel" onclick="timerCancel()">✕ Cancelar</button>
+    </div>
+  </div>
+
+  <div class="feedback" id="feedbackView">
+    <h4>Como foi o estudo? <span id="feedbackTime" style="font-weight:400;color:var(--text-light)"></span></h4>
+    <button class="feedback-option" onclick="feedback('concluiu')">
+      <div class="fb-icon green">✓</div>
+      <div class="fb-text">
+        <strong>Conclui a aula</strong>
+        <span>Marca a aula como 100% concluida</span>
+      </div>
+    </button>
+    <button class="feedback-option" onclick="feedback('estudando')">
+      <div class="fb-icon orange">▶</div>
+      <div class="fb-text">
+        <strong>Ainda estou estudando</strong>
+        <span>Mantem a aula em andamento (50%)</span>
+      </div>
+    </button>
+    <button class="feedback-option" onclick="feedback('marcar')">
+      <div class="fb-icon gray">⏱</div>
+      <div class="fb-text">
+        <strong>Apenas marque o tempo</strong>
+        <span>Salva as horas sem alterar o progresso</span>
+      </div>
+    </button>
+  </div>
+
+  <div class="timer-footer">
+    Pomodoro: alerta em 25min e 50min · Mantenha esta janela visivel
+  </div>
+
+  <script>
+    // =============================================
+    //  CONFIG from URL params
+    // =============================================
+    var params = new URLSearchParams(window.location.search);
+    var materia = params.get('materia') || 'Estudo';
+    document.getElementById('timerMateria').textContent = materia;
+    document.title = 'Pronto — ' + materia;
+
+    // =============================================
+    //  BROADCAST CHANNEL (communicate with dashboard)
+    // =============================================
+    var channel = new BroadcastChannel('planejador-timer');
+
+    // =============================================
+    //  TIMER STATE
+    // =============================================
+    var interval = null;
+    var seconds = 0;
+    var running = false;
+    var startTime = null;
+    var isSubmitting = false;
+    var alerted25 = false;
+    var alerted50 = false;
+    var RING_R = 80;
+    var RING_CIRC = 2 * Math.PI * RING_R;
+
+    function formatTime(totalSecs) {
+      var h = Math.floor(totalSecs / 3600);
+      var m = Math.floor((totalSecs % 3600) / 60);
+      var s = totalSecs % 60;
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function formatShort(totalSecs) {
+      var m = Math.floor(totalSecs / 60);
+      var s = totalSecs % 60;
+      return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function updateRing(secs) {
+      var progress = (secs % (25 * 60)) / (25 * 60);
+      var offset = RING_CIRC * (1 - progress);
+      document.getElementById('ringFill').style.strokeDashoffset = offset;
+    }
+
+    function playBeep() {
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.25, 0.5].forEach(function(delay) {
+          var osc = ctx.createOscillator();
+          var gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          osc.type = 'sine';
+          gain.gain.value = 0.15;
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + 0.15);
+        });
+      } catch (e) {}
+    }
+
+    // =============================================
+    //  TIMER CONTROLS
+    // =============================================
+    function timerStart() {
+      if (!startTime) startTime = new Date();
+      running = true;
+
+      document.getElementById('timerStatus').textContent = 'Estudando...';
+      document.getElementById('timerStatus').className = 'timer-status running';
+      document.getElementById('btnStart').style.display = 'none';
+      document.getElementById('btnPause').style.display = '';
+      document.getElementById('btnFinish').style.display = '';
+
+      clearInterval(interval);
+      interval = setInterval(function() {
+        seconds++;
+        document.getElementById('timerDisplay').textContent = formatTime(seconds);
+        updateRing(seconds);
+
+        // Dynamic tab title
+        document.title = '[' + formatShort(seconds) + '] ' + materia + ' — Planejador Renno';
+
+        // Broadcast tick to dashboard
+        channel.postMessage({ type: 'tick', seconds: seconds, materia: materia });
+
+        // Pomodoro alerts
+        if (seconds === 25 * 60 && !alerted25) {
+          alerted25 = true;
+          playBeep();
+          document.body.classList.add('pomodoro-flash');
+          setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
+        }
+        if (seconds === 50 * 60 && !alerted50) {
+          alerted50 = true;
+          playBeep();
+          document.body.classList.add('pomodoro-flash');
+          setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
+        }
+      }, 1000);
+
+      channel.postMessage({ type: 'started', materia: materia });
+    }
+
+    function timerPause() {
+      running = false;
+      clearInterval(interval);
+      document.getElementById('timerStatus').textContent = 'Pausado';
+      document.getElementById('timerStatus').className = 'timer-status paused';
+      document.getElementById('btnPause').style.display = 'none';
+      document.getElementById('btnStart').style.display = '';
+      document.getElementById('btnStart').textContent = '▶ Retomar';
+      document.title = '[PAUSADO] ' + materia + ' — Planejador Renno';
+
+      channel.postMessage({ type: 'paused', seconds: seconds, materia: materia });
+    }
+
+    function timerFinish() {
+      clearInterval(interval);
+      running = false;
+
+      if (seconds < 5) {
+        channel.postMessage({ type: 'cancelled', materia: materia });
+        window.close();
+        return;
+      }
+
+      var mins = Math.floor(seconds / 60);
+      var secs = seconds % 60;
+      document.getElementById('feedbackTime').textContent = '(' + mins + 'min ' + secs + 's)';
+      document.getElementById('timerBodyView').style.display = 'none';
+      document.getElementById('feedbackView').classList.add('show');
+      document.title = 'Finalizar — ' + materia;
+    }
+
+    function timerCancel() {
+      clearInterval(interval);
+      running = false;
+      channel.postMessage({ type: 'cancelled', materia: materia });
+      window.close();
+    }
+
+    // =============================================
+    //  FEEDBACK
+    // =============================================
+    function feedback(tipo) {
+      if (isSubmitting) return;
+      isSubmitting = true;
+
+      // Disable all buttons
+      document.querySelectorAll('.feedback-option').forEach(function(btn) {
+        btn.disabled = true;
+      });
+
+      var h4 = document.querySelector('#feedbackView h4');
+      if (h4) h4.innerHTML = '⏳ Salvando sessao...';
+
+      // Send result to dashboard (it handles saving to Supabase)
+      channel.postMessage({
+        type: 'finished',
+        materia: materia,
+        seconds: seconds,
+        startTime: startTime ? startTime.toISOString() : new Date().toISOString(),
+        feedback: tipo
+      });
+    }
+
+    // Listen for confirmation from dashboard
+    channel.onmessage = function(e) {
+      if (e.data.type === 'saved') {
+        document.title = 'Salvo! — ' + materia;
+        setTimeout(function() { window.close(); }, 800);
+      }
+    };
+
+    // =============================================
+    //  PREVENT ACCIDENTAL CLOSE
+    // =============================================
+    window.addEventListener('beforeunload', function(e) {
+      if (seconds > 5 && !isSubmitting) {
+        e.preventDefault();
+        e.returnValue = 'Sua sessao ainda esta ativa. Deseja mesmo sair?';
+        return e.returnValue;
+      }
+    });
+  </script>
+</body>
+</html>
