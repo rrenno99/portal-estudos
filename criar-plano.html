@@ -474,6 +474,43 @@
           <input type="file" id="editalFileInput" accept=".pdf" style="display:none" onchange="handleEditalUpload(this)">
         </div>
 
+        <!-- Renno Analysis Upload (premium/strategic) -->
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:6px">
+            <span>⭐</span> Subir Analise Estruturada (Modelo Prof. Renno)
+            <span style="font-size:0.65rem;font-weight:600;color:var(--success);background:rgba(56,161,105,0.1);padding:1px 6px;border-radius:4px">RECOMENDADO</span>
+          </label>
+          <div class="upload-area" id="rennoUploadArea" onclick="document.getElementById('rennoFileInput').click()" style="border-color:rgba(56,161,105,0.3);background:rgba(56,161,105,0.02)">
+            <div class="upload-icon">⭐</div>
+            <div class="upload-text">Clique para selecionar o PDF/DOCX da analise do Prof. Renno</div>
+            <div class="upload-filename" id="rennoFileName" style="display:none"></div>
+          </div>
+          <input type="file" id="rennoFileInput" accept=".pdf,.docx" style="display:none" onchange="handleRennoUpload(this)">
+          <div class="form-hint">Se voce tem a Analise de Edital do Prof. Renno, suba aqui. As materias e pesos serao extraidos com precisao maxima, substituindo a leitura do edital bruto.</div>
+        </div>
+
+        <!-- Renno detected banner (shown when Renno format is detected in edital) -->
+        <div id="rennoDetectedBanner" style="display:none;padding:12px;background:linear-gradient(135deg,rgba(56,161,105,0.08),rgba(56,161,105,0.02));border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>⭐</span>
+            <strong style="font-size:0.85rem;color:var(--success)">Analise Estruturada detectada!</strong>
+          </div>
+          <p style="font-size:0.78rem;color:var(--text-light);margin-top:4px">Dados de materias e pesos extraidos com precisao do modelo Prof. Renno.</p>
+        </div>
+
+        <!-- Link detection banner -->
+        <div id="linkAnalyseBanner" style="display:none;padding:12px;background:#FFF8F0;border:1px solid rgba(255,152,0,0.2);border-radius:var(--radius-sm);margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>🔗</span>
+            <strong style="font-size:0.85rem;color:#E65100">Detectamos uma Analise Estruturada!</strong>
+          </div>
+          <p style="font-size:0.78rem;color:var(--text-light);margin:4px 0 8px">Deseja priorizar esses dados para montar o ciclo 40/30/30?</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="usarLinkAnalise()" style="font-size:0.82rem;padding:6px 14px">Sim, priorizar</button>
+            <button class="btn-add-cancel" onclick="document.getElementById('linkAnalyseBanner').style.display='none'" style="font-size:0.82rem">Nao</button>
+          </div>
+        </div>
+
         <div style="text-align:center;margin:12px 0">
           <button class="btn btn-primary" onclick="processarEditalComCargo()" id="btnProcessarEdital" style="display:none">
             🔍 Analisar edital para este cargo
@@ -544,7 +581,7 @@
 
         <div class="form-group" style="margin-top:12px">
           <label>Link do concurso ou edital (opcional)</label>
-          <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/...">
+          <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/..." oninput="detectarLinkAnalise(this.value)">
         </div>
       </div>
 
@@ -1151,6 +1188,8 @@
       _materiasExtraidasEdital = [];
       _textoEditalCompleto = '';
       _textoEditalFiltrado = '';
+      _rennoPrioridade = false;
+      _rennoFile = null;
 
       // Search community plans for known concursos
       if (!isOutro && selectedConcurso) {
@@ -1356,6 +1395,109 @@
     }
 
     // =============================================
+    //  RENNO ANALYSIS UPLOAD
+    // =============================================
+    var _rennoFile = null;
+    var _rennoPrioridade = false;
+
+    async function handleRennoUpload(input) {
+      if (!input.files || !input.files[0]) return;
+      _rennoFile = input.files[0];
+
+      var area = document.getElementById('rennoUploadArea');
+      area.classList.add('has-file');
+      area.style.borderColor = 'var(--success)';
+      document.getElementById('rennoFileName').textContent = '⭐ ' + _rennoFile.name;
+      document.getElementById('rennoFileName').style.display = '';
+
+      // Process immediately
+      try {
+        var texto = await window.MentorIA.extrairTextoPDF(_rennoFile);
+
+        if (texto.length < 50) {
+          alert('Nao foi possivel ler o arquivo. Verifique se e um PDF valido.');
+          return;
+        }
+
+        if (window.MentorIA.detectarAnaliseRenno(texto)) {
+          var materias = window.MentorIA.extrairTabelaProvas(texto);
+          if (materias.length > 0) {
+            _materiasExtraidasEdital = materias;
+            _rennoPrioridade = true;
+
+            // Show results
+            document.getElementById('rennoDetectedBanner').style.display = '';
+            document.getElementById('editalResultTitle').innerHTML =
+              '⭐ <strong>Analise Prof. Renno</strong> — ' + materias.length + ' materias com pesos extraidos';
+
+            var pesos = {};
+            materias.forEach(function(m) { if (m.pontos) pesos[m.nome] = m.pontos; });
+            pesos._encontrouPesos = true;
+
+            if (typeof renderTabelaTriangulada === 'function') {
+              renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null);
+            } else {
+              renderTabelaMaterias(_materiasExtraidasEdital, pesos);
+            }
+            document.getElementById('editalMateriasPreview').style.display = '';
+            document.getElementById('editalPesoQuestion').style.display = 'none';
+            document.getElementById('btnProcessarEdital').style.display = 'none';
+
+            // Try to extract cargo name
+            var cargoInput = document.getElementById('editalCargoInput');
+            if (cargoInput && !cargoInput.value) {
+              var cargos = window.MentorIA.extrairCargos(texto);
+              if (cargos.length > 0) cargoInput.value = cargos[0];
+            }
+
+            selectedConcurso = document.getElementById('editalCargoInput').value || 'Analise Renno';
+            console.log('[Renno] Upload processado:', materias.length, 'materias com pesos');
+            return;
+          }
+        }
+
+        // Not a Renno format — treat as regular edital
+        alert('Este arquivo nao parece ser uma Analise Estruturada do Prof. Renno. Tente subi-lo como Edital normal.');
+        _rennoFile = null;
+        area.classList.remove('has-file');
+        area.style.borderColor = '';
+        document.getElementById('rennoFileName').style.display = 'none';
+
+      } catch (e) {
+        console.error('[Renno] Erro:', e);
+        alert('Erro ao processar o arquivo: ' + e.message);
+      }
+    }
+
+    function detectarLinkAnalise(url) {
+      if (!url) {
+        document.getElementById('linkAnalyseBanner').style.display = 'none';
+        return;
+      }
+
+      var isAnalysis = /docs\.google\.com|drive\.google\.com|estrategia.*analise|renno.*analise|analise.*edital/i.test(url);
+      if (isAnalysis) {
+        document.getElementById('linkAnalyseBanner').style.display = '';
+      } else {
+        document.getElementById('linkAnalyseBanner').style.display = 'none';
+      }
+    }
+
+    function usarLinkAnalise() {
+      document.getElementById('linkAnalyseBanner').style.display = 'none';
+      // Highlight the Renno upload area to guide the user
+      var area = document.getElementById('rennoUploadArea');
+      area.style.borderColor = 'var(--primary)';
+      area.style.background = 'rgba(30,136,229,0.05)';
+      area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function() {
+        area.style.borderColor = '';
+        area.style.background = '';
+      }, 3000);
+      alert('Baixe o PDF da analise e suba no campo "Analise Estruturada" acima para que possamos extrair os dados com precisao.');
+    }
+
+    // =============================================
     //  EDITAL UPLOAD + OUTRO CONCURSO
     // =============================================
     var _textoEditalCompleto = '';
@@ -1413,6 +1555,12 @@
     }
 
     async function processarEditalComCargo() {
+      // If Renno analysis already processed, skip edital processing
+      if (_rennoPrioridade && _materiasExtraidasEdital.length > 0) {
+        selectedConcurso = document.getElementById('editalCargoInput').value.trim() || selectedConcurso;
+        return;
+      }
+
       var cargoInput = document.getElementById('editalCargoInput').value.trim();
       if (!cargoInput) {
         alert('Digite o nome do cargo que deseja estudar.');
