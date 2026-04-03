@@ -179,6 +179,32 @@ CREATE TRIGGER aulas_materia_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- =============================================
+--  CAMPO: pontos em perfil_aluno
+--  Sistema de creditos por tempo estudado
+-- =============================================
+ALTER TABLE perfil_aluno ADD COLUMN IF NOT EXISTS pontos INTEGER DEFAULT 0;
+
+-- =============================================
+--  TABELA: notificacoes_aluno
+--  Notificacoes do sistema para o aluno
+-- =============================================
+CREATE TABLE notificacoes_aluno (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  texto TEXT NOT NULL,
+  lida BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_notificacoes_user_id ON notificacoes_aluno(user_id, created_at DESC);
+
+ALTER TABLE notificacoes_aluno ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Aluno le proprias notificacoes" ON notificacoes_aluno FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Aluno cria proprias notificacoes" ON notificacoes_aluno FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Aluno atualiza proprias notificacoes" ON notificacoes_aluno FOR UPDATE USING (auth.uid() = user_id);
+
+-- =============================================
 --  TABELA: usuarios_autorizados
 --  Lista de e-mails com acesso permitido
 -- =============================================

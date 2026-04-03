@@ -231,8 +231,34 @@
       border-radius: 20px;
       font-size: 0.82rem;
       font-weight: 600;
+      position: relative;
+      cursor: default;
     }
     .credits-badge span { font-size: 1rem; }
+    .credits-badge:hover::after {
+      content: 'Seus pontos acumulados por dedicação';
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--secondary);
+      color: white;
+      font-size: 0.72rem;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      z-index: 200;
+      pointer-events: none;
+    }
+    .credits-badge.animating {
+      animation: creditsPop 0.6s ease;
+    }
+    @keyframes creditsPop {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(1.15); }
+      60%  { transform: scale(0.95); }
+      100% { transform: scale(1); }
+    }
 
     .topbar-icon {
       position: relative;
@@ -1753,8 +1779,8 @@
 
         <div class="topbar-right">
           <!-- Credits -->
-          <div class="credits-badge">
-            <span>🪙</span> 4.750 cr
+          <div class="credits-badge" id="creditsBadge">
+            <span>🪙</span> <span id="creditsValue">0</span> cr
           </div>
 
           <!-- Notifications -->
@@ -1769,26 +1795,8 @@
                 <span>Notificações</span>
                 <button onclick="markAllRead()">Marcar como lidas</button>
               </div>
-              <div class="notif-item unread">
-                <div class="notif-dot"></div>
-                <div>
-                  <div class="notif-text">Seu cronograma de hoje está pronto! Confira as sessões do dia. 📅</div>
-                  <div class="notif-time">Há 5 minutos</div>
-                </div>
-              </div>
-              <div class="notif-item unread">
-                <div class="notif-dot"></div>
-                <div>
-                  <div class="notif-text">🔥 Você está em uma sequência de <strong>7 dias</strong>! Continue assim!</div>
-                  <div class="notif-time">Há 1 hora</div>
-                </div>
-              </div>
-              <div class="notif-item unread">
-                <div class="notif-dot"></div>
-                <div>
-                  <div class="notif-text">🏆 Meta semanal atingida! Parabéns!</div>
-                  <div class="notif-time">Ontem, 18:30</div>
-                </div>
+              <div id="notifList">
+                <p style="color:var(--text-lighter);font-size:0.82rem;padding:16px;text-align:center">Nenhuma notificação</p>
               </div>
             </div>
           </div>
@@ -2192,11 +2200,123 @@
       }
     });
 
-    function markAllRead() {
-      document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
-      document.querySelectorAll('.notif-dot').forEach(d => d.style.display = 'none');
-      const badge = document.getElementById('notifCount');
+    async function markAllRead() {
+      var sb = window._supabase;
+      if (sb && window._userId) {
+        await sb.from('notificacoes_aluno')
+          .update({ lida: true })
+          .eq('user_id', window._userId)
+          .eq('lida', false);
+      }
+      document.querySelectorAll('.notif-item.unread').forEach(function(el) { el.classList.remove('unread'); });
+      document.querySelectorAll('.notif-dot').forEach(function(d) { d.style.display = 'none'; });
+      var badge = document.getElementById('notifCount');
       if (badge) badge.style.display = 'none';
+    }
+
+    // =============================================
+    //  NOTIFICAÇÕES — Carregar do Supabase
+    // =============================================
+    async function carregarNotificacoes() {
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+
+      var { data, error } = await sb
+        .from('notificacoes_aluno')
+        .select('*')
+        .eq('user_id', window._userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) { console.error('[Notif] Erro:', error.message); return; }
+
+      var list = document.getElementById('notifList');
+      if (!data || data.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-lighter);font-size:0.82rem;padding:16px;text-align:center">Nenhuma notificação</p>';
+        document.getElementById('notifCount').style.display = 'none';
+        return;
+      }
+
+      var unreadCount = data.filter(function(n) { return !n.lida; }).length;
+      var badge = document.getElementById('notifCount');
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
+
+      list.innerHTML = data.map(function(n) {
+        var tempo = tempoRelativo(n.created_at);
+        return '<div class="notif-item' + (n.lida ? '' : ' unread') + '">'
+          + (!n.lida ? '<div class="notif-dot"></div>' : '')
+          + '<div><div class="notif-text">' + n.texto + '</div>'
+          + '<div class="notif-time">' + tempo + '</div></div></div>';
+      }).join('');
+    }
+
+    function tempoRelativo(isoDate) {
+      var diff = (Date.now() - new Date(isoDate).getTime()) / 1000;
+      if (diff < 60) return 'Agora mesmo';
+      if (diff < 3600) return 'Há ' + Math.floor(diff / 60) + ' min';
+      if (diff < 86400) return 'Há ' + Math.floor(diff / 3600) + 'h';
+      if (diff < 172800) return 'Ontem';
+      return new Date(isoDate).toLocaleDateString('pt-BR');
+    }
+
+    async function criarNotificacao(texto) {
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+      await sb.from('notificacoes_aluno').insert([{
+        user_id: window._userId,
+        texto: texto
+      }]);
+      await carregarNotificacoes();
+    }
+
+    // =============================================
+    //  PONTOS / CRÉDITOS
+    // =============================================
+    var _pontosAtuais = 0;
+
+    async function carregarPontos() {
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+
+      var { data, error } = await sb
+        .from('perfil_aluno')
+        .select('pontos')
+        .eq('user_id', window._userId)
+        .single();
+
+      if (error || !data) return;
+      _pontosAtuais = data.pontos || 0;
+      renderPontos(_pontosAtuais);
+    }
+
+    function renderPontos(valor) {
+      document.getElementById('creditsValue').textContent = valor.toLocaleString('pt-BR');
+    }
+
+    async function adicionarPontos(quantidade) {
+      var sb = window._supabase;
+      if (!sb || !window._userId) return;
+
+      _pontosAtuais += quantidade;
+
+      var { error } = await sb
+        .from('perfil_aluno')
+        .update({ pontos: _pontosAtuais })
+        .eq('user_id', window._userId);
+
+      if (error) { console.error('[Pontos] Erro:', error.message); return; }
+
+      // Animate
+      var badge = document.getElementById('creditsBadge');
+      badge.classList.remove('animating');
+      void badge.offsetWidth;
+      badge.classList.add('animating');
+      renderPontos(_pontosAtuais);
     }
 
     function scrollToCalendar(e) {
@@ -2803,6 +2923,14 @@
           var tempoStr = h > 0 ? h + 'h ' + m + 'min' : m + 'min';
           await registrarAtividade('tempo_estudo',
             '⏱ Estudou <strong>' + tempoStr + '</strong> de <strong>' + timerMateria + '</strong>');
+
+          // Award points: 10 per minute studied
+          var minEstudados = Math.floor(timerSeconds / 60);
+          if (minEstudados > 0) {
+            await adicionarPontos(minEstudados * 10);
+            await criarNotificacao('🪙 Você ganhou <strong>' + (minEstudados * 10) + ' pontos</strong> por estudar ' + tempoStr + ' de ' + timerMateria + '!');
+          }
+
           // Check weekly goal
           await verificarMetaSemanal();
         }
@@ -3343,6 +3471,9 @@
               '🏆 Meta semanal de <strong>' + metaHoras + 'h</strong> atingida! Parabéns!');
             celebrar('🎯', 'Meta da semana batida!',
               'Você completou <strong>' + metaHoras + 'h</strong> de estudo esta semana! 🎯 Agora é hora de descansar ou fazer aquele ajuste fino.');
+            // Bonus 500 points for weekly goal
+            await adicionarPontos(500);
+            await criarNotificacao('🏆 Bônus de <strong>500 pontos</strong> por bater a meta semanal!');
           }
         }
       } catch (e) {
@@ -3841,6 +3972,8 @@
         try { await carregarSessoesSupabase(); } catch (e) { console.error('[Init] sessões:', e); }
         try { await carregarDiasEstudados(); } catch (e) { console.error('[Init] dias:', e); }
         try { await carregarAtividadesSupabase(); } catch (e) { console.error('[Init] atividades:', e); }
+        try { await carregarPontos(); } catch (e) { console.error('[Init] pontos:', e); }
+        try { await carregarNotificacoes(); } catch (e) { console.error('[Init] notificações:', e); }
         atualizarPulsoFogo();
 
         // 4. Final render
