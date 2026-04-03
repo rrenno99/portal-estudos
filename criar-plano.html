@@ -498,17 +498,19 @@
           <p style="font-size:0.78rem;color:var(--text-light);margin-top:4px">Dados de materias e pesos extraidos com precisao do modelo Prof. Renno.</p>
         </div>
 
-        <!-- Link detection banner -->
-        <div id="linkAnalyseBanner" style="display:none;padding:12px;background:#FFF8F0;border:1px solid rgba(255,152,0,0.2);border-radius:var(--radius-sm);margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span>🔗</span>
-            <strong style="font-size:0.85rem;color:#E65100">Detectamos uma Analise Estruturada!</strong>
-          </div>
-          <p style="font-size:0.78rem;color:var(--text-light);margin:4px 0 8px">Deseja priorizar esses dados para montar o ciclo 40/30/30?</p>
+        <!-- Link da Analise Estruturada -->
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:6px">
+            <span>🔗</span> Link da Analise Estruturada (Google Docs)
+          </label>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-primary" onclick="usarLinkAnalise()" style="font-size:0.82rem;padding:6px 14px">Sim, priorizar</button>
-            <button class="btn-add-cancel" onclick="document.getElementById('linkAnalyseBanner').style.display='none'" style="font-size:0.82rem">Nao</button>
+            <input type="url" class="form-control" id="rennoLinkInput" placeholder="https://docs.google.com/document/d/..." style="flex:1">
+            <button class="btn btn-primary" onclick="importarLinkAnalise()" id="btnImportarLink" style="font-size:0.82rem;padding:8px 16px;white-space:nowrap">
+              🔍 Importar
+            </button>
           </div>
+          <div class="form-hint">Cole o link do Google Docs com a Analise do Prof. Renno. O sistema extrai materias, pesos e data da prova automaticamente.</div>
+          <div id="linkImportStatus" style="display:none;margin-top:8px"></div>
         </div>
 
         <div style="text-align:center;margin:12px 0">
@@ -580,8 +582,8 @@
         </div>
 
         <div class="form-group" style="margin-top:12px">
-          <label>Link do concurso ou edital (opcional)</label>
-          <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/..." oninput="detectarLinkAnalise(this.value)">
+          <label>Link do edital oficial (opcional)</label>
+          <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/...">
         </div>
       </div>
 
@@ -1469,32 +1471,105 @@
       }
     }
 
-    function detectarLinkAnalise(url) {
+    async function importarLinkAnalise() {
+      var url = document.getElementById('rennoLinkInput').value.trim();
       if (!url) {
-        document.getElementById('linkAnalyseBanner').style.display = 'none';
+        alert('Cole o link da Analise Estruturada.');
+        document.getElementById('rennoLinkInput').focus();
         return;
       }
 
-      var isAnalysis = /docs\.google\.com|drive\.google\.com|estrategia.*analise|renno.*analise|analise.*edital/i.test(url);
-      if (isAnalysis) {
-        document.getElementById('linkAnalyseBanner').style.display = '';
-      } else {
-        document.getElementById('linkAnalyseBanner').style.display = 'none';
-      }
-    }
+      var statusDiv = document.getElementById('linkImportStatus');
+      var btn = document.getElementById('btnImportarLink');
+      btn.disabled = true;
+      btn.textContent = '⏳ Importando...';
+      statusDiv.style.display = '';
+      statusDiv.innerHTML = '<div class="loading-subjects"><span class="spinner"></span> Lendo documento...</div>';
 
-    function usarLinkAnalise() {
-      document.getElementById('linkAnalyseBanner').style.display = 'none';
-      // Highlight the Renno upload area to guide the user
-      var area = document.getElementById('rennoUploadArea');
-      area.style.borderColor = 'var(--primary)';
-      area.style.background = 'rgba(30,136,229,0.05)';
-      area.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(function() {
-        area.style.borderColor = '';
-        area.style.background = '';
-      }, 3000);
-      alert('Baixe o PDF da analise e suba no campo "Analise Estruturada" acima para que possamos extrair os dados com precisao.');
+      try {
+        var texto = await window.MentorIA.fetchTextoDeUrl(url);
+
+        if (!texto || texto.length < 100) {
+          statusDiv.innerHTML = '<p style="color:#C53030;font-size:0.82rem">Nao foi possivel acessar o documento. Verifique se o link e publico (Compartilhar > Qualquer pessoa com o link) ou baixe o PDF e use o upload acima.</p>';
+          btn.disabled = false;
+          btn.textContent = '🔍 Importar';
+          return;
+        }
+
+        console.log('[Link] Texto obtido:', texto.length, 'chars');
+
+        // Check if it's a Renno analysis
+        var isRenno = window.MentorIA.detectarAnaliseRenno(texto);
+        var materias = [];
+        var pesos = {};
+
+        if (isRenno) {
+          materias = window.MentorIA.extrairTabelaProvas(texto);
+          console.log('[Link] Analise Renno detectada:', materias.length, 'materias');
+        }
+
+        // If Renno extraction didn't work well, fallback to general extraction
+        if (materias.length === 0) {
+          materias = window.MentorIA.extrairMateriasDoTexto(texto);
+          pesos = window.MentorIA.extrairPesosPorMateria(texto, materias);
+          console.log('[Link] Extracao geral:', materias.length, 'materias');
+        } else {
+          materias.forEach(function(m) { if (m.pontos) pesos[m.nome] = m.pontos; });
+          pesos._encontrouPesos = true;
+        }
+
+        // Extract exam date
+        var dataExtraida = window.MentorIA.extrairDataProva(texto);
+        if (dataExtraida) {
+          document.getElementById('dataProva').value = dataExtraida;
+          console.log('[Link] Data da prova:', dataExtraida);
+        }
+
+        // Extract banca
+        var banca = window.MentorIA.extrairBanca(texto);
+
+        if (materias.length === 0) {
+          statusDiv.innerHTML = '<p style="color:#C53030;font-size:0.82rem">Nao encontramos materias estruturadas no documento. Tente baixar o PDF e usar o upload, ou insira as materias manualmente.</p>';
+          btn.disabled = false;
+          btn.textContent = '🔍 Importar';
+          return;
+        }
+
+        // Success! Set all data
+        _materiasExtraidasEdital = materias;
+        _rennoPrioridade = true;
+        selectedConcurso = document.getElementById('editalCargoInput').value.trim() || 'Analise Renno';
+
+        // Show success in status
+        statusDiv.innerHTML = '<div style="padding:10px;background:rgba(56,161,105,0.08);border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm)">'
+          + '<strong style="color:var(--success);font-size:0.85rem">⭐ ' + materias.length + ' materias importadas com sucesso!</strong>'
+          + (banca ? '<span style="margin-left:8px;font-size:0.75rem;color:var(--text-light)">Banca: ' + banca + '</span>' : '')
+          + (dataExtraida ? '<span style="margin-left:8px;font-size:0.75rem;color:var(--text-light)">Prova: ' + new Date(dataExtraida).toLocaleDateString('pt-BR') + '</span>' : '')
+          + '</div>';
+
+        // Show materias preview
+        document.getElementById('editalResultTitle').innerHTML =
+          '⭐ <strong>Analise importada via link</strong> — ' + materias.length + ' materias';
+        if (typeof renderTabelaTriangulada === 'function') {
+          renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null);
+        } else {
+          renderTabelaMaterias(_materiasExtraidasEdital, pesos);
+        }
+        document.getElementById('editalMateriasPreview').style.display = '';
+        document.getElementById('editalPesoQuestion').style.display = pesos._encontrouPesos ? 'none' : '';
+        document.getElementById('btnProcessarEdital').style.display = 'none';
+        document.getElementById('rennoDetectedBanner').style.display = isRenno ? '' : 'none';
+
+        btn.disabled = false;
+        btn.textContent = '✓ Importado';
+        btn.style.background = 'var(--success)';
+
+      } catch (e) {
+        console.error('[Link] Erro:', e);
+        statusDiv.innerHTML = '<p style="color:#C53030;font-size:0.82rem">Erro ao importar: ' + e.message + '. Tente baixar o PDF e usar o upload.</p>';
+        btn.disabled = false;
+        btn.textContent = '🔍 Importar';
+      }
     }
 
     // =============================================

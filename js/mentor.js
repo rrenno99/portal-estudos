@@ -970,7 +970,76 @@ function triangularDados(materiasPDF, pesquisaWeb, bancaDetectada, pesosEdital) 
 }
 
 // =============================================
-//  13. IMPORTADOR ANALISE RENNO (PDF/DOCX)
+//  13a. FETCH GOOGLE DOCS AS TEXT
+// =============================================
+
+function googleDocsToExportUrl(url) {
+  // Convert Google Docs URL to plain text export
+  // https://docs.google.com/document/d/XXXXX/edit -> /export?format=txt
+  var match = url.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    return 'https://docs.google.com/document/d/' + match[1] + '/export?format=txt';
+  }
+  // Google Drive file link
+  var driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch) {
+    return 'https://drive.google.com/uc?export=download&id=' + driveMatch[1];
+  }
+  return null;
+}
+
+async function fetchTextoDeUrl(url) {
+  // Try direct fetch first
+  var exportUrl = googleDocsToExportUrl(url);
+  var urlsToTry = [];
+
+  if (exportUrl) urlsToTry.push(exportUrl);
+  urlsToTry.push(url);
+
+  for (var i = 0; i < urlsToTry.length; i++) {
+    try {
+      // Try via CORS proxy
+      var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(urlsToTry[i]);
+      var response = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (response.ok) {
+        var text = await response.text();
+        // Strip HTML if the response is HTML
+        if (text.indexOf('<html') !== -1 || text.indexOf('<!DOCTYPE') !== -1) {
+          var temp = document.createElement('div');
+          temp.innerHTML = text;
+          text = temp.textContent || temp.innerText || '';
+        }
+        if (text.length > 100) {
+          console.log('[Fetch] Texto obtido de URL:', text.length, 'chars');
+          return text;
+        }
+      }
+    } catch (e) {
+      console.log('[Fetch] Tentativa', i + 1, 'falhou:', e.message);
+    }
+
+    // Try direct (no proxy)
+    try {
+      var resp = await fetch(urlsToTry[i], { mode: 'cors', signal: AbortSignal.timeout(10000) });
+      if (resp.ok) {
+        var text = await resp.text();
+        if (text.indexOf('<html') !== -1) {
+          var t = document.createElement('div');
+          t.innerHTML = text;
+          text = t.textContent || t.innerText || '';
+        }
+        if (text.length > 100) return text;
+      }
+    } catch (e) {
+      // CORS blocked — expected
+    }
+  }
+
+  return '';
+}
+
+// =============================================
+//  13b. IMPORTADOR ANALISE RENNO (PDF/DOCX)
 //  Detecta e prioriza tabelas estruturadas do
 //  modelo de analise do Prof. Rodrigo Renno
 // =============================================
@@ -1189,6 +1258,8 @@ window.MentorIA = {
   classificarMaterias: classificarMaterias,
   distribuirHoras: distribuirHoras,
   gerarCiclo: gerarCiclo,
+  fetchTextoDeUrl: fetchTextoDeUrl,
+  googleDocsToExportUrl: googleDocsToExportUrl,
   detectarAnaliseRenno: detectarAnaliseRenno,
   extrairTabelaProvas: extrairTabelaProvas,
   buscarPlanoComunidade: buscarPlanoComunidade,
