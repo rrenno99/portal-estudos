@@ -969,6 +969,211 @@ function triangularDados(materiasPDF, pesquisaWeb, bancaDetectada, pesosEdital) 
   return resultado;
 }
 
+// =============================================
+//  13. IMPORTADOR ANALISE RENNO (PDF/DOCX)
+//  Detecta e prioriza tabelas estruturadas do
+//  modelo de analise do Prof. Rodrigo Renno
+// =============================================
+
+function detectarAnaliseRenno(texto) {
+  // Markers that indicate this is a Renno-style analysis document
+  var markers = [
+    /an[aá]lise\s+(?:do\s+)?edital/i,
+    /estrutura\s+das?\s+provas?/i,
+    /conte[uú]do\s+program[aá]tico/i,
+    /pontua[cç][aã]o|pontos?\s+por\s+mat[eé]ria/i,
+    /rodrigo\s+renn[oó]/i,
+    /estrat[eé]gia\s+concursos/i,
+  ];
+  var score = markers.reduce(function(acc, m) { return acc + (m.test(texto) ? 1 : 0); }, 0);
+  return score >= 2; // At least 2 markers = Renno analysis
+}
+
+function extrairTabelaProvas(texto) {
+  // Look for structured table: "Materia | Questoes | Pontos"
+  var materias = [];
+  var linhas = texto.split(/\n/);
+
+  // Find the "Estrutura das Provas" section
+  var dentroTabela = false;
+  var headerFound = false;
+
+  for (var i = 0; i < linhas.length; i++) {
+    var linha = linhas[i].trim();
+
+    if (/estrutura\s+das?\s+provas?|quadro\s+de\s+provas/i.test(linha)) {
+      dentroTabela = true;
+      continue;
+    }
+
+    if (!dentroTabela) continue;
+
+    // Detect header row
+    if (!headerFound && /mat[eé]ria|disciplina/i.test(linha) && /quest|ponto|peso|valor/i.test(linha)) {
+      headerFound = true;
+      continue;
+    }
+
+    // End of table markers
+    if (headerFound && (/^total/i.test(linha) || /conte[uú]do\s+program/i.test(linha) || linha.length < 3)) {
+      if (materias.length > 0) break;
+      continue;
+    }
+
+    if (!headerFound) continue;
+
+    // Parse table row: "Lingua Portuguesa 10 10" or "Lingua Portuguesa | 10 | 10"
+    var parts = linha.split(/[\|\t]/).map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+
+    if (parts.length < 2) {
+      // Try space-separated with numbers at end
+      var m = linha.match(/^(.+?)\s+(\d+)\s+(\d+(?:[.,]\d+)?)/);
+      if (m) {
+        parts = [m[1].trim(), m[2], m[3]];
+      }
+    }
+
+    if (parts.length >= 2) {
+      var nome = parts[0].replace(/^\d+[\.\)]\s*/, '').trim();
+      if (nome.length < 3 || nome.length > 60) continue;
+      if (/^total|^sub\s*total|^\s*$/i.test(nome)) continue;
+
+      var questoes = 0;
+      var pontos = 0;
+      for (var j = 1; j < parts.length; j++) {
+        var num = parseFloat(parts[j].replace(',', '.'));
+        if (!isNaN(num) && num > 0) {
+          if (questoes === 0) questoes = num;
+          else pontos = num;
+        }
+      }
+
+      materias.push({
+        nome: nome,
+        questoes: questoes,
+        pontos: pontos || questoes,
+        topicos: '',
+        fonte: 'analise_renno'
+      });
+    }
+  }
+
+  // Now try to enrich with topics from "Conteudo Programatico" section
+  var dentroConteudo = false;
+  var materiaAtual = null;
+
+  for (var i = 0; i < linhas.length; i++) {
+    var linha = linhas[i].trim();
+    if (/conte[uú]do\s+program[aá]tico/i.test(linha)) {
+      dentroConteudo = true;
+      continue;
+    }
+    if (!dentroConteudo) continue;
+
+    // Check if this line is a materia name from our list
+    var matchedMateria = materias.find(function(m) {
+      return linha.toLowerCase().indexOf(m.nome.toLowerCase()) !== -1;
+    });
+
+    if (matchedMateria) {
+      materiaAtual = matchedMateria;
+      continue;
+    }
+
+    // Sub-items (topics) for the current materia
+    if (materiaAtual && /^\d+[\.\)]|^[a-z]\)|^[-–•]/.test(linha)) {
+      var topico = linha.replace(/^\d+[\.\)]\s*/, '').replace(/^[a-z]\)\s*/, '').replace(/^[-–•]\s*/, '').trim();
+      if (topico.length > 2 && topico.length < 80) {
+        materiaAtual.topicos = materiaAtual.topicos ? materiaAtual.topicos + ', ' + topico : topico;
+      }
+    }
+
+    // End if we hit another major section
+    if (/^(?:CARGO|T[IÍ]TULO|CAP[IÍ]TULO|ANEXO|DAS\s+DISPOSI)/i.test(linha) && materias.length > 0) {
+      break;
+    }
+  }
+
+  console.log('[Renno] Tabela de provas extraida:', materias.length, 'materias');
+  return materias;
+}
+
+// =============================================
+//  14. COMMUNITY PLANS — Busca e Publicacao
+// =============================================
+
+async function buscarPlanoComunidade(supabase, concurso, cargo) {
+  if (!supabase) return null;
+
+  try {
+    // Search by cargo first (most specific)
+    var cargoLower = (cargo || '').toLowerCase().trim();
+    var concursoLower = (concurso || '').toLowerCase().trim();
+
+    var { data, error } = await supabase
+      .from('community_plans')
+      .select('*')
+      .order('votos', { ascending: false })
+      .limit(5);
+
+    if (error || !data || data.length === 0) return null;
+
+    // Score each plan by relevance
+    var best = null;
+    var bestScore = 0;
+
+    data.forEach(function(plan) {
+      var score = 0;
+      if (cargoLower && plan.cargo.toLowerCase().indexOf(cargoLower) !== -1) score += 10;
+      if (concursoLower && plan.orgao.toLowerCase().indexOf(concursoLower) !== -1) score += 5;
+      // Partial word match
+      cargoLower.split(/\s+/).forEach(function(w) {
+        if (w.length > 2 && plan.cargo.toLowerCase().indexOf(w) !== -1) score += 2;
+      });
+      score += Math.min(plan.votos, 10); // cap vote bonus
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = plan;
+      }
+    });
+
+    if (bestScore >= 5) {
+      console.log('[Community] Plano encontrado:', best.orgao, best.cargo, 'votos:', best.votos);
+      return best;
+    }
+  } catch (e) {
+    console.error('[Community] Erro na busca:', e);
+  }
+  return null;
+}
+
+async function publicarPlanoComunidade(supabase, userId, concurso, cargo, subjects, dataProva, horasSemanais, trilha) {
+  if (!supabase || !userId) return;
+
+  try {
+    var materias = subjects.map(function(s) {
+      return { nome: s.nome, aulas: s.aulas, link: s.link || '' };
+    });
+
+    // Upsert: if same orgao+cargo exists, update if our version is newer
+    var { error } = await supabase.from('community_plans').upsert({
+      orgao: concurso || 'Personalizado',
+      cargo: cargo || concurso || 'Geral',
+      materias: materias,
+      data_prova: dataProva,
+      horas_semanais: horasSemanais,
+      trilha: trilha,
+      criado_por: userId
+    }, { onConflict: 'orgao,cargo' });
+
+    if (error) console.error('[Community] Erro ao publicar:', error.message);
+    else console.log('[Community] Plano publicado:', concurso, cargo);
+  } catch (e) {
+    console.error('[Community] Erro:', e);
+  }
+}
+
 // Export for use in criar-plano.html
 window.MentorIA = {
   gerarPlanoInteligente: gerarPlanoInteligente,
@@ -984,5 +1189,9 @@ window.MentorIA = {
   classificarMaterias: classificarMaterias,
   distribuirHoras: distribuirHoras,
   gerarCiclo: gerarCiclo,
+  detectarAnaliseRenno: detectarAnaliseRenno,
+  extrairTabelaProvas: extrairTabelaProvas,
+  buscarPlanoComunidade: buscarPlanoComunidade,
+  publicarPlanoComunidade: publicarPlanoComunidade,
   INCIDENCIA_BANCA: INCIDENCIA_BANCA
 };

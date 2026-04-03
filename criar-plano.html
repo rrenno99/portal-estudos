@@ -443,6 +443,19 @@
         </div>
       </div>
 
+      <!-- Community plan banner (shown when a matching plan is found) -->
+      <div id="communityPlanBanner" style="display:none;padding:14px;background:linear-gradient(135deg,#F0FFF4,#fff);border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:1.2rem">👥</span>
+          <strong style="font-size:0.88rem;color:var(--secondary)" id="communityPlanTitle">Plano encontrado!</strong>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:10px" id="communityPlanDesc"></p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="carregarPlanoComunidade()" style="font-size:0.82rem;padding:8px 16px">Carregar materias validadas</button>
+          <button class="btn-add-cancel" onclick="document.getElementById('communityPlanBanner').style.display='none'" style="font-size:0.82rem">Nao, obrigado</button>
+        </div>
+      </div>
+
       <!-- Edital upload (shown when "Outro Concurso" selected) -->
       <div id="editalUploadGroup" style="display:none">
         <div class="form-group">
@@ -1129,14 +1142,20 @@
       el.classList.add('selected');
       selectedConcurso = el.textContent.trim();
 
-      // Show/hide upload area for "Outro Concurso"
       var isOutro = selectedConcurso.includes('Outro Concurso');
       document.getElementById('editalUploadGroup').style.display = isOutro ? '' : 'none';
+      document.getElementById('communityPlanBanner').style.display = 'none';
       if (isOutro) selectedConcurso = '';
-      // Reset edital state when switching
+
+      // Reset edital state
       _materiasExtraidasEdital = [];
       _textoEditalCompleto = '';
       _textoEditalFiltrado = '';
+
+      // Search community plans for known concursos
+      if (!isOutro && selectedConcurso) {
+        buscarComunidade(selectedConcurso, selectedConcurso);
+      }
     }
 
     function selectNivel(el) {
@@ -1343,7 +1362,7 @@
     var _textoEditalFiltrado = '';
     var _materiasExtraidasEdital = [];
 
-    function handleEditalUpload(input) {
+    async function handleEditalUpload(input) {
       if (!input.files || !input.files[0]) return;
       editalFile = input.files[0];
 
@@ -1352,12 +1371,45 @@
       document.getElementById('editalFileName').textContent = '✓ ' + editalFile.name;
       document.getElementById('editalFileName').style.display = '';
 
-      // Show the analyze button
       document.getElementById('btnProcessarEdital').style.display = '';
-      // Reset previous results
       document.getElementById('editalMateriasPreview').style.display = 'none';
       document.getElementById('editalFallback').style.display = 'none';
-      _textoEditalCompleto = '';
+
+      // Pre-extract text to detect Renno analysis format
+      try {
+        _textoEditalCompleto = await window.MentorIA.extrairTextoPDF(editalFile);
+
+        if (window.MentorIA.detectarAnaliseRenno(_textoEditalCompleto)) {
+          console.log('[Edital] Analise Renno detectada! Usando importador especializado.');
+          var materiasRenno = window.MentorIA.extrairTabelaProvas(_textoEditalCompleto);
+          if (materiasRenno.length > 0) {
+            _materiasExtraidasEdital = materiasRenno;
+            // Show results immediately
+            document.getElementById('editalResultTitle').innerHTML =
+              '📊 <strong>Analise de Edital Renno detectada!</strong> ' + materiasRenno.length + ' materias com pesos.';
+            var pesos = {};
+            materiasRenno.forEach(function(m) { if (m.pontos) pesos[m.nome] = m.pontos; });
+            pesos._encontrouPesos = true;
+            renderTabelaTriangulada ? renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null) : renderTabelaMaterias(_materiasExtraidasEdital, pesos);
+            document.getElementById('editalMateriasPreview').style.display = '';
+            document.getElementById('editalPesoQuestion').style.display = 'none';
+            document.getElementById('btnProcessarEdital').style.display = 'none';
+
+            // Auto-fill cargo from document
+            var cargoInput = document.getElementById('editalCargoInput');
+            if (cargoInput && !cargoInput.value) {
+              var cargos = window.MentorIA.extrairCargos(_textoEditalCompleto);
+              if (cargos.length > 0) cargoInput.value = cargos[0];
+            }
+
+            selectedConcurso = document.getElementById('editalCargoInput').value || 'Analise Renno';
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('[Edital] Pre-extracao falhou:', e.message);
+        _textoEditalCompleto = '';
+      }
     }
 
     async function processarEditalComCargo() {
@@ -1773,9 +1825,10 @@
           var escapedNome = s.nome.replace(/'/g, "\\'");
           html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;align-items:center;justify-content:space-between" data-resumo-materia="' + s.nome + '">';
           html += '<span><strong style="color:var(--secondary)">' + s.nome + '</strong>' + nivelLabel + '</span>';
-          html += '<span style="display:flex;align-items:center;gap:8px">';
+          html += '<span style="display:flex;align-items:center;gap:6px">';
           html += '<span style="font-size:0.75rem;color:var(--text-lighter)">' + s.aulas + ' aulas</span>';
-          html += '<button onclick="removerMateriaResumo(\'' + escapedNome + '\')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text-lighter);padding:2px 4px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.color=\'#E53E3E\'" onmouseout="this.style.color=\'var(--text-lighter)\'" title="Remover materia">🗑</button>';
+          html += '<button onclick="editarMateriaResumo(\'' + escapedNome + '\')" style="background:none;border:none;cursor:pointer;font-size:0.82rem;color:var(--text-lighter);padding:2px 4px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.color=\'var(--primary)\'" onmouseout="this.style.color=\'var(--text-lighter)\'" title="Editar materia">✏️</button>';
+          html += '<button onclick="removerMateriaResumo(\'' + escapedNome + '\')" style="background:none;border:none;cursor:pointer;font-size:0.82rem;color:var(--text-lighter);padding:2px 4px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.color=\'#E53E3E\'" onmouseout="this.style.color=\'var(--text-lighter)\'" title="Remover materia">🗑</button>';
           html += '</span></div>';
         });
         materiasList.innerHTML = html;
@@ -1935,6 +1988,103 @@
 
       btn.disabled = !habilitado;
       btn.style.opacity = habilitado ? '1' : '0.5';
+    }
+
+    // =============================================
+    //  EDIT MATERIA IN REVIEW
+    // =============================================
+    function editarMateriaResumo(nome) {
+      var row = document.querySelector('[data-resumo-materia="' + nome + '"]');
+      if (!row) return;
+      var strongEl = row.querySelector('strong');
+      if (!strongEl) return;
+
+      var currentName = nome;
+      // Replace the name with an inline input
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentName;
+      input.className = 'form-control';
+      input.style.cssText = 'font-size:0.85rem;padding:4px 8px;width:auto;max-width:250px;display:inline';
+
+      input.onkeydown = function(e) {
+        if (e.key === 'Enter') salvarEdicao();
+        if (e.key === 'Escape') cancelarEdicao();
+      };
+      input.onblur = function() { setTimeout(salvarEdicao, 150); };
+
+      strongEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      function salvarEdicao() {
+        var novoNome = input.value.trim();
+        if (!novoNome) novoNome = currentName;
+
+        // Update in step 2 DOM
+        document.querySelectorAll('.subject-card.selected').forEach(function(card) {
+          if (card.getAttribute('data-subject') === currentName) {
+            card.setAttribute('data-subject', novoNome);
+            var nameEl = card.querySelector('.subject-card-info strong');
+            if (nameEl) nameEl.textContent = novoNome;
+          }
+        });
+
+        // Rebuild the row
+        row.setAttribute('data-resumo-materia', novoNome);
+        var newStrong = document.createElement('strong');
+        newStrong.style.color = 'var(--secondary)';
+        newStrong.textContent = novoNome;
+        if (input.parentNode) input.replaceWith(newStrong);
+      }
+
+      function cancelarEdicao() {
+        var newStrong = document.createElement('strong');
+        newStrong.style.color = 'var(--secondary)';
+        newStrong.textContent = currentName;
+        if (input.parentNode) input.replaceWith(newStrong);
+      }
+    }
+
+    // =============================================
+    //  COMMUNITY PLANS
+    // =============================================
+    var _planoComunidade = null;
+
+    async function buscarComunidade(concurso, cargo) {
+      try {
+        var authModule = await import('./js/supabase.js');
+        var sb = authModule.supabase;
+        _planoComunidade = await window.MentorIA.buscarPlanoComunidade(sb, concurso, cargo);
+
+        if (_planoComunidade) {
+          var banner = document.getElementById('communityPlanBanner');
+          banner.style.display = '';
+          document.getElementById('communityPlanTitle').textContent =
+            'Plano encontrado para ' + _planoComunidade.orgao + ' — ' + _planoComunidade.cargo;
+          document.getElementById('communityPlanDesc').textContent =
+            _planoComunidade.materias.length + ' materias validadas por outros alunos. Deseja carregar?';
+        }
+      } catch (e) {
+        console.log('[Community] Busca falhou:', e.message);
+      }
+    }
+
+    function carregarPlanoComunidade() {
+      if (!_planoComunidade || !_planoComunidade.materias) return;
+
+      _materiasExtraidasEdital = _planoComunidade.materias.map(function(m) {
+        return { nome: m.nome, topicos: '', fonte: 'comunidade' };
+      });
+
+      selectedConcurso = _planoComunidade.orgao || selectedConcurso;
+      if (_planoComunidade.data_prova) {
+        document.getElementById('dataProva').value = _planoComunidade.data_prova;
+      }
+
+      document.getElementById('communityPlanBanner').style.display = 'none';
+      // Signal to load these subjects in step 2
+      alert('Materias carregadas! Clique em "Proximo" para ver e ajustar.');
     }
 
     // =============================================
@@ -2225,6 +2375,15 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
       console.log('[Plano] Concluído! Salvo no Supabase:', savedToSupabase);
+
+      // Publish to community plans (best-effort, non-blocking)
+      if (savedToSupabase && subjects.length > 0) {
+        try {
+          var authMod = await import('./js/supabase.js');
+          var cargoFinal = (document.getElementById('editalCargoInput') && document.getElementById('editalCargoInput').value.trim()) || selectedConcurso;
+          window.MentorIA.publicarPlanoComunidade(authMod.supabase, user.id, selectedConcurso, cargoFinal, subjects, dataProva, horasSemanais, selectedTrilha);
+        } catch (e) { console.log('[Community] Publicacao falhou:', e.message); }
+      }
     }
   </script>
 
