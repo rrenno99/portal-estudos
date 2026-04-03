@@ -638,10 +638,24 @@
       </div>
     </div>
 
-    <!-- STEP 4: Horarios -->
+    <!-- STEP 4: Disponibilidade -->
     <div class="wizard-card" id="step4" style="display:none;">
       <h2>Qual sua disponibilidade de estudo?</h2>
-      <p>Informe quando e por quanto tempo você pode estudar durante a semana.</p>
+      <p>Selecione os dias e a carga horaria. Dias nao marcados serao automaticamente dias de descanso.</p>
+
+      <div class="form-group">
+        <label>Quais dias voce pode estudar?</label>
+        <div class="chips" id="diasEstudo">
+          <div class="chip selected" onclick="toggleDay(this)">Segunda</div>
+          <div class="chip selected" onclick="toggleDay(this)">Terca</div>
+          <div class="chip selected" onclick="toggleDay(this)">Quarta</div>
+          <div class="chip selected" onclick="toggleDay(this)">Quinta</div>
+          <div class="chip selected" onclick="toggleDay(this)">Sexta</div>
+          <div class="chip" onclick="toggleDay(this)">Sabado</div>
+          <div class="chip" onclick="toggleDay(this)">Domingo</div>
+        </div>
+        <div class="form-hint">Dias nao selecionados = descanso. Sua sequencia (🔥) nao zera nesses dias.</div>
+      </div>
 
       <div class="form-group">
         <label>Quantas horas por dia voce pode estudar?</label>
@@ -665,40 +679,10 @@
             </div>
           </div>
         </div>
-        <div class="form-hint">Ajuste em intervalos de 30 minutos (0,5h). Ex: 4,5h = 4h30min.</div>
+        <div class="form-hint">Ajuste de 30 em 30 min. Ex: 4,5h = 4h30min.</div>
       </div>
 
-      <div class="form-group">
-        <label>Quais dias você pode estudar?</label>
-        <div class="chips" id="diasEstudo">
-          <div class="chip selected" onclick="toggleDay(this)">Segunda</div>
-          <div class="chip selected" onclick="toggleDay(this)">Terça</div>
-          <div class="chip selected" onclick="toggleDay(this)">Quarta</div>
-          <div class="chip selected" onclick="toggleDay(this)">Quinta</div>
-          <div class="chip selected" onclick="toggleDay(this)">Sexta</div>
-          <div class="chip" onclick="toggleDay(this)">Sábado</div>
-          <div class="chip" onclick="toggleDay(this)">Domingo</div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Qual turno você prefere?</label>
-        <div class="chips">
-          <div class="chip selected" onclick="selectTurno(this)">Manhã (6h-12h)</div>
-          <div class="chip" onclick="selectTurno(this)">Tarde (12h-18h)</div>
-          <div class="chip" onclick="selectTurno(this)">Noite (18h-23h)</div>
-          <div class="chip" onclick="selectTurno(this)">Flexível</div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Dia de descanso semanal</label>
-        <select class="form-control">
-          <option value="dom" selected>Domingo</option>
-          <option value="sab">Sábado</option>
-          <option value="nenhum">Nenhum (estudo todos os dias)</option>
-        </select>
-        <div class="form-hint">Recomendamos pelo menos 1 dia de descanso por semana para melhor rendimento.</div>
+      <div id="resumoCargaPreview" style="margin-top:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--text-light)">
       </div>
 
       <div class="wizard-actions">
@@ -735,7 +719,7 @@
             <div style="font-weight: 700; color: var(--secondary);" id="resumoDias">—</div>
           </div>
           <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Turno Preferido</div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Dias de Descanso</div>
             <div style="font-weight: 700; color: var(--secondary);" id="resumoTurno">—</div>
           </div>
         </div>
@@ -1281,25 +1265,50 @@
     // =============================================
     //  STEP 3 HELPERS
     // =============================================
-    function toggleDay(el) { el.classList.toggle('selected'); }
+    function toggleDay(el) {
+      el.classList.toggle('selected');
+      atualizarResumoCarga();
+    }
 
     function ajustarHoras(inputId, delta) {
       var input = document.getElementById(inputId);
       var val = parseFloat(input.value) || 0;
-      val = Math.round((val + delta) * 2) / 2; // snap to 0.5
+      val = Math.round((val + delta) * 2) / 2;
       val = Math.max(0, Math.min(16, val));
       input.value = val;
+      atualizarResumoCarga();
     }
 
     function validarHoras(input, fallback) {
       var val = parseFloat(input.value);
       if (isNaN(val) || val < 0) {
         input.value = fallback;
-        return;
+      } else {
+        val = Math.round(val * 2) / 2;
+        val = Math.max(0, Math.min(16, val));
+        input.value = val;
       }
-      val = Math.round(val * 2) / 2; // snap to 0.5
-      val = Math.max(0, Math.min(16, val));
-      input.value = val;
+      atualizarResumoCarga();
+    }
+
+    function atualizarResumoCarga() {
+      var dias = [];
+      document.querySelectorAll('#diasEstudo .chip.selected').forEach(function(c) { dias.push(c.textContent); });
+      var hUteis = parseFloat(document.getElementById('horasUteis').value) || 0;
+      var hFds = parseFloat(document.getElementById('horasFds').value) || 0;
+      var nUteis = dias.filter(function(d) { return !['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var nFds = dias.filter(function(d) { return ['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var total = (nUteis * hUteis) + (nFds * hFds);
+      var descanso = 7 - dias.length;
+
+      var preview = document.getElementById('resumoCargaPreview');
+      if (preview) {
+        preview.innerHTML = '<strong style="color:var(--secondary)">' + total + 'h/semana</strong>'
+          + ' (' + dias.length + ' dias de estudo'
+          + (descanso > 0 ? ', ' + descanso + ' de descanso' : '') + ')'
+          + '<br><span style="font-size:0.78rem">' + nUteis + ' dias uteis × ' + hUteis + 'h'
+          + (nFds > 0 ? ' + ' + nFds + ' fds × ' + hFds + 'h' : '') + '</span>';
+      }
     }
 
     function selectTurno(el) {
@@ -1675,8 +1684,8 @@
 
       const horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
       const horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
-      const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
-      const diasFds = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
+      const diasUteis = selectedDays.filter(d => !['Sabado','Sábado','Domingo'].includes(d)).length;
+      const diasFds = selectedDays.filter(d => ['Sabado','Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
 
       document.getElementById('resumoConcurso').textContent = selectedConcurso || 'Não selecionado';
@@ -1685,16 +1694,9 @@
       document.getElementById('resumoHoras').textContent = horasSemanais + 'h/semana (' + diasUteis + ' dias úteis × ' + horasUteis + 'h' + (diasFds > 0 ? ' + ' + diasFds + ' fim de semana × ' + horasFds + 'h' : '') + ')';
       document.getElementById('resumoDias').textContent = selectedDays.join(', ') || '—';
 
-      // Find turno
-      let turnoText = 'Manhã';
-      document.querySelectorAll('#step4 .chips').forEach(chipsGroup => {
-        chipsGroup.querySelectorAll('.chip').forEach(c => {
-          if (c.classList.contains('selected') && c.textContent.includes('h)')) {
-            turnoText = c.textContent.split(' (')[0];
-          }
-        });
-      });
-      document.getElementById('resumoTurno').textContent = turnoText;
+      var turnoText = 'Flexivel';
+      var diasDescanso = 7 - selectedDays.length;
+      document.getElementById('resumoTurno').textContent = diasDescanso > 0 ? diasDescanso + ' dia' + (diasDescanso > 1 ? 's' : '') + '/semana' : 'Nenhum';
 
       // Links review
       const linksDiv = document.getElementById('resumoLinks');
@@ -1788,14 +1790,7 @@
       const selectedDays = [];
       document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
 
-      let turnoText = 'Manhã';
-      document.querySelectorAll('#step4 .chips').forEach(chipsGroup => {
-        chipsGroup.querySelectorAll('.chip').forEach(c => {
-          if (c.classList.contains('selected') && c.textContent.includes('h)')) {
-            turnoText = c.textContent;
-          }
-        });
-      });
+      var turnoText = 'Flexivel';
 
       const dataProva = document.getElementById('dataProva').value || null;
       const editalLink = document.getElementById('editalLink') ? document.getElementById('editalLink').value.trim() : '';
@@ -1804,8 +1799,8 @@
       const email = user.email;
       const horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
       const horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
-      const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
-      const diasFdsCount = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
+      const diasUteis = selectedDays.filter(d => !['Sabado','Sábado','Domingo'].includes(d)).length;
+      const diasFdsCount = selectedDays.filter(d => ['Sabado','Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFdsCount * horasFds);
 
       const HORAS_POR_MATERIA = 50;
@@ -1851,7 +1846,7 @@
           data_prova: dataProva,
           horas_semanais: horasSemanais,
           turno_preferido: turnoText,
-          dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo',
+          dia_descanso: selectedDays.length >= 7 ? 'Nenhum' : 'Auto',
           trilha_revisao: selectedTrilha,
           edital_link: editalLink || null
         };
