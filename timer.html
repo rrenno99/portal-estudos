@@ -10,135 +10,228 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱</text></svg>">
   <style>
     :root {
-      --primary: #1E88E5;
-      --primary-dark: #1565C0;
-      --secondary: #1A1A2E;
-      --bg: #F5F6FA;
-      --bg-card: #FFFFFF;
-      --text: #2D3748;
-      --text-light: #718096;
-      --text-lighter: #A0AEC0;
-      --border: #E2E8F0;
-      --success: #38A169;
+      --primary: #42A5F5;
+      --primary-dark: #1E88E5;
+      --bg: #0F1923;
+      --bg-card: #1A2634;
+      --bg-elevated: #223344;
+      --text: #E8EDF2;
+      --text-light: #8899AA;
+      --text-lighter: #556677;
+      --border: #2A3A4A;
+      --success: #4CAF50;
+      --warning: #FF9800;
       --radius: 12px;
       --radius-sm: 8px;
       --transition: all 0.2s ease;
+      --ring-size: min(45vw, 45vh, 180px);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
     body {
       font-family: 'Inter', -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
+    /* Header - collapses when very small */
     .timer-header {
-      padding: 14px 20px;
-      background: var(--secondary);
-      color: white;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-shrink: 0;
     }
-    .timer-header h1 { font-size: 0.88rem; font-weight: 600; }
-    .timer-header .materia { font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 2px; }
+    .timer-header h1 { font-size: 0.78rem; font-weight: 600; color: var(--text-light); }
+    .timer-header .materia {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 80vw;
+    }
 
+    /* Body - centers the ring, fills available space */
     .timer-body {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px 20px;
+      padding: 12px 16px;
+      min-height: 0;
     }
 
+    /* Ring - scales with viewport */
     .timer-ring {
-      width: 180px; height: 180px;
+      width: var(--ring-size);
+      height: var(--ring-size);
       position: relative;
-      margin-bottom: 20px;
+      margin-bottom: clamp(8px, 2vh, 20px);
+      flex-shrink: 0;
     }
-    .timer-ring svg { transform: rotate(-90deg); width: 180px; height: 180px; }
-    .ring-bg { fill: none; stroke: var(--border); stroke-width: 5; }
-    .ring-fill { fill: none; stroke: var(--primary); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .timer-ring svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 4; }
+    .ring-fill { fill: none; stroke: var(--primary); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
     .ring-center {
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
+
+    /* Timer display - scales with container */
     .timer-display {
-      font-size: 2.8rem;
+      font-size: clamp(1.6rem, 8vw, 2.8rem);
       font-weight: 800;
-      color: var(--secondary);
+      color: var(--text);
       font-variant-numeric: tabular-nums;
       letter-spacing: 1px;
+      line-height: 1;
     }
     .timer-status {
-      font-size: 0.82rem;
+      font-size: clamp(0.65rem, 2vw, 0.82rem);
       font-weight: 600;
       margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .timer-status.running { color: var(--success); }
-    .timer-status.paused  { color: #FF9800; }
+    .timer-status.paused  { color: var(--warning); }
     .timer-status.stopped { color: var(--text-lighter); }
 
+    /* Controls */
     .timer-controls {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       justify-content: center;
       flex-wrap: wrap;
-      margin-top: 8px;
     }
     .btn {
-      padding: 12px 22px; border-radius: var(--radius-sm);
-      font-size: 0.88rem; font-weight: 600; border: none;
-      cursor: pointer; transition: var(--transition);
+      padding: clamp(8px, 2vh, 12px) clamp(14px, 4vw, 22px);
+      border-radius: var(--radius-sm);
+      font-size: clamp(0.75rem, 2.5vw, 0.88rem);
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: var(--transition);
       font-family: inherit;
     }
     .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: scale(0.97); }
     .btn.start  { background: var(--success); color: white; }
-    .btn.pause  { background: #FF9800; color: white; }
+    .btn.pause  { background: var(--warning); color: white; }
     .btn.finish { background: var(--primary); color: white; }
-    .btn.cancel { background: var(--bg-card); color: var(--text-light); border: 1.5px solid var(--border); }
+    .btn.cancel { background: var(--bg-elevated); color: var(--text-light); border: 1px solid var(--border); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
+    /* Footer */
     .timer-footer {
-      padding: 10px 20px;
+      padding: 8px 16px;
       border-top: 1px solid var(--border);
-      font-size: 0.72rem;
+      font-size: 0.65rem;
       color: var(--text-lighter);
       text-align: center;
+      flex-shrink: 0;
     }
 
     /* Feedback view */
-    .feedback { display: none; padding: 24px 20px; }
-    .feedback.show { display: block; }
-    .feedback h4 { font-size: 0.95rem; font-weight: 700; color: var(--secondary); margin-bottom: 16px; text-align: center; }
-    .feedback-option {
-      display: flex; align-items: center; gap: 12px;
-      padding: 14px 16px; border-radius: var(--radius-sm);
-      border: 1.5px solid var(--border); background: var(--bg-card);
-      cursor: pointer; margin-bottom: 10px; transition: var(--transition);
-      width: 100%; text-align: left; font-family: inherit; font-size: 0.88rem;
+    .feedback {
+      display: none;
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
     }
-    .feedback-option:hover { border-color: var(--primary); background: rgba(30,136,229,0.04); }
+    .feedback.show { display: flex; flex-direction: column; }
+    .feedback h4 {
+      font-size: clamp(0.82rem, 2.5vw, 0.95rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .feedback-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: clamp(10px, 2vh, 14px) 12px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg-card);
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: var(--transition);
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+      font-size: clamp(0.78rem, 2.5vw, 0.88rem);
+      color: var(--text);
+      flex-shrink: 0;
+    }
+    .feedback-option:hover { border-color: var(--primary); background: var(--bg-elevated); }
     .feedback-option:disabled { opacity: 0.5; pointer-events: none; }
     .fb-icon {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.1rem; flex-shrink: 0;
+      width: clamp(28px, 8vw, 36px);
+      height: clamp(28px, 8vw, 36px);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.85rem, 3vw, 1.1rem);
+      flex-shrink: 0;
     }
-    .fb-icon.green  { background: #E8F5E9; }
-    .fb-icon.orange { background: #FFF3E0; }
-    .fb-icon.gray   { background: var(--bg); }
-    .fb-text strong { display: block; font-size: 0.85rem; color: var(--text); }
-    .fb-text span   { font-size: 0.75rem; color: var(--text-light); }
+    .fb-icon.green  { background: rgba(76,175,80,0.15); }
+    .fb-icon.orange { background: rgba(255,152,0,0.15); }
+    .fb-icon.gray   { background: var(--bg-elevated); }
+    .fb-text strong { display: block; font-size: clamp(0.75rem, 2.2vw, 0.85rem); color: var(--text); }
+    .fb-text span   { font-size: clamp(0.65rem, 1.8vw, 0.75rem); color: var(--text-light); }
 
     /* Pomodoro flash */
     .pomodoro-flash { animation: pomFlash 0.5s ease 3; }
     @keyframes pomFlash {
       0%, 100% { background: var(--bg); }
-      50% { background: rgba(30,136,229,0.1); }
+      50% { background: rgba(66,165,245,0.08); }
+    }
+
+    /* Very small windows: hide non-essential elements */
+    @media (max-height: 350px) {
+      .timer-header { padding: 6px 12px; }
+      .timer-header h1 { display: none; }
+      .timer-footer { display: none; }
+      .timer-body { padding: 8px 12px; }
+    }
+
+    @media (max-width: 280px) {
+      .timer-header h1 { display: none; }
+      .timer-footer { display: none; }
+      .btn { padding: 8px 12px; font-size: 0.75rem; }
+    }
+
+    /* Ultra-compact: ring hidden, just show time + buttons */
+    @media (max-height: 250px) {
+      .timer-ring { display: none; }
+      .timer-display {
+        font-size: clamp(1.8rem, 12vw, 3rem);
+        margin-bottom: 8px;
+      }
+      .timer-status { margin-bottom: 8px; }
+      .timer-body {
+        padding: 8px;
+        justify-content: center;
+      }
     }
   </style>
 </head>
@@ -152,7 +245,7 @@
 
   <div class="timer-body" id="timerBodyView">
     <div class="timer-ring">
-      <svg viewBox="0 0 180 180">
+      <svg viewBox="0 0 180 180" preserveAspectRatio="xMidYMid meet">
         <circle class="ring-bg" cx="90" cy="90" r="80"></circle>
         <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="80"
           stroke-dasharray="502.65" stroke-dashoffset="0"></circle>
