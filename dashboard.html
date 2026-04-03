@@ -560,26 +560,69 @@
     .welcome-streak {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       background: linear-gradient(135deg, #EBF5FF, #fff);
       border: 1px solid rgba(30,136,229,0.2);
       padding: 14px 20px;
       border-radius: var(--radius);
       flex-shrink: 0;
+      transition: all 0.5s ease;
     }
 
-    .streak-fire { font-size: 1.8rem; }
+    /* Meta batida: gradiente dourado */
+    .welcome-streak.meta-batida {
+      background: linear-gradient(135deg, #FFF8E1, #FFFDE7, #FFF8E1);
+      border-color: rgba(255,152,0,0.3);
+      box-shadow: 0 0 12px rgba(255,152,0,0.15);
+    }
 
-    .streak-info strong {
-      display: block;
-      font-size: 1.1rem;
+    .streak-fire {
+      font-size: 2rem;
+      transition: all 0.3s ease;
+    }
+    .streak-fire.off {
+      filter: grayscale(1);
+      opacity: 0.35;
+    }
+    .streak-fire.pulse {
+      animation: firePulse 1.5s ease-in-out infinite;
+    }
+
+    .streak-info { display: flex; flex-direction: column; gap: 2px; }
+
+    .streak-info .streak-number {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .streak-info .streak-number strong {
+      font-size: 1.3rem;
       font-weight: 800;
-      color: var(--primary);
+      color: var(--secondary);
+    }
+    .streak-info .streak-number .streak-meta {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-lighter);
     }
 
-    .streak-info span {
-      font-size: 0.78rem;
+    .streak-info .streak-label {
+      font-size: 0.72rem;
       color: var(--text-light);
+    }
+
+    .streak-info .streak-week {
+      margin-top: 4px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+    .streak-info .streak-week-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s ease;
     }
 
     /* =========================================
@@ -1369,13 +1412,9 @@
       font-weight: 600;
     }
 
-    /* Streak fire pulse animation */
-    .streak-fire.pulse {
-      animation: firePulse 1.5s ease-in-out infinite;
-    }
     @keyframes firePulse {
       0%, 100% { transform: scale(1); filter: brightness(1); }
-      50% { transform: scale(1.2); filter: brightness(1.3); }
+      50% { transform: scale(1.15); filter: brightness(1.3); }
     }
 
     /* Celebration modal */
@@ -1983,11 +2022,17 @@
               <a href="criar-plano.html">CRIAR NOVO PLANO</a>
             </p>
           </div>
-          <div class="welcome-streak">
-            <span class="streak-fire">🔥</span>
+          <div class="welcome-streak" id="streakCard">
+            <span class="streak-fire off" id="streakFireIcon">🔥</span>
             <div class="streak-info">
-              <strong id="streakCount">0 dias</strong>
-              <span>em sequência</span>
+              <div class="streak-number">
+                <strong id="streakCount">0</strong>
+                <span class="streak-meta" id="streakMeta">/5 dias</span>
+              </div>
+              <span class="streak-label" id="streakLabel">em sequencia esta semana</span>
+              <div class="streak-week">
+                <div class="streak-week-fill" id="streakWeekFill" style="width:0%;background:var(--primary)"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -3225,9 +3270,7 @@
       if (feedbackTitle) feedbackTitle.innerHTML = '⏳ Salvando sessão...';
 
       // Capture streak before saving
-      var streakAntes = 0;
-      var streakEl = document.getElementById('streakCount');
-      if (streakEl) { var sm = streakEl.textContent.match(/(\d+)/); if (sm) streakAntes = parseInt(sm[1]); }
+      var streakAntes = _streakCount;
 
       try {
         var supabase = window._supabase;
@@ -3476,16 +3519,16 @@
     //  DIAS ESTUDADOS + STREAK
     // =============================================
     var diasEstudadosTotal = 0;
-    var streakAtivo = false;
     var diasEstudadosSemana = 0;
     var metaDiasSemana = 5;
+    var _streakCount = 0;
+    var _estudouHoje = false;
 
     async function carregarDiasEstudados() {
       try {
         var sb = window._supabase;
         if (!sb || !window._userId) return;
 
-        // Get all sessions to count distinct days
         var { data, error } = await sb
           .from('sessoes_estudo')
           .select('data_inicio')
@@ -3502,31 +3545,45 @@
         });
         diasEstudadosTotal = diasSet.size;
 
-        // Check streak: did the student study today AND yesterday?
         var now = new Date();
         var hoje = now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
         var ontem = new Date(now);
         ontem.setDate(ontem.getDate() - 1);
         var ontemStr = ontem.getFullYear() + '-' + (ontem.getMonth()+1) + '-' + ontem.getDate();
 
-        var estudouHoje = diasSet.has(hoje);
+        _estudouHoje = diasSet.has(hoje);
         var estudouOntem = diasSet.has(ontemStr);
-        streakAtivo = estudouHoje && estudouOntem;
 
-        // Count streak length (consecutive days backwards from today)
-        var streakCount = 0;
-        if (estudouHoje) {
+        // Count streak: consecutive days backwards
+        // If studied today: count from today backwards
+        // If NOT today but studied yesterday: keep yesterday's streak (don't reset yet)
+        // If neither today nor yesterday: streak = 0
+        _streakCount = 0;
+        if (_estudouHoje) {
           var checkDate = new Date(now);
           while (true) {
             var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
             if (diasSet.has(key)) {
-              streakCount++;
+              _streakCount++;
+              checkDate.setDate(checkDate.getDate() - 1);
+            } else {
+              break;
+            }
+          }
+        } else if (estudouOntem) {
+          // Haven't studied today yet, but yesterday yes - show yesterday's streak
+          var checkDate = new Date(ontem);
+          while (true) {
+            var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
+            if (diasSet.has(key)) {
+              _streakCount++;
               checkDate.setDate(checkDate.getDate() - 1);
             } else {
               break;
             }
           }
         }
+        // If neither today nor yesterday: _streakCount stays 0
 
         // Count days studied this week (Monday to now)
         var dayOfWeek = now.getDay();
@@ -3547,14 +3604,18 @@
           metaDiasSemana = plan.dias.length;
         }
 
-        // Update UI
-        document.getElementById('statDiasEstudados').textContent = diasEstudadosTotal;
+        // === UPDATE ALL UI ===
+        renderStreakCard();
 
+        // Stats card
+        document.getElementById('statDiasEstudados').textContent = diasEstudadosTotal;
         var badge = document.getElementById('streakBadge');
-        if (streakCount >= 2) {
-          badge.textContent = '🔥 ' + streakCount + ' dias!';
+        if (_streakCount >= 2) {
+          badge.textContent = '🔥 ' + _streakCount + ' dias!';
           badge.style.display = '';
-        } else if (estudouHoje) {
+          badge.style.color = '#E65100';
+          badge.style.background = '#FFF3E0';
+        } else if (_estudouHoje) {
           badge.textContent = '✓ Estudou hoje';
           badge.style.display = '';
           badge.style.color = '#38A169';
@@ -3570,13 +3631,64 @@
             + '<div style="height:4px;background:var(--border);border-radius:4px;margin-top:4px;overflow:hidden">'
             + '<div style="height:100%;width:' + pct + '%;background:' + (diasEstudadosSemana >= metaDiasSemana ? 'var(--success)' : 'var(--primary)') + ';border-radius:4px;transition:width 0.5s"></div></div>';
         }
-
-        // Update streak in welcome area
-        document.getElementById('streakCount').textContent = streakCount > 0 ? streakCount + ' dias' : '0 dias';
-
-        console.log('[Dias] Total:', diasEstudadosTotal, '| Streak:', streakCount, '| Semana:', diasEstudadosSemana + '/' + metaDiasSemana);
       } catch (e) {
         console.error('[Dias] Erro:', e);
+      }
+    }
+
+    function renderStreakCard() {
+      var card = document.getElementById('streakCard');
+      var fireIcon = document.getElementById('streakFireIcon');
+      var countEl = document.getElementById('streakCount');
+      var metaEl = document.getElementById('streakMeta');
+      var labelEl = document.getElementById('streakLabel');
+      var fillEl = document.getElementById('streakWeekFill');
+
+      // Streak number
+      countEl.textContent = _streakCount;
+      metaEl.textContent = '/' + metaDiasSemana + ' dias';
+
+      // Fire icon state
+      if (_estudouHoje) {
+        fireIcon.classList.remove('off');
+        if (_streakCount >= 3) {
+          fireIcon.classList.add('pulse');
+        } else {
+          fireIcon.classList.remove('pulse');
+        }
+      } else {
+        fireIcon.classList.add('off');
+        fireIcon.classList.remove('pulse');
+      }
+
+      // Label
+      if (!_estudouHoje && _streakCount > 0) {
+        labelEl.textContent = 'em sequencia — estude hoje para manter!';
+        labelEl.style.color = 'var(--warning, #FF9800)';
+      } else if (_estudouHoje && diasEstudadosSemana >= metaDiasSemana) {
+        labelEl.textContent = 'meta semanal atingida!';
+        labelEl.style.color = 'var(--success)';
+      } else if (_estudouHoje) {
+        labelEl.textContent = 'em sequencia esta semana';
+        labelEl.style.color = '';
+      } else {
+        labelEl.textContent = 'comece a estudar hoje!';
+        labelEl.style.color = '';
+      }
+
+      // Progress bar
+      var pct = metaDiasSemana > 0 ? Math.min(100, Math.round((diasEstudadosSemana / metaDiasSemana) * 100)) : 0;
+      fillEl.style.width = pct + '%';
+
+      // Card state: meta batida = golden
+      if (diasEstudadosSemana >= metaDiasSemana && metaDiasSemana > 0) {
+        card.classList.add('meta-batida');
+        fillEl.style.background = 'linear-gradient(90deg, #FF9800, #FFC107)';
+        countEl.style.color = '#E65100';
+      } else {
+        card.classList.remove('meta-batida');
+        fillEl.style.background = _estudouHoje ? 'var(--success)' : 'var(--primary)';
+        countEl.style.color = '';
       }
     }
 
@@ -3630,14 +3742,7 @@
     // Called after saving session + calculating streak
     function verificarCelebracoes(streakAntes) {
       var nome = window._userName || 'Aluno';
-
-      // Milestone streaks
-      var streakAgora = 0;
-      var el = document.getElementById('streakCount');
-      if (el) {
-        var m = el.textContent.match(/(\d+)/);
-        if (m) streakAgora = parseInt(m[1]);
-      }
+      var streakAgora = _streakCount;
 
       var milestones = [3, 7, 14, 21, 30];
       for (var i = 0; i < milestones.length; i++) {
@@ -3659,15 +3764,8 @@
 
     // Update streak fire pulse
     function atualizarPulsoFogo() {
-      var el = document.querySelector('.streak-fire');
-      if (!el) return;
-      var m = (document.getElementById('streakCount').textContent || '').match(/(\d+)/);
-      var count = m ? parseInt(m[1]) : 0;
-      if (count >= 3) {
-        el.classList.add('pulse');
-      } else {
-        el.classList.remove('pulse');
-      }
+      // Now handled by renderStreakCard, kept for backwards compat
+      renderStreakCard();
     }
 
     // =============================================
@@ -4268,7 +4366,6 @@
       document.getElementById('statHorasEstudadas').textContent = Math.round(totalHorasEstudadas * 10) / 10 + 'h';
       document.getElementById('statHorasRecomendadas').textContent = horasRecomendadas + 'h/sem';
       document.getElementById('statTotalMaterias').textContent = progresso + '%';
-      document.getElementById('streakCount').textContent = materiasConcluidas + '/' + totalMaterias;
 
       // Progress bars
       const pctStr = progresso + '%';
