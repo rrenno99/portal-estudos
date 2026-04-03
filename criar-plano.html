@@ -696,22 +696,23 @@
       <h2>Resumo do seu Plano</h2>
       <p>Confira os detalhes antes de gerar seu plano personalizado.</p>
 
+      <!-- Validation error (shown if no subjects) -->
+      <div id="resumoErro" style="display:none;padding:16px;background:#FFF5F5;border:1px solid #FED7D7;border-radius:var(--radius-sm);margin-bottom:20px">
+        <strong style="color:#C53030;font-size:0.88rem">Nao conseguimos identificar as materias.</strong>
+        <p style="font-size:0.82rem;color:var(--text-light);margin:8px 0">Cole o conteudo programatico abaixo ou volte e insira as materias manualmente.</p>
+        <textarea class="form-control" id="resumoMateriasManual" rows="6" placeholder="Uma materia por linha:&#10;Lingua Portuguesa&#10;Raciocinio Logico&#10;Direito Administrativo&#10;..." style="resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+        <button class="btn btn-primary" onclick="aplicarMateriasResumo()" style="margin-top:8px;width:100%">Usar estas materias e continuar</button>
+      </div>
+
+      <!-- Main summary grid -->
       <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 24px; margin-bottom: 24px;">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Concurso</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoConcurso">—</div>
+          <div style="grid-column:1/-1">
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Concurso / Cargo</div>
+            <div style="font-weight: 700; color: var(--secondary); font-size: 1.05rem;" id="resumoConcurso">—</div>
           </div>
           <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Nível</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoNivel">—</div>
-          </div>
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Matérias Selecionadas</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoMaterias">—</div>
-          </div>
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Horas Semanais</div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Carga Semanal</div>
             <div style="font-weight: 700; color: var(--secondary);" id="resumoHoras">—</div>
           </div>
           <div>
@@ -720,23 +721,33 @@
           </div>
           <div>
             <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Dias de Descanso</div>
-            <div style="font-weight: 700; color: var(--secondary);" id="resumoTurno">—</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoDescanso">—</div>
+          </div>
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 4px;">Trilha de Revisao</div>
+            <div style="font-weight: 700; color: var(--secondary);" id="resumoTrilha">—</div>
           </div>
         </div>
       </div>
 
+      <!-- Materias list with perfil -->
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 20px; margin-bottom: 24px;">
+        <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 10px; font-weight: 600;" id="resumoMateriasHeader">Materias do Plano</div>
+        <div id="resumoMateriasList">—</div>
+      </div>
+
       <!-- Links review -->
       <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 20px; margin-bottom: 24px;">
-        <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 10px; font-weight: 600;">Links de Estudo Cadastrados</div>
+        <div style="font-size: 0.8rem; color: var(--text-lighter); margin-bottom: 10px; font-weight: 600;">Links de Estudo</div>
         <div id="resumoLinks">—</div>
       </div>
 
       <div style="background: #FFF8F0; border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; border-left: 4px solid var(--primary);">
-        <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa de Conclusão</strong>
+        <strong style="color: var(--primary); font-size: 0.9rem;">Estimativa de Conclusao</strong>
         <p style="font-size: 0.85rem; color: var(--text-light); margin-top: 4px;" id="resumoEstimativa">—</p>
       </div>
 
-      <!-- User info from auth (read-only) -->
+      <!-- User info -->
       <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 24px; display:flex; align-items:center; gap:12px;">
         <div style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0" id="resumoAvatarInitials">?</div>
         <div>
@@ -1678,73 +1689,139 @@
     }
 
     async function buildReview() {
-      const subjects = getSelectedSubjects();
-      const selectedDays = [];
-      document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
+      var subjects = getSelectedSubjects();
+      var materiaPerfis = getMateriaPerfis();
+      var selectedDays = [];
+      document.querySelectorAll('#diasEstudo .chip.selected').forEach(function(c) { selectedDays.push(c.textContent); });
 
-      const horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
-      const horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
-      const diasUteis = selectedDays.filter(d => !['Sabado','Sábado','Domingo'].includes(d)).length;
-      const diasFds = selectedDays.filter(d => ['Sabado','Sábado','Domingo'].includes(d)).length;
-      const horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
-
-      document.getElementById('resumoConcurso').textContent = selectedConcurso || 'Não selecionado';
-      document.getElementById('resumoNivel').textContent = selectedNivel || 'Não selecionado';
-      document.getElementById('resumoMaterias').textContent = subjects.length + ' matérias';
-      document.getElementById('resumoHoras').textContent = horasSemanais + 'h/semana (' + diasUteis + ' dias úteis × ' + horasUteis + 'h' + (diasFds > 0 ? ' + ' + diasFds + ' fim de semana × ' + horasFds + 'h' : '') + ')';
-      document.getElementById('resumoDias').textContent = selectedDays.join(', ') || '—';
-
-      var turnoText = 'Flexivel';
+      var horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
+      var horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
+      var diasUteis = selectedDays.filter(function(d) { return !['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var diasFds = selectedDays.filter(function(d) { return ['Sabado','Sábado','Domingo'].includes(d); }).length;
+      var horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
       var diasDescanso = 7 - selectedDays.length;
-      document.getElementById('resumoTurno').textContent = diasDescanso > 0 ? diasDescanso + ' dia' + (diasDescanso > 1 ? 's' : '') + '/semana' : 'Nenhum';
 
-      // Links review
-      const linksDiv = document.getElementById('resumoLinks');
+      // === VALIDATION: no subjects = show error ===
+      var erroDiv = document.getElementById('resumoErro');
       if (subjects.length === 0) {
-        linksDiv.innerHTML = '<em style="color:var(--text-lighter)">Nenhuma matéria selecionada</em>';
+        erroDiv.style.display = '';
       } else {
-        let html = '';
-        subjects.forEach(s => {
-          html += `<div class="review-link-item">
-            <span class="review-link-name">${s.nome}</span>
-            ${s.link
-              ? '<span class="review-link-url" title="' + s.link + '">' + s.link + '</span>'
-              : '<span class="review-link-none">Sem link</span>'
-            }
-          </div>`;
-        });
-        linksDiv.innerHTML = html;
+        erroDiv.style.display = 'none';
       }
 
-      // Estimate: 50h per subject / weekly hours = weeks → months
-      const HORAS_POR_MATERIA = 50;
-      const totalHorasNecessarias = subjects.length * HORAS_POR_MATERIA;
-      const semanasNecessarias = horasSemanais > 0 ? totalHorasNecessarias / horasSemanais : 0;
-      const mesesNecessarios = horasSemanais > 0 ? Math.max(1, Math.ceil(semanasNecessarias / 4.3)) : 0;
+      // === CONCURSO / CARGO ===
+      var cargoInput = document.getElementById('editalCargoInput');
+      var concursoDisplay = selectedConcurso || '';
+      if (cargoInput && cargoInput.value.trim()) {
+        concursoDisplay = cargoInput.value.trim();
+        if (selectedConcurso && selectedConcurso !== concursoDisplay) {
+          concursoDisplay = selectedConcurso + ' — ' + cargoInput.value.trim();
+        }
+      }
+      document.getElementById('resumoConcurso').textContent = concursoDisplay || 'Personalizado';
+
+      // === HORAS (with decimals) ===
+      var horasDisplay = horasSemanais % 1 === 0 ? horasSemanais + 'h' : horasSemanais.toFixed(1) + 'h';
+      var detalhe = diasUteis + ' dias × ' + horasUteis + 'h';
+      if (diasFds > 0) detalhe += ' + ' + diasFds + ' fds × ' + horasFds + 'h';
+      document.getElementById('resumoHoras').textContent = horasDisplay + '/semana (' + detalhe + ')';
+
+      // === DIAS ===
+      document.getElementById('resumoDias').textContent = selectedDays.join(', ') || '—';
+      document.getElementById('resumoDescanso').textContent =
+        diasDescanso > 0 ? diasDescanso + ' dia' + (diasDescanso > 1 ? 's' : '') + '/semana' : 'Nenhum';
+
+      // === TRILHA ===
+      var trilhaNames = { 'agil': 'Agil (Iniciante)', 'consistente': 'Consistente (Intermediario)', 'blindada': 'Blindada (Avancado)' };
+      document.getElementById('resumoTrilha').textContent = trilhaNames[selectedTrilha] || selectedTrilha;
+
+      // === MATERIAS LIST with perfil ===
+      var materiasHeader = document.getElementById('resumoMateriasHeader');
+      var materiasList = document.getElementById('resumoMateriasList');
+      materiasHeader.textContent = subjects.length + ' Materias do Plano';
+
+      if (subjects.length > 0) {
+        var html = '';
+        subjects.forEach(function(s) {
+          var perfil = materiaPerfis.find(function(p) { return p.materia === s.nome; });
+          var nivelLabel = '';
+          if (perfil) {
+            if (perfil.fechada) {
+              nivelLabel = '<span style="font-size:0.68rem;font-weight:600;color:var(--success);background:rgba(56,161,105,0.1);padding:1px 6px;border-radius:4px;margin-left:6px">Fechada</span>';
+            } else if (perfil.nivel && perfil.nivel !== 'iniciante') {
+              var nivelColors = { 'regular': 'var(--primary)', 'avancado': 'var(--success)' };
+              nivelLabel = '<span style="font-size:0.68rem;font-weight:600;color:' + (nivelColors[perfil.nivel] || 'var(--text-light)') + ';background:rgba(30,136,229,0.08);padding:1px 6px;border-radius:4px;margin-left:6px">' + perfil.nivel.charAt(0).toUpperCase() + perfil.nivel.slice(1) + '</span>';
+            }
+          }
+          html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;align-items:center;justify-content:space-between">';
+          html += '<span><strong style="color:var(--secondary)">' + s.nome + '</strong>' + nivelLabel + '</span>';
+          html += '<span style="font-size:0.75rem;color:var(--text-lighter)">' + s.aulas + ' aulas</span>';
+          html += '</div>';
+        });
+        materiasList.innerHTML = html;
+      } else {
+        materiasList.innerHTML = '<em style="color:var(--text-lighter);font-size:0.85rem">Nenhuma materia selecionada</em>';
+      }
+
+      // === LINKS ===
+      var linksDiv = document.getElementById('resumoLinks');
+      var linksComLink = subjects.filter(function(s) { return s.link; });
+      if (linksComLink.length === 0) {
+        linksDiv.innerHTML = '<em style="color:var(--text-lighter);font-size:0.85rem">Nenhum link cadastrado</em>';
+      } else {
+        var lhtml = '';
+        linksComLink.forEach(function(s) {
+          lhtml += '<div class="review-link-item"><span class="review-link-name">' + s.nome + '</span>';
+          lhtml += '<span class="review-link-url" title="' + s.link + '">' + s.link + '</span></div>';
+        });
+        linksDiv.innerHTML = lhtml;
+      }
+
+      // === ESTIMATIVA ===
+      var HORAS_POR_MATERIA = 50;
+      var totalHorasNecessarias = subjects.length * HORAS_POR_MATERIA;
+      var semanasNecessarias = horasSemanais > 0 ? totalHorasNecessarias / horasSemanais : 0;
+      var mesesNecessarios = horasSemanais > 0 ? Math.max(1, Math.ceil(semanasNecessarias / 4.3)) : 0;
 
       if (horasSemanais > 0 && subjects.length > 0) {
         document.getElementById('resumoEstimativa').innerHTML =
-          `${subjects.length} matérias × ${HORAS_POR_MATERIA}h = <strong>${totalHorasNecessarias}h</strong> de estudo total.<br>` +
-          `Com <strong>${horasSemanais}h/semana</strong>, você concluirá em aproximadamente <strong>${mesesNecessarios} ${mesesNecessarios === 1 ? 'mês' : 'meses'}</strong>.`;
+          subjects.length + ' materias x ' + HORAS_POR_MATERIA + 'h = <strong>' + totalHorasNecessarias + 'h</strong> de estudo total.<br>' +
+          'Com <strong>' + horasDisplay + '/semana</strong>, voce concluira em aproximadamente <strong>' + mesesNecessarios + ' ' + (mesesNecessarios === 1 ? 'mes' : 'meses') + '</strong>.';
       } else {
-        document.getElementById('resumoEstimativa').textContent = 'Selecione matérias e disponibilidade para ver a estimativa.';
+        document.getElementById('resumoEstimativa').textContent = 'Selecione materias e disponibilidade para ver a estimativa.';
       }
 
-      // Load user from Supabase Auth (no name/email fields needed)
+      // === USER INFO ===
       try {
-        const { getUsuarioAtual } = await import('./js/auth.js');
-        const user = await getUsuarioAtual();
+        var authModule = await import('./js/auth.js');
+        var user = await authModule.getUsuarioAtual();
         if (user) {
-          const nome = user.user_metadata?.nome || user.email.split('@')[0];
-          const initials = nome.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+          var nome = (user.user_metadata && user.user_metadata.nome) || user.email.split('@')[0];
+          var initials = nome.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
           document.getElementById('resumoUserName').textContent = nome;
           document.getElementById('resumoUserEmail').textContent = user.email;
           document.getElementById('resumoAvatarInitials').textContent = initials;
         }
       } catch (e) {
-        document.getElementById('resumoUserName').textContent = 'Usuário';
-        document.getElementById('resumoUserEmail').textContent = '';
+        document.getElementById('resumoUserName').textContent = 'Usuario';
       }
+    }
+
+    function aplicarMateriasResumo() {
+      var texto = document.getElementById('resumoMateriasManual').value.trim();
+      if (!texto) return;
+      var linhas = texto.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 2; });
+
+      // Add subjects to step 2 grid
+      var espGrid = document.getElementById('especificasGrid');
+      linhas.forEach(function(nome) {
+        espGrid.appendChild(createSubjectCard(nome, '', true, true));
+      });
+      _materiasExtraidasEdital = linhas.map(function(n) { return { nome: n, topicos: '' }; });
+
+      // Rebuild review
+      document.getElementById('resumoErro').style.display = 'none';
+      buildReview();
     }
 
     // =============================================
