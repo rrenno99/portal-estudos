@@ -3605,38 +3605,56 @@
         var ontemStr = ontem.getFullYear() + '-' + (ontem.getMonth()+1) + '-' + ontem.getDate();
 
         _estudouHoje = diasSet.has(hoje);
-        var estudouOntem = diasSet.has(ontemStr);
 
-        // Count streak: consecutive days backwards
-        // If studied today: count from today backwards
-        // If NOT today but studied yesterday: keep yesterday's streak (don't reset yet)
-        // If neither today nor yesterday: streak = 0
-        _streakCount = 0;
-        if (_estudouHoje) {
-          var checkDate = new Date(now);
-          while (true) {
-            var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
-            if (diasSet.has(key)) {
-              _streakCount++;
-              checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-              break;
-            }
-          }
-        } else if (estudouOntem) {
-          // Haven't studied today yet, but yesterday yes - show yesterday's streak
-          var checkDate = new Date(ontem);
-          while (true) {
-            var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
-            if (diasSet.has(key)) {
-              _streakCount++;
-              checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-              break;
-            }
-          }
+        // Get planned study days (0=Dom, 1=Seg, ..., 6=Sab)
+        var plan = getPlanData();
+        var studyDaysOfWeek = [1,2,3,4,5]; // default Mon-Fri
+        if (plan && plan.dias) {
+          var dayMap = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
+          studyDaysOfWeek = plan.dias.map(function(d) { return dayMap[d]; }).filter(function(d) { return d !== undefined; });
         }
-        // If neither today nor yesterday: _streakCount stays 0
+
+        // Smart streak: walks backwards from today
+        // - Study day with session: +1 streak
+        // - Study day without session: BREAK (streak ends)
+        // - Rest day (not in plan): skip (neutral, streak continues)
+        // - Today if not studied yet: skip (grace period, don't count but don't break)
+        _streakCount = 0;
+        var checkDate = new Date(now);
+        var isFirstDay = true;
+        var maxLookback = 365;
+
+        while (maxLookback-- > 0) {
+          var key = checkDate.getFullYear() + '-' + (checkDate.getMonth()+1) + '-' + checkDate.getDate();
+          var dow = checkDate.getDay();
+          var isStudyDay = studyDaysOfWeek.indexOf(dow) !== -1;
+          var studied = diasSet.has(key);
+
+          if (isFirstDay) {
+            isFirstDay = false;
+            if (isStudyDay && studied) {
+              _streakCount++;
+            } else if (isStudyDay && !studied) {
+              // Today is a study day but hasn't studied yet — grace period
+              // Don't count, don't break. Check yesterday.
+            } else {
+              // Today is a rest day — skip
+            }
+            checkDate.setDate(checkDate.getDate() - 1);
+            continue;
+          }
+
+          // Past days
+          if (isStudyDay) {
+            if (studied) {
+              _streakCount++;
+            } else {
+              break; // Missed a study day = streak broken
+            }
+          }
+          // Rest days: just skip (neutral)
+          checkDate.setDate(checkDate.getDate() - 1);
+        }
 
         // Count days studied this week (Monday to now)
         var dayOfWeek = now.getDay();
@@ -3651,8 +3669,7 @@
           if (d >= monday) diasEstudadosSemana++;
         });
 
-        // Get meta from plan
-        var plan = getPlanData();
+        // Get meta from plan (plan already loaded above for streak)
         if (plan && plan.dias) {
           metaDiasSemana = plan.dias.length;
         }
@@ -3689,7 +3706,15 @@
       }
     }
 
-    var _streakWasOff = true; // track if fire was off to trigger ignite
+    function proximoDiaEstudo(studyDays) {
+      var nomes = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+      var d = new Date();
+      for (var i = 1; i <= 7; i++) {
+        d.setDate(d.getDate() + 1);
+        if (studyDays.indexOf(d.getDay()) !== -1) return nomes[d.getDay()];
+      }
+      return 'em breve';
+    }
 
     function renderStreakCard(animate) {
       var card = document.getElementById('streakCard');
@@ -3704,12 +3729,21 @@
       daysEl.textContent = _streakCount;
       daysLabelEl.textContent = _streakCount === 1 ? 'dia' : 'dias';
 
-      // Fire icon
+      // Determine if today is a rest day
+      var todayDow = new Date().getDay();
+      var planData = getPlanData();
+      var studyDaysLocal = [1,2,3,4,5];
+      if (planData && planData.dias) {
+        var dm = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
+        studyDaysLocal = planData.dias.map(function(d) { return dm[d]; }).filter(function(d) { return d !== undefined; });
+      }
+      var isRestDay = studyDaysLocal.indexOf(todayDow) === -1;
+
+      // Fire icon state
       if (_estudouHoje) {
         var wasOff = fireIcon.classList.contains('off');
         fireIcon.classList.remove('off');
 
-        // Ignite animation: only on first transition off -> on
         if (wasOff && animate) {
           fireIcon.classList.remove('pulse');
           fireIcon.classList.add('ignite');
@@ -3717,8 +3751,6 @@
             fireIcon.classList.remove('ignite');
             if (_streakCount >= 3) fireIcon.classList.add('pulse');
           }, 900);
-
-          // Fire confetti on the streak card
           dispararFogoStreak();
         } else if (_streakCount >= 3) {
           fireIcon.classList.add('pulse');
@@ -3727,27 +3759,51 @@
         }
 
         card.classList.add('streak-active');
+      } else if (isRestDay && _streakCount > 0) {
+        // Rest day with active streak: fire stays on (dimmed slightly)
+        fireIcon.classList.remove('off', 'ignite');
+        if (_streakCount >= 3) {
+          fireIcon.classList.add('pulse');
+        } else {
+          fireIcon.classList.remove('pulse');
+        }
+        fireIcon.style.opacity = '0.7';
+        card.classList.add('streak-active');
       } else {
+        // Study day not yet studied, or streak = 0
         fireIcon.classList.add('off');
         fireIcon.classList.remove('pulse', 'ignite');
+        fireIcon.style.opacity = '';
         card.classList.remove('streak-active');
       }
 
+      // Determine if today is a study day
+      var todayDow = new Date().getDay();
+      var plan = getPlanData();
+      var studyDaysOfWeek = [1,2,3,4,5];
+      if (plan && plan.dias) {
+        var dayMap = { 'Segunda':1, 'Terça':2, 'Quarta':3, 'Quinta':4, 'Sexta':5, 'Sábado':6, 'Domingo':0 };
+        studyDaysOfWeek = plan.dias.map(function(d) { return dayMap[d]; }).filter(function(d) { return d !== undefined; });
+      }
+      var hojeEDiaDeEstudo = studyDaysOfWeek.indexOf(todayDow) !== -1;
+
       // Sublabel
       sublabelEl.classList.remove('warn');
-      if (!_estudouHoje && _streakCount > 0) {
-        sublabelEl.textContent = 'Estude hoje para manter a sequencia!';
-        sublabelEl.classList.add('warn');
-      } else if (_estudouHoje && diasEstudadosSemana >= metaDiasSemana) {
+      if (_estudouHoje && diasEstudadosSemana >= metaDiasSemana) {
         sublabelEl.textContent = 'Meta semanal atingida! Voce e incrivel!';
       } else if (_estudouHoje && _streakCount >= 7) {
-        sublabelEl.textContent = _streakCount + ' dias consecutivos! Habito formado!';
+        sublabelEl.textContent = _streakCount + ' dias de estudo consecutivos!';
       } else if (_estudouHoje) {
         sublabelEl.textContent = 'Sequencia ativa — continue assim!';
-      } else if (_streakCount === 0) {
+      } else if (!hojeEDiaDeEstudo && _streakCount > 0) {
+        sublabelEl.textContent = 'Dia de descanso — sequencia protegida';
+      } else if (hojeEDiaDeEstudo && _streakCount > 0) {
+        sublabelEl.textContent = 'Estude hoje para manter a sequencia!';
+        sublabelEl.classList.add('warn');
+      } else if (_streakCount === 0 && hojeEDiaDeEstudo) {
         sublabelEl.textContent = 'Comece a estudar hoje!';
       } else {
-        sublabelEl.textContent = 'Inicie uma sessao para somar +1';
+        sublabelEl.textContent = 'Proximo dia de estudo: ' + proximoDiaEstudo(studyDaysOfWeek);
       }
 
       // Weekly meta bar
