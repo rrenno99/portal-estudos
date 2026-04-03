@@ -32,70 +32,169 @@ async function extrairTextoPDF(file) {
 //  1b. EXTRACAO DE CARGOS DO PDF
 // =============================================
 
-// Common patterns for cargo/specialty sections in Brazilian editais
-var CARGO_PATTERNS = [
-  /cargo\s*(?:\d+)?[:\s-]+\s*([^\n\r.;]{5,80})/gi,
-  /especialidade[:\s-]+\s*([^\n\r.;]{5,80})/gi,
-  /(?:area|[aá]rea)\s*(?:de\s+)?(?:atua[cç][aã]o|conhecimento)[:\s-]+\s*([^\n\r.;]{5,80})/gi,
-  /(?:analista|t[eé]cnico|agente|auditor|fiscal|inspetor|delegado|perito|escrivao|assessor|consultor)\s+(?:de\s+)?([^\n\r.;,]{3,60})/gi,
-  /(?:CARGO|ESPECIALIDADE|FUN[CÇ][AÃ]O)\s*[:\s-]+\s*([^\n\r.;]{5,80})/g,
+// Known profession roots (titles that START a cargo name)
+var PROFISSOES_CONHECIDAS = [
+  'analista', 'tecnico', 'técnico', 'agente', 'auditor', 'fiscal',
+  'inspetor', 'delegado', 'perito', 'escrivao', 'escrivão',
+  'assessor', 'consultor', 'procurador', 'defensor', 'promotor',
+  'oficial', 'assistente', 'auxiliar', 'servidor', 'policial',
+  'investigador', 'papiloscopista', 'médico', 'medico', 'enfermeiro',
+  'engenheiro', 'arquiteto', 'contador', 'administrador', 'economista',
+  'psicólogo', 'psicologo', 'pedagogo', 'bibliotecário', 'bibliotecario',
+  'programador', 'desenvolvedor', 'secretário', 'secretario'
 ];
 
-// Words that are NOT cargo names (false positives)
-var CARGO_STOPWORDS = [
-  /edital/i, /inscri/i, /prova/i, /resultado/i, /convoca/i,
+// Phrases that are NEVER cargo names (clauses, instructions, noise)
+var CARGO_BLACKLIST = [
+  /edital/i, /inscri[cç]/i, /prova/i, /resultado/i, /convoca[cç]/i,
   /remunera/i, /vencimento/i, /requisito/i, /escolaridade/i,
-  /vagas?\s+/i, /total\s+de/i, /quadro\s+de/i, /anexo/i,
-  /cronograma/i, /publica[cç]/i, /diario\s+oficial/i,
-  /carga\s+hor/i, /jornada/i, /atribui[cç]/i
+  /vaga/i, /total\s+de/i, /quadro\s+de/i, /anexo/i,
+  /cronograma/i, /publica[cç]/i, /di[aá]rio\s+oficial/i,
+  /carga\s+hor/i, /jornada/i, /atribui[cç]/i,
+  /por\s+ocasi/i, /de\s+acordo/i, /conforme/i, /disposto/i,
+  /dever[aá]/i, /poder[aá]/i, /ser[aá]\s+/i, /estar[aá]/i,
+  /no\s+prazo/i, /mediante/i, /observ/i, /previsto/i,
+  /aprova[cç]/i, /classifica[cç]/i, /eliminat/i, /habilita/i,
+  /documento/i, /comprova/i, /apresent/i, /exig[eê]/i,
+  /n[uú]mero/i, /artigo/i, /par[aá]grafo/i, /inciso/i,
+  /cap[ií]tulo/i, /se[cç][aã]o/i, /item\s+\d/i,
+  /candidato/i, /requerimento/i, /formul[aá]rio/i,
+  /www\./i, /http/i, /\.gov\./i, /\.com/i,
+  /^\d+[\.\)]\s*$/i, /^[a-z]\)/i
 ];
+
+function validarCargo(cargo) {
+  // 1. Must be 3-50 chars (real cargos are short)
+  if (cargo.length < 3 || cargo.length > 50) return false;
+
+  // 2. Max 7 words (longer = probably a sentence, not a cargo)
+  var palavras = cargo.split(/\s+/);
+  if (palavras.length > 7) return false;
+
+  // 3. Must NOT match any blacklist pattern
+  for (var i = 0; i < CARGO_BLACKLIST.length; i++) {
+    if (CARGO_BLACKLIST[i].test(cargo)) return false;
+  }
+
+  // 4. Must NOT be mostly numbers or punctuation
+  var letras = (cargo.match(/[a-zA-ZÀ-ú]/g) || []).length;
+  if (letras < cargo.length * 0.6) return false;
+
+  // 5. Must NOT start with lowercase preposition/article (indicates mid-sentence)
+  if (/^(de |do |da |dos |das |no |na |nos |nas |em |para |com |por |que |se |ou |e |a |o |os |as )/i.test(cargo) &&
+      !/^(de\s+)/i.test(cargo)) {
+    // Allow "de" only if followed by a profession name (e.g. "de Controle Externo")
+    return false;
+  }
+
+  return true;
+}
 
 function extrairCargos(texto) {
-  var cargosSet = new Map(); // nome normalizado -> original
+  var cargosSet = new Map();
 
-  CARGO_PATTERNS.forEach(function(pattern) {
-    var match;
+  // === STRATEGY 1: "CARGO:" or "ESPECIALIDADE:" labels ===
+  var labelPatterns = [
+    /(?:CARGO|ESPECIALIDADE|FUN[CÇ][AÃ]O|EMPREGO)\s*(?:\d+)?\s*[:\-–]\s*([^\n\r.;]{3,50})/gi,
+    /(?:cargo|especialidade)\s*[:\-–]\s*([^\n\r.;]{3,50})/gi,
+  ];
+
+  labelPatterns.forEach(function(pattern) {
     var regex = new RegExp(pattern.source, pattern.flags);
+    var match;
     while ((match = regex.exec(texto)) !== null) {
-      var cargo = match[1].trim();
-
-      // Clean up
-      cargo = cargo.replace(/\s+/g, ' ').replace(/[–—]+$/, '').trim();
-
-      // Skip if too short, too long, or is a stopword
-      if (cargo.length < 4 || cargo.length > 80) continue;
-      var isStop = CARGO_STOPWORDS.some(function(sw) { return sw.test(cargo); });
-      if (isStop) continue;
-
-      // Skip if mostly numbers
-      if ((cargo.match(/\d/g) || []).length > cargo.length * 0.3) continue;
-
-      var normalizado = cargo.toLowerCase().replace(/\s+/g, ' ');
-      if (!cargosSet.has(normalizado)) {
-        cargosSet.set(normalizado, cargo);
+      var cargo = match[1].trim().replace(/\s+/g, ' ').replace(/[–—:]+$/, '').trim();
+      if (validarCargo(cargo)) {
+        var key = cargo.toLowerCase();
+        if (!cargosSet.has(key)) cargosSet.set(key, cargo);
       }
     }
   });
 
-  // Also look for structured table-like patterns: "1. Analista - Area X"
-  var linhas = texto.split(/\n/);
-  linhas.forEach(function(linha) {
-    var m = linha.match(/^\s*\d+[\.\)]\s*(.{5,80}?)(?:\s*[-–]\s*|\s{2,})/);
-    if (m) {
-      var cargo = m[1].trim();
-      if (cargo.length >= 4 && cargo.length <= 80) {
-        var isStop = CARGO_STOPWORDS.some(function(sw) { return sw.test(cargo); });
-        if (!isStop) {
-          var normalizado = cargo.toLowerCase().replace(/\s+/g, ' ');
-          if (!cargosSet.has(normalizado)) {
-            cargosSet.set(normalizado, cargo);
+  // === STRATEGY 2: Known profession names followed by area ===
+  // E.g., "Analista Judiciário — Área Administrativa"
+  var profRegex = new RegExp(
+    '(' + PROFISSOES_CONHECIDAS.join('|') + ')\\s+' +
+    '([A-ZÀ-Ú][a-zA-ZÀ-ú\\s\\-–/]{2,40})',
+    'gi'
+  );
+  var match;
+  while ((match = profRegex.exec(texto)) !== null) {
+    var cargo = (match[1] + ' ' + match[2]).trim().replace(/\s+/g, ' ');
+    // Cut at common separators
+    cargo = cargo.split(/\s*[-–]\s*/)[0].trim();
+    if (cargo.split(/\s+/).length > 6) {
+      cargo = cargo.split(/\s+/).slice(0, 5).join(' ');
+    }
+    if (validarCargo(cargo)) {
+      var key = cargo.toLowerCase();
+      if (!cargosSet.has(key)) cargosSet.set(key, cargo);
+    }
+  }
+
+  // === STRATEGY 3: QUADRO DE VAGAS table rows ===
+  // Look for the section header, then parse nearby lines
+  var quadroIdx = texto.search(/quadro\s+de\s+vagas/i);
+  if (quadroIdx !== -1) {
+    var afterQuadro = texto.substring(quadroIdx, quadroIdx + 3000);
+    var linhas = afterQuadro.split(/\n/);
+    linhas.forEach(function(linha) {
+      // Table rows often have: "Analista ... 10 ... R$ 8.000"
+      PROFISSOES_CONHECIDAS.forEach(function(prof) {
+        var idx = linha.toLowerCase().indexOf(prof);
+        if (idx !== -1) {
+          // Extract from profession name to next number or pipe
+          var substr = linha.substring(idx).replace(/\s+/g, ' ');
+          var cargoMatch = substr.match(/^([a-zA-ZÀ-ú\s\-–/]{3,50})/);
+          if (cargoMatch) {
+            var cargo = cargoMatch[1].trim();
+            if (validarCargo(cargo)) {
+              var key = cargo.toLowerCase();
+              if (!cargosSet.has(key)) cargosSet.set(key, cargo);
+            }
           }
         }
+      });
+    });
+  }
+
+  // === STRATEGY 4: Numbered list items with profession names ===
+  var linhas = texto.split(/\n/);
+  linhas.forEach(function(linha) {
+    var m = linha.match(/^\s*(?:\d+[\.\)]|[IVX]+[\.\)]|[a-z]\))\s+(.{3,50})$/);
+    if (m) {
+      var cargo = m[1].trim();
+      // Only accept if it contains a known profession
+      var hasProfissao = PROFISSOES_CONHECIDAS.some(function(p) {
+        return cargo.toLowerCase().indexOf(p) !== -1;
+      });
+      if (hasProfissao && validarCargo(cargo)) {
+        var key = cargo.toLowerCase();
+        if (!cargosSet.has(key)) cargosSet.set(key, cargo);
       }
     }
   });
 
-  return Array.from(cargosSet.values());
+  var result = Array.from(cargosSet.values());
+
+  // Deduplicate similar names (e.g., "Analista" and "Analista Judiciário")
+  // Keep the more specific (longer) version
+  result.sort(function(a, b) { return b.length - a.length; });
+  var filtered = [];
+  var usedKeys = new Set();
+  result.forEach(function(cargo) {
+    var dominated = false;
+    usedKeys.forEach(function(existing) {
+      if (existing.indexOf(cargo.toLowerCase()) !== -1) dominated = true;
+    });
+    if (!dominated) {
+      filtered.push(cargo);
+      usedKeys.add(cargo.toLowerCase());
+    }
+  });
+
+  console.log('[Mentor] Cargos extraidos (pos-filtro):', filtered.length, filtered);
+  return filtered;
 }
 
 // =============================================
