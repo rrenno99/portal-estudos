@@ -622,19 +622,23 @@ function classificarMaterias(subjects, materiaPerfis, pesosEdital) {
     var nivel = perfil.nivel || 'iniciante';
     var fechada = perfil.fechada || false;
 
-    // Score calculation:
-    // - Edital weight (questoes) is strongest signal
-    // - Student difficulty (iniciante = needs more time)
-    // - Fechada = low priority
+    // Use relevancia from Renno analysis if available (proportional to points)
+    var relevancia = s.relevancia || 0;
+
     var score = 0;
 
-    // Edital weight (0-50 points based on relative weight)
-    score += pesoEdital * 3;
+    // If we have relevancia from Renno analysis, use it as primary signal
+    if (relevancia > 0) {
+      score += relevancia * 2; // 0-200 range from percentage
+    } else {
+      // Fallback: edital weight
+      score += pesoEdital * 3;
+    }
 
-    // Student level (iniciante needs more attention)
-    if (nivel === 'iniciante') score += 20;
-    else if (nivel === 'regular') score += 10;
-    else score += 5; // avancado
+    // Student level modifier
+    if (nivel === 'iniciante') score += 15;
+    else if (nivel === 'regular') score += 8;
+    else score += 3;
 
     // Fechada penalty
     if (fechada) score -= 30;
@@ -646,6 +650,7 @@ function classificarMaterias(subjects, materiaPerfis, pesosEdital) {
       nivel: nivel,
       fechada: fechada,
       pesoEdital: pesoEdital,
+      relevancia: relevancia,
       score: Math.max(0, score)
     };
   });
@@ -1187,132 +1192,217 @@ async function fetchTextoDeUrl(url) {
 }
 
 // =============================================
-//  13b. IMPORTADOR ANALISE RENNO (PDF/DOCX)
-//  Detecta e prioriza tabelas estruturadas do
-//  modelo de analise do Prof. Rodrigo Renno
+//  13b. IMPORTADOR POR TAGS ESTRUTURADAS
+//  Blocos obrigatorios do modelo Prof. Renno:
+//  [Estrutura das Provas]
+//  [Conteudo Programatico Completo]
+//  [Estrategia de Estudos]
 // =============================================
 
+// Sections to DISCARD (noise)
+var SECOES_DESCARTAVEIS = [
+  /vagas/i, /inscri[cç]/i, /remunera/i, /vencimento/i,
+  /requisito/i, /escolaridade/i, /cronograma/i,
+  /posse/i, /nomea[cç]/i, /convoca[cç]/i, /recurso/i,
+  /taxa/i, /isen[cç]/i, /atendimento\s+especial/i,
+  /publica[cç][aã]o/i, /disposi[cç][oõ]es?\s+(?:finais|gerais|preliminares)/i,
+];
+
+// Tag patterns for the 3 mandatory blocks
+var TAG_ESTRUTURA = /estrutura\s+das?\s+provas?|quadro\s+(?:de\s+)?provas|distribui[cç][aã]o\s+(?:de\s+)?quest/i;
+var TAG_CONTEUDO = /conte[uú]do\s+program[aá]tico|programa\s+(?:das?\s+)?provas?|conte[uú]do\s+das?\s+provas?/i;
+var TAG_ESTRATEGIA = /estrat[eé]gia\s+(?:de\s+)?estudo|dicas?\s+(?:de\s+)?estudo|recomenda[cç]/i;
+
 function detectarAnaliseRenno(texto) {
-  // Markers that indicate this is a Renno-style analysis document
-  var markers = [
-    /an[aá]lise\s+(?:do\s+)?edital/i,
-    /estrutura\s+das?\s+provas?/i,
-    /conte[uú]do\s+program[aá]tico/i,
-    /pontua[cç][aã]o|pontos?\s+por\s+mat[eé]ria/i,
-    /rodrigo\s+renn[oó]/i,
-    /estrat[eé]gia\s+concursos/i,
-  ];
-  var score = markers.reduce(function(acc, m) { return acc + (m.test(texto) ? 1 : 0); }, 0);
-  return score >= 2; // At least 2 markers = Renno analysis
+  var hasEstrutura = TAG_ESTRUTURA.test(texto);
+  var hasConteudo = TAG_CONTEUDO.test(texto);
+  var hasRenno = /rodrigo\s+renn[oó]|prof\.?\s+renn[oó]|an[aá]lise\s+(?:do\s+)?edital/i.test(texto);
+  var hasEstrategia = TAG_ESTRATEGIA.test(texto);
+
+  // Must have at least Estrutura + Conteudo, OR Renno name + one block
+  if (hasEstrutura && hasConteudo) return true;
+  if (hasRenno && (hasEstrutura || hasConteudo)) return true;
+  if (hasEstrutura && hasEstrategia) return true;
+  return false;
+}
+
+// Extract a section between a start tag and the next major section header
+function extrairSecao(linhas, tagPattern) {
+  var start = -1;
+  var result = [];
+
+  for (var i = 0; i < linhas.length; i++) {
+    if (start === -1) {
+      if (tagPattern.test(linhas[i])) { start = i + 1; continue; }
+    } else {
+      // End at next major section or discardable section
+      var isNewSection = TAG_ESTRUTURA.test(linhas[i]) || TAG_CONTEUDO.test(linhas[i]) || TAG_ESTRATEGIA.test(linhas[i]);
+      var isDiscard = SECOES_DESCARTAVEIS.some(function(p) { return p.test(linhas[i]); });
+      if ((isNewSection || isDiscard) && result.length > 3) break;
+      result.push(linhas[i]);
+    }
+  }
+  return result;
 }
 
 function extrairTabelaProvas(texto) {
-  // Look for structured table: "Materia | Questoes | Pontos"
-  var materias = [];
   var linhas = texto.split(/\n/);
+  var resultado = {
+    materias: [],
+    totalPontos: 0,
+    estrategia: '',
+    blocosEncontrados: []
+  };
 
-  // Find the "Estrutura das Provas" section
-  var dentroTabela = false;
-  var headerFound = false;
+  // ===== BLOCO 1: [Estrutura das Provas] =====
+  var secaoEstrutura = extrairSecao(linhas, TAG_ESTRUTURA);
+  if (secaoEstrutura.length > 0) {
+    resultado.blocosEncontrados.push('Estrutura das Provas');
+    var headerFound = false;
 
-  for (var i = 0; i < linhas.length; i++) {
-    var linha = linhas[i].trim();
+    secaoEstrutura.forEach(function(linha) {
+      linha = linha.trim();
+      if (!linha) return;
 
-    if (/estrutura\s+das?\s+provas?|quadro\s+de\s+provas/i.test(linha)) {
-      dentroTabela = true;
-      continue;
-    }
-
-    if (!dentroTabela) continue;
-
-    // Detect header row
-    if (!headerFound && /mat[eé]ria|disciplina/i.test(linha) && /quest|ponto|peso|valor/i.test(linha)) {
-      headerFound = true;
-      continue;
-    }
-
-    // End of table markers
-    if (headerFound && (/^total/i.test(linha) || /conte[uú]do\s+program/i.test(linha) || linha.length < 3)) {
-      if (materias.length > 0) break;
-      continue;
-    }
-
-    if (!headerFound) continue;
-
-    // Parse table row: "Lingua Portuguesa 10 10" or "Lingua Portuguesa | 10 | 10"
-    var parts = linha.split(/[\|\t]/).map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
-
-    if (parts.length < 2) {
-      // Try space-separated with numbers at end
-      var m = linha.match(/^(.+?)\s+(\d+)\s+(\d+(?:[.,]\d+)?)/);
-      if (m) {
-        parts = [m[1].trim(), m[2], m[3]];
+      // Detect header row
+      if (!headerFound && /mat[eé]ria|disciplina/i.test(linha) && /quest|ponto|peso|valor/i.test(linha)) {
+        headerFound = true;
+        return;
       }
-    }
+      if (!headerFound && resultado.materias.length === 0) return;
 
-    if (parts.length >= 2) {
-      var nome = parts[0].replace(/^\d+[\.\)]\s*/, '').trim();
-      if (nome.length < 3 || nome.length > 60) continue;
-      if (/^total|^sub\s*total|^\s*$/i.test(nome)) continue;
+      // Skip totals and noise
+      if (/^total|^sub\s*total/i.test(linha)) return;
+      if (SECOES_DESCARTAVEIS.some(function(p) { return p.test(linha); })) return;
 
-      var questoes = 0;
-      var pontos = 0;
-      for (var j = 1; j < parts.length; j++) {
-        var num = parseFloat(parts[j].replace(',', '.'));
-        if (!isNaN(num) && num > 0) {
-          if (questoes === 0) questoes = num;
-          else pontos = num;
+      // Parse row: "Materia | Qtd | Peso | Pontos" or space-separated
+      var parts = linha.split(/[\|\t]/).map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+      if (parts.length < 2) {
+        var m = linha.match(/^(.+?)\s+(\d+)\s+(\d+(?:[.,]\d+)?)(?:\s+(\d+(?:[.,]\d+)?))?/);
+        if (m) parts = [m[1].trim(), m[2], m[3], m[4] || ''].filter(function(p) { return p; });
+      }
+
+      if (parts.length >= 2) {
+        var nome = parts[0].replace(/^\d+[\.\)]\s*/, '').trim();
+        nome = normalizarNomeMateria(nome);
+        if (nome.length < 3 || nome.length > 60) return;
+        if (/^total|^sub/i.test(nome)) return;
+
+        var questoes = 0, peso = 0, pontos = 0;
+        var nums = [];
+        for (var j = 1; j < parts.length; j++) {
+          var num = parseFloat(parts[j].replace(',', '.'));
+          if (!isNaN(num) && num > 0) nums.push(num);
         }
-      }
 
-      materias.push({
-        nome: nome,
-        questoes: questoes,
-        pontos: pontos || questoes,
-        topicos: '',
-        fonte: 'analise_renno'
+        questoes = nums[0] || 0;
+        peso = nums.length >= 3 ? nums[1] : 1;
+        pontos = nums.length >= 3 ? nums[2] : (nums[1] || questoes);
+
+        // Calculate relevance
+        var pontosEfetivos = pontos || (questoes * peso);
+
+        resultado.materias.push({
+          nome: nome,
+          questoes: questoes,
+          peso: peso,
+          pontos: pontosEfetivos,
+          relevancia: 0, // calculated after total is known
+          topicos: '',
+          topicosArray: [],
+          fonte: 'analise_renno',
+          confianca: 85
+        });
+
+        resultado.totalPontos += pontosEfetivos;
+      }
+    });
+
+    // Calculate relevance percentage
+    if (resultado.totalPontos > 0) {
+      resultado.materias.forEach(function(m) {
+        m.relevancia = Math.round((m.pontos / resultado.totalPontos) * 100);
       });
     }
   }
 
-  // Now try to enrich with topics from "Conteudo Programatico" section
-  var dentroConteudo = false;
-  var materiaAtual = null;
+  // ===== BLOCO 2: [Conteudo Programatico Completo] =====
+  var secaoConteudo = extrairSecao(linhas, TAG_CONTEUDO);
+  if (secaoConteudo.length > 0) {
+    resultado.blocosEncontrados.push('Conteudo Programatico');
 
-  for (var i = 0; i < linhas.length; i++) {
-    var linha = linhas[i].trim();
-    if (/conte[uú]do\s+program[aá]tico/i.test(linha)) {
-      dentroConteudo = true;
-      continue;
-    }
-    if (!dentroConteudo) continue;
+    var materiaAtual = null;
 
-    // Check if this line is a materia name from our list
-    var matchedMateria = materias.find(function(m) {
-      return linha.toLowerCase().indexOf(m.nome.toLowerCase()) !== -1;
-    });
+    secaoConteudo.forEach(function(linha) {
+      linha = linha.trim();
+      if (!linha || linha.length < 3) return;
 
-    if (matchedMateria) {
-      materiaAtual = matchedMateria;
-      continue;
-    }
-
-    // Sub-items (topics) for the current materia
-    if (materiaAtual && /^\d+[\.\)]|^[a-z]\)|^[-–•]/.test(linha)) {
-      var topico = linha.replace(/^\d+[\.\)]\s*/, '').replace(/^[a-z]\)\s*/, '').replace(/^[-–•]\s*/, '').trim();
-      if (topico.length > 2 && topico.length < 80) {
-        materiaAtual.topicos = materiaAtual.topicos ? materiaAtual.topicos + ', ' + topico : topico;
+      // Discard noise sections
+      if (SECOES_DESCARTAVEIS.some(function(p) { return p.test(linha); })) {
+        materiaAtual = null;
+        return;
       }
-    }
 
-    // End if we hit another major section
-    if (/^(?:CARGO|T[IÍ]TULO|CAP[IÍ]TULO|ANEXO|DAS\s+DISPOSI)/i.test(linha) && materias.length > 0) {
-      break;
-    }
+      // Check if this line matches a materia from Estrutura
+      var matched = resultado.materias.find(function(m) {
+        return linha.toLowerCase().indexOf(m.nome.toLowerCase()) !== -1 ||
+               m.nome.toLowerCase().indexOf(linha.toLowerCase().replace(/^\d+[\.\)]\s*/, '').trim()) !== -1;
+      });
+
+      if (matched) {
+        materiaAtual = matched;
+        return;
+      }
+
+      // If no materias from Estrutura, try to create from hierarchy
+      if (resultado.materias.length === 0) {
+        var parsed = parseHierarchyLine(linha);
+        if (parsed && parsed.level === 1) {
+          var nome = normalizarNomeMateria(parsed.text);
+          materiaAtual = {
+            nome: nome, questoes: 0, peso: 1, pontos: 0, relevancia: 0,
+            topicos: '', topicosArray: [], fonte: 'analise_renno', confianca: 70
+          };
+          resultado.materias.push(materiaAtual);
+          return;
+        }
+      }
+
+      // Collect topics for current materia
+      if (materiaAtual) {
+        var isTopicLine = /^\d+[\.\)]|^[a-z]\)|^[-–•]|^\d+\.\d+/.test(linha);
+        var isContentLine = linha.length > 3 && linha.length < 120;
+
+        if (isTopicLine || isContentLine) {
+          var topico = limparTopico(linha.replace(/^\d+[\.\)]\s*/, '').replace(/^[a-z]\)\s*/, '').replace(/^[-–•]\s*/, ''));
+          if (topico.length > 2 && topico.length < 80) {
+            materiaAtual.topicosArray.push(topico);
+            materiaAtual.topicos = materiaAtual.topicosArray.slice(0, 15).join(', ');
+          }
+        }
+      }
+    });
   }
 
-  console.log('[Renno] Tabela de provas extraida:', materias.length, 'materias');
-  return materias;
+  // ===== BLOCO 3: [Estrategia de Estudos] =====
+  var secaoEstrategia = extrairSecao(linhas, TAG_ESTRATEGIA);
+  if (secaoEstrategia.length > 0) {
+    resultado.blocosEncontrados.push('Estrategia de Estudos');
+    resultado.estrategia = secaoEstrategia.join(' ').substring(0, 500).trim();
+  }
+
+  // Sort by relevance (pontos) descending
+  resultado.materias.sort(function(a, b) { return b.pontos - a.pontos; });
+
+  console.log('[Renno] Blocos encontrados:', resultado.blocosEncontrados.join(', '));
+  console.log('[Renno] Materias:', resultado.materias.length, '| Total pontos:', resultado.totalPontos);
+  if (resultado.estrategia) console.log('[Renno] Estrategia:', resultado.estrategia.substring(0, 100) + '...');
+
+  // Return materias in the format expected by the rest of the system
+  // (backwards compat: return array, but attach metadata)
+  var materiasArray = resultado.materias;
+  materiasArray._resultado = resultado;
+  return materiasArray;
 }
 
 // =============================================

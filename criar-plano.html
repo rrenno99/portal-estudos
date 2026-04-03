@@ -490,12 +490,23 @@
         </div>
 
         <!-- Renno detected banner (shown when Renno format is detected in edital) -->
-        <div id="rennoDetectedBanner" style="display:none;padding:12px;background:linear-gradient(135deg,rgba(56,161,105,0.08),rgba(56,161,105,0.02));border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:8px">
+        <div id="rennoDetectedBanner" style="display:none;padding:14px;background:linear-gradient(135deg,rgba(56,161,105,0.08),rgba(56,161,105,0.02));border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span>⭐</span>
             <strong style="font-size:0.85rem;color:var(--success)">Analise Estruturada detectada!</strong>
           </div>
-          <p style="font-size:0.78rem;color:var(--text-light);margin-top:4px">Dados de materias e pesos extraidos com precisao do modelo Prof. Renno.</p>
+          <div id="rennoBlocosInfo" style="font-size:0.75rem;color:var(--text-light);display:flex;gap:8px;flex-wrap:wrap"></div>
+          <div id="rennoEstrategiaAlerta" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(30,136,229,0.06);border-radius:6px;font-size:0.78rem;color:var(--primary)"></div>
+        </div>
+
+        <!-- Format not recognized warning -->
+        <div id="rennoFormatoErro" style="display:none;padding:14px;background:#FFF5F5;border:1px solid #FED7D7;border-radius:var(--radius-sm);margin-bottom:12px">
+          <strong style="font-size:0.85rem;color:#C53030">Formato de analise nao reconhecido.</strong>
+          <p style="font-size:0.78rem;color:var(--text-light);margin-top:4px">Nao encontramos os blocos obrigatorios (Estrutura das Provas / Conteudo Programatico).</p>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary" onclick="usarExtratorGenerico()" style="font-size:0.82rem;padding:6px 14px">Usar extrator generico</button>
+            <button class="btn-add-cancel" onclick="mostrarColarManual()" style="font-size:0.82rem">Colar manualmente</button>
+          </div>
         </div>
 
         <!-- Link da Analise Estruturada -->
@@ -1423,52 +1434,96 @@
 
         if (window.MentorIA.detectarAnaliseRenno(texto)) {
           var materias = window.MentorIA.extrairTabelaProvas(texto);
+          var resultado = materias._resultado || { blocosEncontrados: [], estrategia: '', totalPontos: 0 };
+
           if (materias.length > 0) {
             _materiasExtraidasEdital = materias;
             _rennoPrioridade = true;
 
-            // Show results
+            // Show detected blocks
             document.getElementById('rennoDetectedBanner').style.display = '';
+            document.getElementById('rennoFormatoErro').style.display = 'none';
+
+            var blocosHtml = resultado.blocosEncontrados.map(function(b) {
+              return '<span style="background:rgba(56,161,105,0.12);color:var(--success);padding:2px 8px;border-radius:4px;font-weight:600">✓ ' + b + '</span>';
+            }).join('');
+            document.getElementById('rennoBlocosInfo').innerHTML = blocosHtml;
+
+            // Show strategy alert if available
+            var alertaDiv = document.getElementById('rennoEstrategiaAlerta');
+            if (resultado.estrategia) {
+              alertaDiv.style.display = '';
+              alertaDiv.innerHTML = '💡 <strong>Alerta do Mentor:</strong> ' + resultado.estrategia.substring(0, 200);
+            } else {
+              alertaDiv.style.display = 'none';
+            }
+
+            // Title with total points
             document.getElementById('editalResultTitle').innerHTML =
-              '⭐ <strong>Analise Prof. Renno</strong> — ' + materias.length + ' materias com pesos extraidos';
+              '⭐ <strong>Analise Prof. Renno</strong> — ' + materias.length + ' materias'
+              + (resultado.totalPontos > 0 ? ' (' + resultado.totalPontos + ' pontos totais)' : '');
 
             var pesos = {};
             materias.forEach(function(m) { if (m.pontos) pesos[m.nome] = m.pontos; });
             pesos._encontrouPesos = true;
 
-            if (typeof renderTabelaTriangulada === 'function') {
-              renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null);
-            } else {
-              renderTabelaMaterias(_materiasExtraidasEdital, pesos);
-            }
+            renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null);
             document.getElementById('editalMateriasPreview').style.display = '';
             document.getElementById('editalPesoQuestion').style.display = 'none';
             document.getElementById('btnProcessarEdital').style.display = 'none';
 
-            // Try to extract cargo name
+            // Auto-fill cargo
             var cargoInput = document.getElementById('editalCargoInput');
             if (cargoInput && !cargoInput.value) {
               var cargos = window.MentorIA.extrairCargos(texto);
               if (cargos.length > 0) cargoInput.value = cargos[0];
             }
 
+            // Auto-fill exam date
+            var dataExtraida = window.MentorIA.extrairDataProva(texto);
+            if (dataExtraida && !document.getElementById('dataProva').value) {
+              document.getElementById('dataProva').value = dataExtraida;
+            }
+
             selectedConcurso = document.getElementById('editalCargoInput').value || 'Analise Renno';
-            console.log('[Renno] Upload processado:', materias.length, 'materias com pesos');
             return;
           }
         }
 
-        // Not a Renno format — treat as regular edital
-        alert('Este arquivo nao parece ser uma Analise Estruturada do Prof. Renno. Tente subi-lo como Edital normal.');
-        _rennoFile = null;
-        area.classList.remove('has-file');
-        area.style.borderColor = '';
-        document.getElementById('rennoFileName').style.display = 'none';
+        // Format not recognized — show fallback options
+        document.getElementById('rennoDetectedBanner').style.display = 'none';
+        document.getElementById('rennoFormatoErro').style.display = '';
+        _textoEditalCompleto = texto; // store for generic extractor fallback
 
       } catch (e) {
         console.error('[Renno] Erro:', e);
         alert('Erro ao processar o arquivo: ' + e.message);
       }
+    }
+
+    function usarExtratorGenerico() {
+      document.getElementById('rennoFormatoErro').style.display = 'none';
+      // Use the text already extracted and run generic parser
+      if (_textoEditalCompleto) {
+        _materiasExtraidasEdital = window.MentorIA.extrairMateriasDoTexto(_textoEditalCompleto);
+        var pesos = window.MentorIA.extrairPesosPorMateria(_textoEditalCompleto, _materiasExtraidasEdital);
+
+        if (_materiasExtraidasEdital.length > 0) {
+          document.getElementById('editalResultTitle').textContent =
+            _materiasExtraidasEdital.length + ' materias extraidas (extrator generico)';
+          renderTabelaTriangulada(_materiasExtraidasEdital, pesos, null);
+          document.getElementById('editalMateriasPreview').style.display = '';
+          document.getElementById('editalPesoQuestion').style.display = pesos._encontrouPesos ? 'none' : '';
+        } else {
+          mostrarColarManual();
+        }
+      }
+    }
+
+    function mostrarColarManual() {
+      document.getElementById('rennoFormatoErro').style.display = 'none';
+      document.getElementById('editalFallback').style.display = '';
+      document.getElementById('editalFallback').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     async function importarLinkAnalise() {
