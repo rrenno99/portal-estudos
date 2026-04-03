@@ -560,69 +560,119 @@
     .welcome-streak {
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: linear-gradient(135deg, #EBF5FF, #fff);
-      border: 1px solid rgba(30,136,229,0.2);
-      padding: 14px 20px;
+      gap: 14px;
+      background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #1A1A2E 100%);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 16px 22px;
       border-radius: var(--radius);
       flex-shrink: 0;
       transition: all 0.5s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .welcome-streak::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 50%, rgba(255,152,0,0.06) 0%, transparent 60%);
+      pointer-events: none;
     }
 
-    /* Meta batida: gradiente dourado */
+    /* Fogo aceso: borda quente */
+    .welcome-streak.streak-active {
+      border-color: rgba(255,152,0,0.25);
+      box-shadow: 0 2px 16px rgba(255,152,0,0.1);
+    }
+    .welcome-streak.streak-active::before {
+      background: radial-gradient(circle at 20% 50%, rgba(255,152,0,0.12) 0%, transparent 60%);
+    }
+
+    /* Meta semanal batida: dourado */
     .welcome-streak.meta-batida {
-      background: linear-gradient(135deg, #FFF8E1, #FFFDE7, #FFF8E1);
-      border-color: rgba(255,152,0,0.3);
-      box-shadow: 0 0 12px rgba(255,152,0,0.15);
+      border-color: rgba(255,193,7,0.35);
+      box-shadow: 0 2px 20px rgba(255,193,7,0.18);
+      background: linear-gradient(135deg, #1A1A2E 0%, #2A1F0E 50%, #1A1A2E 100%);
+    }
+    .welcome-streak.meta-batida::before {
+      background: radial-gradient(circle at 20% 50%, rgba(255,193,7,0.15) 0%, transparent 60%);
     }
 
     .streak-fire {
-      font-size: 2rem;
-      transition: all 0.3s ease;
+      font-size: 2.2rem;
+      transition: all 0.4s ease;
+      flex-shrink: 0;
     }
     .streak-fire.off {
-      filter: grayscale(1);
-      opacity: 0.35;
+      filter: grayscale(1) brightness(0.5);
+      opacity: 0.3;
     }
     .streak-fire.pulse {
       animation: firePulse 1.5s ease-in-out infinite;
     }
+    /* Ignite animation: played once when first session of the day fires */
+    .streak-fire.ignite {
+      animation: fireIgnite 0.8s ease;
+    }
+    @keyframes fireIgnite {
+      0%   { transform: scale(0.5); filter: grayscale(1) brightness(0.5); opacity: 0.3; }
+      40%  { transform: scale(1.5); filter: grayscale(0) brightness(1.5); opacity: 1; }
+      70%  { transform: scale(0.9); }
+      100% { transform: scale(1); filter: brightness(1); opacity: 1; }
+    }
 
-    .streak-info { display: flex; flex-direction: column; gap: 2px; }
+    .streak-content { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
-    .streak-info .streak-number {
+    .streak-main {
       display: flex;
       align-items: baseline;
-      gap: 4px;
+      gap: 6px;
     }
-    .streak-info .streak-number strong {
-      font-size: 1.3rem;
+    .streak-main .streak-days {
+      font-size: 1.6rem;
       font-weight: 800;
-      color: var(--secondary);
+      color: #FFFFFF;
+      line-height: 1;
     }
-    .streak-info .streak-number .streak-meta {
+    .streak-main .streak-days-label {
       font-size: 0.82rem;
       font-weight: 600;
-      color: var(--text-lighter);
+      color: rgba(255,255,255,0.5);
     }
 
-    .streak-info .streak-label {
+    .streak-sublabel {
       font-size: 0.72rem;
-      color: var(--text-light);
+      color: rgba(255,255,255,0.45);
+      line-height: 1.3;
+    }
+    .streak-sublabel.warn {
+      color: #FF9800;
     }
 
-    .streak-info .streak-week {
+    .streak-week-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       margin-top: 4px;
+    }
+    .streak-week-text {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      white-space: nowrap;
+    }
+    .streak-week-bar {
+      flex: 1;
       height: 4px;
-      background: var(--border);
+      background: rgba(255,255,255,0.08);
       border-radius: 4px;
       overflow: hidden;
-      min-width: 80px;
+      min-width: 50px;
     }
-    .streak-info .streak-week-fill {
+    .streak-week-fill {
       height: 100%;
       border-radius: 4px;
       transition: width 0.8s ease;
+      background: var(--primary);
     }
 
     /* =========================================
@@ -2024,14 +2074,17 @@
           </div>
           <div class="welcome-streak" id="streakCard">
             <span class="streak-fire off" id="streakFireIcon">🔥</span>
-            <div class="streak-info">
-              <div class="streak-number">
-                <strong id="streakCount">0</strong>
-                <span class="streak-meta" id="streakMeta">/5 dias</span>
+            <div class="streak-content">
+              <div class="streak-main">
+                <span class="streak-days" id="streakDays">0</span>
+                <span class="streak-days-label" id="streakDaysLabel">dias</span>
               </div>
-              <span class="streak-label" id="streakLabel">em sequencia esta semana</span>
-              <div class="streak-week">
-                <div class="streak-week-fill" id="streakWeekFill" style="width:0%;background:var(--primary)"></div>
+              <span class="streak-sublabel" id="streakSublabel">comece a estudar hoje!</span>
+              <div class="streak-week-row">
+                <span class="streak-week-text" id="streakWeekText">Meta: 0/5</span>
+                <div class="streak-week-bar">
+                  <div class="streak-week-fill" id="streakWeekFill" style="width:0%"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -3314,7 +3367,7 @@
         console.error('[Timer] Erro:', e);
       }
       await carregarSessoesSupabase();
-      await carregarDiasEstudados();
+      await carregarDiasEstudados(true);
       calcularEstatisticas();
       atualizarPulsoFogo();
       renderCalendar();
@@ -3524,7 +3577,7 @@
     var _streakCount = 0;
     var _estudouHoje = false;
 
-    async function carregarDiasEstudados() {
+    async function carregarDiasEstudados(animate) {
       try {
         var sb = window._supabase;
         if (!sb || !window._userId) return;
@@ -3605,7 +3658,7 @@
         }
 
         // === UPDATE ALL UI ===
-        renderStreakCard();
+        renderStreakCard(animate);
 
         // Stats card
         document.getElementById('statDiasEstudados').textContent = diasEstudadosTotal;
@@ -3636,60 +3689,101 @@
       }
     }
 
-    function renderStreakCard() {
+    var _streakWasOff = true; // track if fire was off to trigger ignite
+
+    function renderStreakCard(animate) {
       var card = document.getElementById('streakCard');
       var fireIcon = document.getElementById('streakFireIcon');
-      var countEl = document.getElementById('streakCount');
-      var metaEl = document.getElementById('streakMeta');
-      var labelEl = document.getElementById('streakLabel');
+      var daysEl = document.getElementById('streakDays');
+      var daysLabelEl = document.getElementById('streakDaysLabel');
+      var sublabelEl = document.getElementById('streakSublabel');
+      var weekTextEl = document.getElementById('streakWeekText');
       var fillEl = document.getElementById('streakWeekFill');
 
-      // Streak number
-      countEl.textContent = _streakCount;
-      metaEl.textContent = '/' + metaDiasSemana + ' dias';
+      // Main number: total consecutive days
+      daysEl.textContent = _streakCount;
+      daysLabelEl.textContent = _streakCount === 1 ? 'dia' : 'dias';
 
-      // Fire icon state
+      // Fire icon
       if (_estudouHoje) {
+        var wasOff = fireIcon.classList.contains('off');
         fireIcon.classList.remove('off');
-        if (_streakCount >= 3) {
+
+        // Ignite animation: only on first transition off -> on
+        if (wasOff && animate) {
+          fireIcon.classList.remove('pulse');
+          fireIcon.classList.add('ignite');
+          setTimeout(function() {
+            fireIcon.classList.remove('ignite');
+            if (_streakCount >= 3) fireIcon.classList.add('pulse');
+          }, 900);
+
+          // Fire confetti on the streak card
+          dispararFogoStreak();
+        } else if (_streakCount >= 3) {
           fireIcon.classList.add('pulse');
         } else {
           fireIcon.classList.remove('pulse');
         }
+
+        card.classList.add('streak-active');
       } else {
         fireIcon.classList.add('off');
-        fireIcon.classList.remove('pulse');
+        fireIcon.classList.remove('pulse', 'ignite');
+        card.classList.remove('streak-active');
       }
 
-      // Label
+      // Sublabel
+      sublabelEl.classList.remove('warn');
       if (!_estudouHoje && _streakCount > 0) {
-        labelEl.textContent = 'em sequencia — estude hoje para manter!';
-        labelEl.style.color = 'var(--warning, #FF9800)';
+        sublabelEl.textContent = 'Estude hoje para manter a sequencia!';
+        sublabelEl.classList.add('warn');
       } else if (_estudouHoje && diasEstudadosSemana >= metaDiasSemana) {
-        labelEl.textContent = 'meta semanal atingida!';
-        labelEl.style.color = 'var(--success)';
+        sublabelEl.textContent = 'Meta semanal atingida! Voce e incrivel!';
+      } else if (_estudouHoje && _streakCount >= 7) {
+        sublabelEl.textContent = _streakCount + ' dias consecutivos! Habito formado!';
       } else if (_estudouHoje) {
-        labelEl.textContent = 'em sequencia esta semana';
-        labelEl.style.color = '';
+        sublabelEl.textContent = 'Sequencia ativa — continue assim!';
+      } else if (_streakCount === 0) {
+        sublabelEl.textContent = 'Comece a estudar hoje!';
       } else {
-        labelEl.textContent = 'comece a estudar hoje!';
-        labelEl.style.color = '';
+        sublabelEl.textContent = 'Inicie uma sessao para somar +1';
       }
 
-      // Progress bar
+      // Weekly meta bar
       var pct = metaDiasSemana > 0 ? Math.min(100, Math.round((diasEstudadosSemana / metaDiasSemana) * 100)) : 0;
+      weekTextEl.textContent = 'Meta: ' + diasEstudadosSemana + '/' + metaDiasSemana;
       fillEl.style.width = pct + '%';
 
-      // Card state: meta batida = golden
+      // Card state
       if (diasEstudadosSemana >= metaDiasSemana && metaDiasSemana > 0) {
         card.classList.add('meta-batida');
         fillEl.style.background = 'linear-gradient(90deg, #FF9800, #FFC107)';
-        countEl.style.color = '#E65100';
       } else {
         card.classList.remove('meta-batida');
         fillEl.style.background = _estudouHoje ? 'var(--success)' : 'var(--primary)';
-        countEl.style.color = '';
       }
+    }
+
+    function dispararFogoStreak() {
+      if (typeof confetti !== 'function') return;
+      var card = document.getElementById('streakCard');
+      if (!card) return;
+      var rect = card.getBoundingClientRect();
+      var x = (rect.left + rect.width * 0.2) / window.innerWidth;
+      var y = (rect.top + rect.height * 0.5) / window.innerHeight;
+
+      confetti({
+        particleCount: 40,
+        spread: 55,
+        startVelocity: 25,
+        origin: { x: x, y: y },
+        colors: ['#FF6D00', '#FF9800', '#FFC107', '#FFEB3B', '#FF5722'],
+        shapes: ['circle'],
+        gravity: 0.8,
+        scalar: 0.8,
+        ticks: 100
+      });
     }
 
     // =============================================
@@ -3764,8 +3858,7 @@
 
     // Update streak fire pulse
     function atualizarPulsoFogo() {
-      // Now handled by renderStreakCard, kept for backwards compat
-      renderStreakCard();
+      renderStreakCard(false);
     }
 
     // =============================================
