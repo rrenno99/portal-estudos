@@ -212,16 +212,6 @@
     }
     .sidebar-toggle:hover { background: var(--bg); }
 
-    .topbar-greeting h2 {
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--secondary);
-    }
-    .topbar-greeting p {
-      font-size: 0.78rem;
-      color: var(--text-light);
-    }
-
     .topbar-right {
       display: flex;
       align-items: center;
@@ -1759,10 +1749,6 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="sidebar-toggle" id="sidebarToggle" title="Menu">☰</button>
-          <div class="topbar-greeting">
-            <h2 id="topbarGreeting">Olá! 👋</h2>
-            <p>Seu plano acaba em <strong style="color:var(--primary)" id="topbarPlanEnd">—</strong></p>
-          </div>
         </div>
 
         <div class="topbar-right">
@@ -1863,9 +1849,9 @@
             <div class="plan-progress-bar">
               <div class="plan-progress-fill" id="mainProgressFill" style="width:0%"></div>
             </div>
-            <p class="plan-end-text">
-              Seu planejamento de estudos acabou em
-              <a href="criar-plano.html">CRIAR PLANO</a>
+            <p class="plan-end-text" id="planEndText">
+              Deseja ajustar sua rota?
+              <a href="criar-plano.html">CRIAR NOVO PLANO</a>
             </p>
           </div>
           <div class="welcome-streak">
@@ -1950,7 +1936,7 @@
           </div>
           <div class="progress-details">
             <span id="progressConcurso">Concurso: —</span>
-            <span id="progressPlanDate">Plano válido até —</span>
+            <span id="progressPlanDate">Data-alvo do objetivo: —</span>
           </div>
         </div>
 
@@ -3416,7 +3402,6 @@
       const firstName = nome ? nome.split(' ')[0] : 'Aluno';
 
       document.getElementById('welcomeTitle').textContent = `Olá, ${firstName}! 👋`;
-      document.getElementById('topbarGreeting').textContent = `Olá, ${firstName}! 👋`;
       document.getElementById('userNameLabel').textContent = firstName;
       document.getElementById('dropdownName').textContent = nome || 'Aluno';
       document.getElementById('dropdownEmail').textContent = email || '';
@@ -3650,9 +3635,20 @@
           localStorage.setItem('studyplan_perfil', JSON.stringify(perfil));
 
           if (perfil.data_prova) {
-            const d = new Date(perfil.data_prova).toLocaleDateString('pt-BR');
-            document.getElementById('topbarPlanEnd').textContent = d;
-            document.getElementById('progressPlanDate').textContent = 'Plano válido até ' + d;
+            const dataProva = new Date(perfil.data_prova);
+            const d = dataProva.toLocaleDateString('pt-BR');
+            const hoje = new Date();
+            hoje.setHours(0,0,0,0);
+            dataProva.setHours(0,0,0,0);
+            const diffDias = Math.ceil((dataProva - hoje) / (1000 * 60 * 60 * 24));
+
+            if (diffDias > 0) {
+              document.getElementById('progressPlanDate').textContent = `Faltam ${diffDias} dias para o seu objetivo (${d})`;
+            } else if (diffDias === 0) {
+              document.getElementById('progressPlanDate').textContent = `Hoje e o dia! Boa prova! (${d})`;
+            } else {
+              document.getElementById('progressPlanDate').textContent = `Data-alvo do objetivo: ${d}`;
+            }
             document.getElementById('dropdownPlanDate').textContent = d;
           }
 
