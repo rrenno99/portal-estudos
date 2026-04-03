@@ -815,30 +815,26 @@
 
     .weekly-calendar {
       display: grid;
-      grid-template-columns: 56px repeat(7, 1fr);
-      gap: 3px;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
       overflow-x: auto;
     }
 
-    .cal-time {
-      font-size: 0.72rem;
-      color: var(--text-lighter);
+    .cal-day-col {
       display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding-right: 8px;
-      height: 52px;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
     }
 
     .cal-day-header {
       background: var(--bg);
       border-radius: 8px;
-      padding: 6px 4px;
+      padding: 8px 4px;
       text-align: center;
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-light);
-      height: 52px;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -856,18 +852,44 @@
       color: white;
     }
 
+    .cal-day-header .cal-day-count {
+      font-size: 0.58rem;
+      font-weight: 500;
+      opacity: 0.7;
+      margin-top: 1px;
+    }
+
+    .cal-day-slots {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .cal-day-slots::-webkit-scrollbar { width: 3px; }
+    .cal-day-slots::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .cal-day-empty {
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--text-lighter);
+      padding: 12px 4px;
+      font-style: italic;
+    }
+
     .cal-slot {
       border-radius: 6px;
       padding: 6px 8px;
       font-size: 0.7rem;
       font-weight: 600;
       color: white;
-      height: 52px;
+      min-height: 38px;
       display: flex;
       align-items: center;
       cursor: pointer;
       transition: var(--transition);
       overflow: hidden;
+      position: relative;
     }
 
     .cal-slot:hover { opacity: 0.85; transform: scale(1.02); }
@@ -878,29 +900,47 @@
       font-weight: 400;
     }
 
+    /* Slot label for planned vs extra */
+    .cal-slot-badge {
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      font-size: 0.45rem;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 3px;
+      line-height: 1.2;
+      letter-spacing: 0.3px;
+    }
+
     /* Calendario: materia concluida (estudada nesse dia) */
     .cal-slot.cal-done {
-      opacity: 0.5;
-      position: relative;
+      opacity: 0.55;
     }
     .cal-slot.cal-done .cal-slot-name {
       text-decoration: line-through;
     }
-    .cal-slot.cal-done::after {
-      content: '✓';
-      position: absolute;
-      top: 4px;
-      right: 6px;
-      font-size: 0.7rem;
-      font-weight: 800;
+    .cal-slot.cal-done .cal-slot-badge {
+      background: rgba(255,255,255,0.9);
+      color: var(--success);
     }
     .cal-slot.cal-done-anim {
       animation: calDonePop 0.5s ease;
     }
     @keyframes calDonePop {
       0%   { transform: scale(1); }
-      30%  { transform: scale(1.08); background: rgba(56,161,105,0.3); }
+      30%  { transform: scale(1.08); box-shadow: 0 0 12px rgba(56,161,105,0.4); }
       100% { transform: scale(1); }
+    }
+
+    /* Calendario: produtividade extra (além da meta) */
+    .cal-slot.cal-extra {
+      opacity: 0.55;
+      border: 1.5px dashed rgba(255,255,255,0.4);
+    }
+    .cal-slot.cal-extra .cal-slot-badge {
+      background: #FF9800;
+      color: white;
     }
 
     /* Calendario: proxima materia (slot de hoje) */
@@ -908,30 +948,11 @@
       outline: 2.5px solid var(--primary);
       outline-offset: -2px;
       animation: pulseBorder 2s ease-in-out infinite;
-      position: relative;
       box-shadow: 0 0 8px rgba(30,136,229,0.3);
     }
-    .cal-slot.cal-next::before {
-      content: 'ESTUDAR AGORA';
-      position: absolute;
-      top: 3px;
-      right: 4px;
-      font-size: 0.45rem;
-      font-weight: 800;
+    .cal-slot.cal-next .cal-slot-badge {
       background: white;
       color: var(--primary);
-      padding: 1px 4px;
-      border-radius: 3px;
-      line-height: 1.2;
-      letter-spacing: 0.3px;
-    }
-
-    /* Calendario: dia de descanso ou sem aula */
-    .cal-slot.cal-rest {
-      background: var(--bg) !important;
-      color: var(--text-lighter) !important;
-      font-weight: 400;
-      font-style: italic;
     }
 
     /* Calendario: dia passado sem sessao registrada */
@@ -939,6 +960,7 @@
       opacity: 0.25;
       background: var(--border) !important;
       color: var(--text-lighter) !important;
+      min-height: 28px;
     }
 
     .subject-dir-admin  { background: var(--primary); }
@@ -1674,7 +1696,9 @@
       .dashboard-body { padding: 16px 16px 40px; }
       .credits-badge { display: none; }
       .user-name-label { display: none; }
-      .weekly-calendar { grid-template-columns: 44px repeat(7, minmax(70px, 1fr)); }
+      .weekly-calendar { grid-template-columns: repeat(7, minmax(60px, 1fr)); }
+      .cal-day-slots { max-height: 240px; }
+      .cal-slot { min-height: 32px; font-size: 0.62rem; padding: 4px 6px; }
 
       /* Profile modal — mobile */
       .profile-modal {
@@ -2798,177 +2822,179 @@
     }
 
     function renderCalendar() {
-      const days = getWeekDates(weekOffset);
-      const today = new Date();
+      var days = getWeekDates(weekOffset);
+      var today = new Date();
       today.setHours(0,0,0,0);
-      const subjects = getCicloSubjects();
-
-      if (subjects.length === 0) {
-        document.getElementById('weeklyCalendar').innerHTML = '<p style="padding:20px;color:var(--text-lighter);text-align:center;grid-column:1/-1">Crie um plano para ver o cronograma</p>';
-        return;
-      }
-
-      // Build time slots
-      var maxSlots = Math.max(_calConfig.slotsPerDay, _calConfig.slotsFds || 0);
-      var times = [];
-      for (var ti = 0; ti < maxSlots; ti++) {
-        var h = _calConfig.startHour + ti;
-        if (h >= 24) break;
-        times.push(String(h).padStart(2,'0') + ':00');
-      }
-      if (times.length === 0) times = ['08:00','09:00','10:00'];
-
-      // Current "next" subject from cycle
-      var proximaMateria = subjects[_cicloPosicao % subjects.length];
+      var subjects = getCicloSubjects();
 
       document.getElementById('weekLabel').textContent = formatDate(days[0]) + ' — ' + formatDate(days[6]);
-
       var grid = document.getElementById('weeklyCalendar');
       grid.innerHTML = '';
 
-      // Headers
-      grid.appendChild(el('div','cal-time',''));
-      days.forEach(function(d, i) {
-        var isToday = d.toDateString() === today.toDateString();
-        var h = el('div', 'cal-day-header' + (isToday ? ' today' : ''), '');
-        h.innerHTML = '<span>' + DAYS_PT[(i+1)%7] + '</span>' + formatDate(d);
-        grid.appendChild(h);
-      });
+      if (subjects.length === 0) {
+        grid.innerHTML = '<p style="padding:20px;color:var(--text-lighter);text-align:center;grid-column:1/-1">Crie um plano para ver o cronograma</p>';
+        return;
+      }
 
-      // For future projection: track cycle index starting from current position
-      var futureIdx = _cicloPosicao;
-      // Count how many study slots are TODAY before the current time slot (already studied today)
-      var todayStudiedSet = _sessoesHistorico[today.getFullYear() + '-' + (today.getMonth()+1) + '-' + today.getDate()] || new Set();
+      var todayDateKey = today.getFullYear() + '-' + (today.getMonth()+1) + '-' + today.getDate();
+      var todayStudied = _sessoesHistorico[todayDateKey] || new Set();
+      var plannedPerDay = _calConfig.slotsPerDay;
 
-      // Render rows
-      times.forEach(function(time, timeIdx) {
-        grid.appendChild(el('div','cal-time', time));
-
-        days.forEach(function(d, dayIdx) {
-          var dayOfWeek = (dayIdx + 1) % 7;
-          var isStudyDay = _calConfig.studyDays.indexOf(dayOfWeek) !== -1;
-          var isFds = dayOfWeek === 0 || dayOfWeek === 6;
-          var slotsForDay = isFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
-          var isToday = d.toDateString() === today.toDateString();
-          var dayDate = new Date(d); dayDate.setHours(0,0,0,0);
-          var isPast = dayDate < today;
-          var isFuture = dayDate > today;
-          var dateKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-          var sessoesNoDia = _sessoesHistorico[dateKey] || new Set();
-
-          // If not a study day or slot beyond day's limit
-          if (!isStudyDay || timeIdx >= slotsForDay) {
-            grid.appendChild(el('div', 'cal-slot empty', ''));
-            return;
+      // Count how many future study slots from today to each day (for projection)
+      function countFutureSlots(fromDate, toDate) {
+        var count = 0;
+        var d = new Date(fromDate);
+        d.setDate(d.getDate() + 1);
+        while (d <= toDate) {
+          var dow = d.getDay();
+          if (_calConfig.studyDays.indexOf(dow) !== -1) {
+            var fds = dow === 0 || dow === 6;
+            count += fds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
           }
+          d.setDate(d.getDate() + 1);
+        }
+        return count;
+      }
 
-          // Check if this is the Revisao slot (last slot of the day)
-          var isRevisao = _calConfig.hasRevisao && timeIdx === slotsForDay - 1;
+      // Render each day as a column
+      days.forEach(function(d, dayIdx) {
+        var col = document.createElement('div');
+        col.className = 'cal-day-col';
 
-          // === PAST DAYS: show actual history ===
-          if (isPast) {
-            var materias = Array.from(sessoesNoDia);
-            if (materias.length > 0 && !isRevisao) {
-              // Show the actual subject studied in this slot
-              var mat = materias[timeIdx] || materias[materias.length - 1];
+        var dayOfWeek = (dayIdx + 1) % 7;
+        var isToday = d.toDateString() === today.toDateString();
+        var dayDate = new Date(d); dayDate.setHours(0,0,0,0);
+        var isPast = dayDate < today;
+        var isFuture = dayDate > today;
+        var isStudyDay = _calConfig.studyDays.indexOf(dayOfWeek) !== -1;
+        var dateKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+        var sessoesNoDia = _sessoesHistorico[dateKey] || new Set();
+        var isFds = dayOfWeek === 0 || dayOfWeek === 6;
+        var slotsForDay = isFds ? (_calConfig.slotsFds || 0) : plannedPerDay;
+
+        // Header
+        var header = document.createElement('div');
+        header.className = 'cal-day-header' + (isToday ? ' today' : '');
+        var countLabel = '';
+        if (isPast && sessoesNoDia.size > 0) {
+          countLabel = '<div class="cal-day-count">' + sessoesNoDia.size + ' matéria' + (sessoesNoDia.size > 1 ? 's' : '') + '</div>';
+        } else if (isToday && todayStudied.size > 0) {
+          countLabel = '<div class="cal-day-count">' + todayStudied.size + '/' + slotsForDay + ' feitas</div>';
+        }
+        header.innerHTML = '<span>' + DAYS_PT[dayOfWeek] + '</span>' + formatDate(d) + countLabel;
+        col.appendChild(header);
+
+        // Slots container
+        var slotsDiv = document.createElement('div');
+        slotsDiv.className = 'cal-day-slots';
+
+        // === NOT A STUDY DAY ===
+        if (!isStudyDay) {
+          slotsDiv.innerHTML = '<div class="cal-day-empty">Descanso</div>';
+          col.appendChild(slotsDiv);
+          grid.appendChild(col);
+          return;
+        }
+
+        // === PAST: show real history (elastic) ===
+        if (isPast) {
+          var materias = Array.from(sessoesNoDia);
+          if (materias.length === 0) {
+            slotsDiv.innerHTML = '<div class="cal-slot cal-missed">—</div>';
+          } else {
+            materias.forEach(function(mat, idx) {
               var colorIdx = subjects.indexOf(mat);
-              if (colorIdx === -1) colorIdx = 0;
+              if (colorIdx === -1) colorIdx = idx;
               var cls = SUBJECT_COLORS[colorIdx % SUBJECT_COLORS.length].cls;
               var shortName = mat.length > 16 ? mat.substring(0,14) + '…' : mat;
+              var isExtra = idx >= slotsForDay;
               var cell = document.createElement('div');
-              cell.className = 'cal-slot ' + cls + ' cal-done';
-              cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>';
-              grid.appendChild(cell);
-            } else if (isRevisao) {
-              grid.appendChild(el('div', 'cal-slot subject-revisao' + (sessoesNoDia.size > 0 ? ' cal-done' : ' cal-missed'), 'Revisão'));
-            } else {
-              // No session this slot -> missed
-              grid.appendChild(el('div', 'cal-slot cal-missed', '—'));
-            }
-            return;
+              cell.className = 'cal-slot ' + cls + ' cal-done' + (isExtra ? ' cal-extra' : '');
+              cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>'
+                + '<span class="cal-slot-badge">' + (isExtra ? 'EXTRA' : '✓') + '</span>';
+              slotsDiv.appendChild(cell);
+            });
           }
+          col.appendChild(slotsDiv);
+          grid.appendChild(col);
+          return;
+        }
 
-          // === TODAY: mix of history + next from cycle ===
-          if (isToday) {
-            if (isRevisao) {
-              grid.appendChild(el('div', 'cal-slot subject-revisao', 'Revisão'));
-              return;
-            }
+        // === TODAY: studied + next from cycle + projected ===
+        if (isToday) {
+          var estudadasHoje = Array.from(todayStudied);
+          var proximaMateria = subjects[_cicloPosicao % subjects.length];
 
-            // Check if this slot's cycle subject was already studied today
-            var slotSubject = proximaMateria;
-            // For today's multiple slots, project from cycle
-            var todaySlotIdx = _cicloPosicao + timeIdx;
-            // But subtract revisao slots before this
-            var studySlotsBeforeThis = _calConfig.hasRevisao ? Math.min(timeIdx, slotsForDay - 1) : timeIdx;
-            var projected = subjects[((_cicloPosicao + studySlotsBeforeThis) % subjects.length)];
+          // 1. Show what was already studied today
+          estudadasHoje.forEach(function(mat, idx) {
+            var colorIdx = subjects.indexOf(mat);
+            if (colorIdx === -1) colorIdx = idx;
+            var cls = SUBJECT_COLORS[colorIdx % SUBJECT_COLORS.length].cls;
+            var shortName = mat.length > 16 ? mat.substring(0,14) + '…' : mat;
+            var isExtra = idx >= slotsForDay;
+            var cell = document.createElement('div');
+            cell.className = 'cal-slot ' + cls + ' cal-done' + (isExtra ? ' cal-extra' : '');
+            cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>'
+              + '<span class="cal-slot-badge">' + (isExtra ? 'EXTRA' : '✓') + '</span>';
+            slotsDiv.appendChild(cell);
+          });
+
+          // 2. Show remaining planned slots from cycle
+          var remainingSlots = Math.max(0, slotsForDay - estudadasHoje.length);
+          for (var ri = 0; ri < remainingSlots; ri++) {
+            var projIdx = (_cicloPosicao + ri) % subjects.length;
+            var projected = subjects[projIdx];
+
+            // Skip if already studied today
+            var alreadyDone = false;
+            estudadasHoje.forEach(function(m) { if (matchMateria(projected, m) || matchMateria(m, projected)) alreadyDone = true; });
+            if (alreadyDone) { remainingSlots++; continue; }
+
             var colorIdx = subjects.indexOf(projected) % SUBJECT_COLORS.length;
             var cls = SUBJECT_COLORS[colorIdx].cls;
             var shortName = projected.length > 16 ? projected.substring(0,14) + '…' : projected;
-
-            var wasStudied = false;
-            todayStudiedSet.forEach(function(m) { if (matchMateria(shortName, m)) wasStudied = true; });
-
             var cell = document.createElement('div');
-            if (wasStudied) {
-              cell.className = 'cal-slot ' + cls + ' cal-done';
-              cell.innerHTML = '<span class="cal-slot-name">' + shortName + '</span>';
-            } else if (studySlotsBeforeThis === 0) {
-              // First unstudied slot = NEXT
+            if (ri === 0) {
               cell.className = 'cal-slot ' + cls + ' cal-next';
-              cell.textContent = shortName;
+              cell.innerHTML = shortName + '<span class="cal-slot-badge">ESTUDAR AGORA</span>';
             } else {
               cell.className = 'cal-slot ' + cls;
               cell.textContent = shortName;
             }
-            grid.appendChild(cell);
-            return;
+            slotsDiv.appendChild(cell);
           }
 
-          // === FUTURE DAYS: project from cycle ===
-          if (isRevisao) {
-            grid.appendChild(el('div', 'cal-slot subject-revisao', 'Revisão'));
-            return;
+          if (slotsDiv.children.length === 0) {
+            slotsDiv.innerHTML = '<div class="cal-day-empty">Sem matérias</div>';
           }
 
-          var studySlotsBeforeThis = _calConfig.hasRevisao ? Math.min(timeIdx, slotsForDay - 1) : timeIdx;
-          // Calculate how many study slots between today and this future date
-          var slotsFromToday = 0;
-          var scanDate = new Date(today);
-          scanDate.setDate(scanDate.getDate() + 1);
-          while (scanDate <= dayDate) {
-            var scanDow = scanDate.getDay();
-            if (_calConfig.studyDays.indexOf(scanDow) !== -1) {
-              var scanFds = scanDow === 0 || scanDow === 6;
-              var scanSlots = scanFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
-              var studySlots = _calConfig.hasRevisao && scanSlots > 2 ? scanSlots - 1 : scanSlots;
-              if (scanDate.toDateString() === dayDate.toDateString()) {
-                slotsFromToday += studySlotsBeforeThis;
-              } else {
-                slotsFromToday += studySlots;
-              }
-            }
-            scanDate.setDate(scanDate.getDate() + 1);
+          col.appendChild(slotsDiv);
+          grid.appendChild(col);
+          return;
+        }
+
+        // === FUTURE: project from cycle ===
+        if (isFuture) {
+          // Count study slots between today and this day
+          var slotsBefore = countFutureSlots(today, dayDate);
+          // Subtract slots for this day itself (we add them one by one)
+          var slotsBeforeThisDay = slotsBefore - slotsForDay;
+          // Also add today's remaining
+          var todayRemaining = Math.max(0, slotsForDay - todayStudied.size);
+
+          for (var fi = 0; fi < slotsForDay; fi++) {
+            var projIdx = (_cicloPosicao + todayRemaining + slotsBeforeThisDay + fi) % subjects.length;
+            var projected = subjects[projIdx];
+            var colorIdx = subjects.indexOf(projected) % SUBJECT_COLORS.length;
+            var cls = SUBJECT_COLORS[colorIdx].cls;
+            var shortName = projected.length > 16 ? projected.substring(0,14) + '…' : projected;
+            slotsDiv.appendChild(el('div', 'cal-slot ' + cls, shortName));
           }
 
-          // Also count remaining slots from today
-          var todayDow = today.getDay();
-          var todayInStudy = _calConfig.studyDays.indexOf(todayDow) !== -1;
-          var todaySlots = 0;
-          if (todayInStudy) {
-            var todayFds = todayDow === 0 || todayDow === 6;
-            var todayTotalSlots = todayFds ? (_calConfig.slotsFds || 0) : _calConfig.slotsPerDay;
-            todaySlots = _calConfig.hasRevisao && todayTotalSlots > 2 ? todayTotalSlots - 1 : todayTotalSlots;
-          }
-
-          var projectedIdx = (_cicloPosicao + todaySlots + slotsFromToday) % subjects.length;
-          var projected = subjects[projectedIdx];
-          var colorIdx = subjects.indexOf(projected) % SUBJECT_COLORS.length;
-          var cls = SUBJECT_COLORS[colorIdx].cls;
-          var shortName = projected.length > 16 ? projected.substring(0,14) + '…' : projected;
-
-          grid.appendChild(el('div', 'cal-slot ' + cls, shortName));
-        });
+          col.appendChild(slotsDiv);
+          grid.appendChild(col);
+          return;
+        }
       });
     }
 
