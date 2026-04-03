@@ -425,7 +425,39 @@
             <strong style="font-size:0.88rem;color:var(--secondary)" id="editalResultTitle">Materias encontradas</strong>
           </div>
           <div id="editalMateriasTable" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px"></div>
-          <div class="form-hint" style="margin-top:8px">Estas materias serao pre-selecionadas no proximo passo. Voce podera ajustar.</div>
+
+          <!-- Peso question (shown when weights not found automatically) -->
+          <div id="editalPesoQuestion" style="display:none;margin-top:12px;padding:12px;background:#FFF8F0;border:1px solid rgba(255,152,0,0.2);border-radius:var(--radius-sm)">
+            <strong style="font-size:0.82rem;color:#E65100">Nao encontrei os pesos das materias no edital.</strong>
+            <p style="font-size:0.78rem;color:var(--text-light);margin:6px 0 8px">Qual o peso de cada bloco? (opcional — se nao souber, pularemos e usaremos distribuicao igual)</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <div style="flex:1;min-width:120px">
+                <label style="font-size:0.72rem;font-weight:600;color:var(--text-light)">Conhec. Basicos</label>
+                <input type="number" class="form-control" id="pesoBasicos" placeholder="Ex: 40" min="0" max="100" style="font-size:0.82rem">
+              </div>
+              <div style="flex:1;min-width:120px">
+                <label style="font-size:0.72rem;font-weight:600;color:var(--text-light)">Conhec. Especificos</label>
+                <input type="number" class="form-control" id="pesoEspecificos" placeholder="Ex: 60" min="0" max="100" style="font-size:0.82rem">
+              </div>
+            </div>
+          </div>
+
+          <!-- Curadoria: editable text area -->
+          <div style="margin-top:12px">
+            <button onclick="toggleCuradoria()" style="background:none;border:none;cursor:pointer;font-size:0.78rem;color:var(--primary);font-weight:600;font-family:inherit;padding:4px 0">
+              ✏️ Editar lista de materias extraida
+            </button>
+            <div id="curadoriaArea" style="display:none;margin-top:8px">
+              <textarea class="form-control" id="curadoriaMaterias" rows="8" style="resize:vertical;font-family:monospace;font-size:0.82rem;line-height:1.6" placeholder="Uma materia por linha..."></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-primary" onclick="aplicarCuradoria()" style="font-size:0.82rem;padding:8px 16px">Aplicar alteracoes</button>
+                <button class="btn-add-cancel" onclick="toggleCuradoria()" style="font-size:0.82rem">Cancelar</button>
+              </div>
+              <div class="form-hint">Edite, remova ou adicione materias. Uma por linha. Use "Materia: topico1, topico2" para incluir topicos.</div>
+            </div>
+          </div>
+
+          <div class="form-hint" style="margin-top:8px">Estas materias serao pre-selecionadas no proximo passo.</div>
         </div>
 
         <!-- Fallback: nothing found -->
@@ -1291,7 +1323,6 @@
         document.getElementById('btnProcessarEdital').disabled = false;
 
         if (_materiasExtraidasEdital.length === 0) {
-          // Fallback: nothing found
           document.getElementById('editalFallback').style.display = '';
           return;
         }
@@ -1299,24 +1330,12 @@
         // Show results
         document.getElementById('editalResultTitle').textContent =
           'Localizei estas materias para o cargo "' + cargoInput + '". Estao corretas?';
-
-        var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
-        html += '<tr style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-light)">';
-        html += '<td style="padding:8px">Materia</td><td style="padding:8px">Topicos</td>';
-        html += '<td style="padding:8px;text-align:center">Questoes</td></tr>';
-
-        _materiasExtraidasEdital.forEach(function(m) {
-          var peso = pesos[m.nome] || '—';
-          html += '<tr style="border-bottom:1px solid var(--border)">';
-          html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
-          html += '<td style="padding:8px;color:var(--text-light);font-size:0.75rem">' + m.topicos + '</td>';
-          html += '<td style="padding:8px;text-align:center;font-weight:700;color:var(--primary)">' + peso + '</td>';
-          html += '</tr>';
-        });
-        html += '</table>';
-
-        document.getElementById('editalMateriasTable').innerHTML = html;
+        renderTabelaMaterias(_materiasExtraidasEdital, pesos);
         document.getElementById('editalMateriasPreview').style.display = '';
+
+        // Show peso question if no weights found
+        document.getElementById('editalPesoQuestion').style.display =
+          pesos._encontrouPesos ? 'none' : '';
 
       } catch (e) {
         console.error('[Edital] Erro:', e);
@@ -1346,6 +1365,61 @@
       document.getElementById('editalMateriasPreview').style.display = '';
 
       selectedConcurso = document.getElementById('editalCargoInput').value.trim() || 'Personalizado';
+    }
+
+    function toggleCuradoria() {
+      var area = document.getElementById('curadoriaArea');
+      if (area.style.display === 'none') {
+        // Populate with current extracted materias
+        var linhas = _materiasExtraidasEdital.map(function(m) {
+          return m.topicos ? m.nome + ': ' + m.topicos : m.nome;
+        });
+        document.getElementById('curadoriaMaterias').value = linhas.join('\n');
+        area.style.display = '';
+      } else {
+        area.style.display = 'none';
+      }
+    }
+
+    function aplicarCuradoria() {
+      var texto = document.getElementById('curadoriaMaterias').value.trim();
+      if (!texto) return;
+
+      var linhas = texto.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 2; });
+      _materiasExtraidasEdital = linhas.map(function(linha) {
+        // Parse "Materia: topico1, topico2" format
+        var parts = linha.split(/:\s*/);
+        return {
+          nome: parts[0].trim(),
+          topicos: parts[1] ? parts[1].trim() : '',
+          fonte: 'curadoria'
+        };
+      });
+
+      // Re-render the table
+      renderTabelaMaterias(_materiasExtraidasEdital, {});
+      document.getElementById('curadoriaArea').style.display = 'none';
+      document.getElementById('editalResultTitle').textContent =
+        _materiasExtraidasEdital.length + ' materias (editadas pelo aluno)';
+    }
+
+    function renderTabelaMaterias(materias, pesos) {
+      var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
+      html += '<tr style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-light)">';
+      html += '<td style="padding:8px">Materia</td><td style="padding:8px">Topicos</td>';
+      html += '<td style="padding:8px;text-align:center">Peso/Qtd</td></tr>';
+
+      materias.forEach(function(m) {
+        var peso = (pesos && pesos[m.nome]) || '—';
+        html += '<tr style="border-bottom:1px solid var(--border)">';
+        html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
+        html += '<td style="padding:8px;color:var(--text-light);font-size:0.75rem">' + (m.topicos || '—') + '</td>';
+        html += '<td style="padding:8px;text-align:center;font-weight:700;color:var(--primary)">' + peso + '</td>';
+        html += '</tr>';
+      });
+      html += '</table>';
+
+      document.getElementById('editalMateriasTable').innerHTML = html;
     }
 
     // =============================================

@@ -198,107 +198,221 @@ function extrairCargos(texto) {
 }
 
 // =============================================
-//  1c. EXTRAIR TEXTO POR SECAO DE CARGO
-//  Filtra o texto do PDF para a secao do cargo
+//  1c. SCOPE-BOUNDED SECTION EXTRACTION
+//  Finds start and end of the cargo's section
 // =============================================
+
+// Section boundary markers in Brazilian editais
+var SECTION_HEADERS = [
+  /conhecimentos?\s+b[aá]sicos/i,
+  /conhecimentos?\s+espec[ií]ficos/i,
+  /conhecimentos?\s+gerais/i,
+  /conhecimentos?\s+complementares/i,
+  /conte[uú]do\s+program[aá]tico/i,
+  /programa\s+das\s+provas/i,
+  /das\s+provas\s+objetivas/i,
+  /prova\s+(?:objetiva|discursiva)/i,
+  /quadro\s+de\s+provas/i,
+  /disciplinas?\s+e\s+quest/i,
+];
+
+// Markers that signal END of a content section
+var SECTION_END_MARKERS = [
+  /^\s*(?:CARGO|cargo)\s*(?:\d+)?\s*[:\-–]/,
+  /^\s*(?:T[IÍ]TULO|CAP[IÍ]TULO|ANEXO)\s+[IVX\d]/,
+  /^\s*(?:DAS\s+DISPOSI[CÇ][OÕ]ES|DA\s+INSCRI[CÇ]|DOS\s+REQUISITOS|DA\s+REMUNERA)/i,
+  /^\s*(?:DO\s+PROCESSO|DAS\s+VAGAS|DO\s+CRONOGRAMA|DA\s+PROVA\s+PR[AÁ]TICA)/i,
+];
 
 function filtrarTextoPorCargo(textoCompleto, cargoSelecionado) {
   var linhas = textoCompleto.split(/\n/);
-  var cargoLower = cargoSelecionado.toLowerCase();
-  var dentroDoBloco = false;
-  var textoFiltrado = '';
-  var linhasCapturadas = 0;
-  var maxLinhas = 500; // Capture up to 500 lines after the cargo header
+  var cargoLower = cargoSelecionado.toLowerCase().trim();
+  // Also try partial match (e.g., "Analista" matches "Analista Judiciário")
+  var cargoWords = cargoLower.split(/\s+/).filter(function(w) { return w.length > 2; });
 
+  // PASS 1: Find all lines where the cargo name appears
+  var cargoLines = [];
   for (var i = 0; i < linhas.length; i++) {
-    var linha = linhas[i].toLowerCase();
-
-    if (!dentroDoBloco) {
-      // Look for the cargo name in the text
-      if (linha.indexOf(cargoLower) !== -1) {
-        dentroDoBloco = true;
-        textoFiltrado += linhas[i] + '\n';
-        linhasCapturadas = 1;
-      }
-    } else {
-      // Check if we hit a DIFFERENT cargo section (end of our block)
-      var isNewCargoSection = /^\s*(?:cargo|especialidade|area)\s*(?:\d+)?[:\s-]/i.test(linhas[i]);
-      if (isNewCargoSection && linhasCapturadas > 10) {
-        // Check it's not the same cargo repeated
-        if (linha.indexOf(cargoLower) === -1) break;
-      }
-
-      textoFiltrado += linhas[i] + '\n';
-      linhasCapturadas++;
-      if (linhasCapturadas >= maxLinhas) break;
+    var linhaLower = linhas[i].toLowerCase();
+    // Exact match first
+    if (linhaLower.indexOf(cargoLower) !== -1) {
+      cargoLines.push(i);
+    }
+    // Partial: all significant words present
+    else if (cargoWords.length >= 2) {
+      var allPresent = cargoWords.every(function(w) { return linhaLower.indexOf(w) !== -1; });
+      if (allPresent) cargoLines.push(i);
     }
   }
 
-  // If filtered text is too short, fall back to searching around the cargo mention
-  if (textoFiltrado.length < 200) {
-    textoFiltrado = '';
-    for (var i = 0; i < linhas.length; i++) {
-      if (linhas[i].toLowerCase().indexOf(cargoLower) !== -1) {
-        var start = Math.max(0, i - 5);
-        var end = Math.min(linhas.length, i + 200);
-        textoFiltrado = linhas.slice(start, end).join('\n');
-        break;
-      }
-    }
+  if (cargoLines.length === 0) {
+    console.log('[Mentor] Cargo nao encontrado no texto');
+    return '';
   }
 
-  // If still too short, return the full text (better than nothing)
-  return textoFiltrado.length > 100 ? textoFiltrado : textoCompleto;
+  // PASS 2: For each cargo mention, look for nearby "Conhecimentos" sections
+  var bestSection = '';
+  var bestScore = 0;
+
+  cargoLines.forEach(function(cargoLine) {
+    // Scan forward from cargo mention to find content sections
+    var sectionStart = -1;
+    var sectionEnd = linhas.length;
+    var scanEnd = Math.min(linhas.length, cargoLine + 800);
+
+    for (var j = cargoLine; j < scanEnd; j++) {
+      // Found a content section header?
+      var isContentHeader = SECTION_HEADERS.some(function(p) { return p.test(linhas[j]); });
+      if (isContentHeader && sectionStart === -1) {
+        sectionStart = j;
+      }
+
+      // Found end boundary?
+      if (sectionStart !== -1 && j > sectionStart + 5) {
+        var isEnd = SECTION_END_MARKERS.some(function(p) { return p.test(linhas[j]); });
+        // Also end if we find a DIFFERENT cargo name
+        var isDiffCargo = /^\s*(?:cargo|especialidade)\s*[:\-–\d]/i.test(linhas[j]) &&
+                          linhas[j].toLowerCase().indexOf(cargoLower) === -1;
+        if (isEnd || isDiffCargo) {
+          sectionEnd = j;
+          break;
+        }
+      }
+    }
+
+    if (sectionStart === -1) sectionStart = cargoLine;
+
+    var section = linhas.slice(sectionStart, sectionEnd).join('\n');
+    // Score: prefer sections with more materia-like content
+    var score = (section.match(/\d+\.\d+/g) || []).length + // numbered items
+               (section.match(/conhecimento/gi) || []).length * 5;
+
+    if (score > bestScore || (score === bestScore && section.length > bestSection.length)) {
+      bestScore = score;
+      bestSection = section;
+    }
+  });
+
+  console.log('[Mentor] Secao extraida:', bestSection.length, 'chars, score:', bestScore);
+  return bestSection || '';
 }
 
 // =============================================
 //  2. EXTRACAO DE MATERIAS DO EDITAL
+//  Anti-hallucination: only returns what's IN the text
 // =============================================
 
-// Dicionario de materias comuns em concursos brasileiros
+// Dicionario de materias comuns (used for MATCHING, not invention)
 var MATERIAS_CONHECIDAS = [
-  { padrao: /l[ií]ngua\s+portugu[eê]sa|portugu[eê]s/i, nome: 'Lingua Portuguesa', topicos: 'Interpretacao, Gramatica, Redacao' },
-  { padrao: /l[ií]ngua\s+inglesa|ingl[eê]s/i, nome: 'Lingua Inglesa', topicos: 'Interpretacao de textos em ingles' },
-  { padrao: /racioc[ií]nio\s+l[oó]gico|matem[aá]tica|RLM/i, nome: 'Raciocinio Logico', topicos: 'Logica, Probabilidade, Estatistica' },
-  { padrao: /direito\s+administrativo/i, nome: 'Direito Administrativo', topicos: 'Atos, Poderes, Licitacoes, Contratos, Lei 14.133' },
-  { padrao: /direito\s+constitucional/i, nome: 'Direito Constitucional', topicos: 'CF/88, Direitos Fundamentais, Organizacao do Estado' },
-  { padrao: /direito\s+penal/i, nome: 'Direito Penal', topicos: 'Parte Geral, Crimes contra a Administracao' },
-  { padrao: /direito\s+processual\s+penal/i, nome: 'Direito Processual Penal', topicos: 'Inquerito, Acao Penal, Provas' },
-  { padrao: /direito\s+civil/i, nome: 'Direito Civil', topicos: 'Pessoas, Obrigacoes, Contratos' },
-  { padrao: /direito\s+tribut[aá]rio/i, nome: 'Direito Tributario', topicos: 'CTN, Tributos, Credito Tributario' },
-  { padrao: /direito\s+do\s+trabalho|direito\s+trabalhista/i, nome: 'Direito do Trabalho', topicos: 'CLT, Contrato, Rescisao' },
-  { padrao: /administra[cç][aã]o\s+(p[uú]blica|geral)|gest[aã]o\s+p[uú]blica/i, nome: 'Administracao Publica', topicos: 'Gestao, Planejamento, Governanca' },
-  { padrao: /contabilidade|contabil/i, nome: 'Contabilidade', topicos: 'Balancos, DRE, Custos' },
-  { padrao: /economia|macroeconomia|microeconomia/i, nome: 'Economia', topicos: 'Micro, Macro, Politica Fiscal' },
-  { padrao: /inform[aá]tica|computa[cç][aã]o|TI/i, nome: 'Informatica', topicos: 'SO, Redes, Seguranca, Office' },
-  { padrao: /controle\s+externo|auditoria\s+govern/i, nome: 'Controle Externo', topicos: 'Fiscalizacao, TCU, Lei Organica' },
-  { padrao: /auditoria(?!\s+govern)/i, nome: 'Auditoria', topicos: 'Normas, Procedimentos, Relatorios' },
-  { padrao: /legisla[cç][aã]o\s+(penal\s+)?especial/i, nome: 'Legislacao Especial', topicos: 'Leis Especiais, Estatutos' },
-  { padrao: /administra[cç][aã]o\s+financeira|AFO|or[cç]ament/i, nome: 'AFO', topicos: 'LOA, LDO, PPA, Creditos' },
-  { padrao: /estat[ií]stica/i, nome: 'Estatistica', topicos: 'Descritiva, Probabilidade, Inferencia' },
-  { padrao: /atualidades|conhecimentos\s+gerais/i, nome: 'Atualidades', topicos: 'Cenario politico, economico e social' },
-  { padrao: /regimento\s+interno/i, nome: 'Regimento Interno', topicos: 'Normas internas do orgao' },
-  { padrao: /[eé]tica|c[oó]digo\s+de\s+conduta/i, nome: 'Etica no Servico Publico', topicos: 'Decreto 1.171, Lei 8.112' },
-  { padrao: /redacao|reda[cç][aã]o\s+oficial|discursiva/i, nome: 'Redacao Oficial', topicos: 'Manual de Redacao, Padroes' },
+  { padrao: /l[ií]ngua\s+portugu[eê]sa|portugu[eê]s/i, nome: 'Lingua Portuguesa' },
+  { padrao: /l[ií]ngua\s+inglesa|ingl[eê]s/i, nome: 'Lingua Inglesa' },
+  { padrao: /racioc[ií]nio\s+l[oó]gico|matem[aá]tica|RLM/i, nome: 'Raciocinio Logico' },
+  { padrao: /direito\s+administrativo/i, nome: 'Direito Administrativo' },
+  { padrao: /direito\s+constitucional/i, nome: 'Direito Constitucional' },
+  { padrao: /direito\s+penal(?!\s+militar)/i, nome: 'Direito Penal' },
+  { padrao: /direito\s+processual\s+penal/i, nome: 'Direito Processual Penal' },
+  { padrao: /direito\s+civil/i, nome: 'Direito Civil' },
+  { padrao: /direito\s+processual\s+civil/i, nome: 'Direito Processual Civil' },
+  { padrao: /direito\s+tribut[aá]rio/i, nome: 'Direito Tributario' },
+  { padrao: /direito\s+(?:do\s+)?trabalho|direito\s+trabalhista/i, nome: 'Direito do Trabalho' },
+  { padrao: /direito\s+empresarial|direito\s+comercial/i, nome: 'Direito Empresarial' },
+  { padrao: /administra[cç][aã]o\s+(?:p[uú]blica|geral)|gest[aã]o\s+p[uú]blica/i, nome: 'Administracao Publica' },
+  { padrao: /contabilidade|ci[eê]ncias?\s+cont[aá]beis/i, nome: 'Contabilidade' },
+  { padrao: /economia|macroeconomia|microeconomia/i, nome: 'Economia' },
+  { padrao: /inform[aá]tica|computa[cç][aã]o|tecnologia\s+da\s+informa/i, nome: 'Informatica' },
+  { padrao: /controle\s+externo/i, nome: 'Controle Externo' },
+  { padrao: /auditoria\s+(?:governamental|p[uú]blica)/i, nome: 'Auditoria Governamental' },
+  { padrao: /auditoria(?!\s+govern|\s+p[uú]b)/i, nome: 'Auditoria' },
+  { padrao: /legisla[cç][aã]o\s+(?:penal\s+)?especial/i, nome: 'Legislacao Especial' },
+  { padrao: /administra[cç][aã]o\s+financeira|AFO|or[cç]ament[aá]ria/i, nome: 'AFO' },
+  { padrao: /estat[ií]stica/i, nome: 'Estatistica' },
+  { padrao: /atualidades|conhecimentos?\s+gerais/i, nome: 'Atualidades' },
+  { padrao: /regimento\s+interno/i, nome: 'Regimento Interno' },
+  { padrao: /[eé]tica\s+(?:no\s+servi[cç]o|p[uú]blica)|c[oó]digo\s+de\s+[eé]tica/i, nome: 'Etica no Servico Publico' },
+  { padrao: /reda[cç][aã]o\s+oficial|discursiva/i, nome: 'Redacao Oficial' },
+  { padrao: /direito\s+financeiro/i, nome: 'Direito Financeiro' },
+  { padrao: /direito\s+ambiental/i, nome: 'Direito Ambiental' },
+  { padrao: /direito\s+previdenci[aá]rio/i, nome: 'Direito Previdenciario' },
+  { padrao: /seguran[cç]a\s+p[uú]blica/i, nome: 'Seguranca Publica' },
+  { padrao: /medicina\s+legal|criminalistica/i, nome: 'Medicina Legal' },
 ];
 
 function extrairMateriasDoTexto(texto) {
+  if (!texto || texto.length < 20) return [];
+
   var encontradas = [];
   var nomesJaAdicionados = new Set();
 
+  // STRATEGY 1: Match known subjects that EXIST in the text
   MATERIAS_CONHECIDAS.forEach(function(m) {
     if (m.padrao.test(texto) && !nomesJaAdicionados.has(m.nome)) {
-      encontradas.push({ nome: m.nome, topicos: m.topicos });
+      // ANTI-HALLUCINATION: extract the ACTUAL topic list from surrounding text
+      var topicosExtraidos = extrairTopicosProximos(texto, m.padrao);
+      encontradas.push({ nome: m.nome, topicos: topicosExtraidos, fonte: 'dicionario' });
       nomesJaAdicionados.add(m.nome);
+    }
+  });
+
+  // STRATEGY 2: Find numbered hierarchy items (1.1, 2.3, etc.)
+  // These are often subject headers in "conteudo programatico"
+  var linhas = texto.split(/\n/);
+  linhas.forEach(function(linha) {
+    // Pattern: "1. LINGUA PORTUGUESA" or "2 - Direito Administrativo"
+    var m = linha.match(/^\s*(\d{1,2})[\.\)\s]+[-–]?\s*([A-ZÀ-Ú][A-ZÀ-Úa-zà-ú\s]{3,50}?)(?:\s*[:.\-–]|$)/);
+    if (m) {
+      var nome = m[2].trim();
+      // Only accept if it looks like a subject name (not too long, starts with uppercase)
+      if (nome.length >= 4 && nome.length <= 50 && nome.split(/\s+/).length <= 6) {
+        var normalizado = nome.charAt(0).toUpperCase() + nome.slice(1).toLowerCase();
+        // Check it's not already found and is actually IN the text
+        if (!nomesJaAdicionados.has(normalizado) && !nomesJaAdicionados.has(nome)) {
+          var topicos = extrairSubitensHierarquicos(linhas, parseInt(m[1]));
+          encontradas.push({ nome: normalizado, topicos: topicos, fonte: 'hierarquia' });
+          nomesJaAdicionados.add(normalizado);
+        }
+      }
     }
   });
 
   return encontradas;
 }
 
+// Extract topics from text NEAR a subject mention (within 300 chars)
+function extrairTopicosProximos(texto, padrao) {
+  var match = padrao.exec(texto);
+  if (!match) { padrao.lastIndex = 0; return ''; }
+  padrao.lastIndex = 0;
+
+  var startIdx = match.index;
+  var nearby = texto.substring(startIdx, startIdx + 500);
+
+  // Look for sub-items: "1.1 Topico; 1.2 Topico" or "a) Topico; b) Topico"
+  var subitens = nearby.match(/(?:\d+\.\d+\.?\d*|[a-z]\))\s*([^;\n\d]{3,60})/g);
+  if (subitens && subitens.length > 0) {
+    var topicos = subitens.slice(0, 5).map(function(s) {
+      return s.replace(/^\d+\.\d+\.?\d*\s*/, '').replace(/^[a-z]\)\s*/, '').trim();
+    }).filter(function(t) { return t.length > 2; });
+    return topicos.join(', ');
+  }
+  return '';
+}
+
+// Extract sub-items from numbered hierarchy (e.g., 1.1, 1.2 under item 1)
+function extrairSubitensHierarquicos(linhas, numPai) {
+  var prefixo = numPai + '.';
+  var topicos = [];
+  for (var i = 0; i < linhas.length; i++) {
+    var m = linhas[i].match(new RegExp('^\\s*' + numPai + '\\.(\\d+)\\s+(.{3,60})'));
+    if (m) {
+      topicos.push(m[2].trim());
+      if (topicos.length >= 5) break;
+    }
+  }
+  return topicos.join(', ');
+}
+
 // Tenta extrair data da prova do texto
 function extrairDataProva(texto) {
-  // Patterns: DD/MM/YYYY, DD de MES de YYYY
   var match = texto.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(20\d{2})/);
   if (match) {
     var d = match[1], m = match[2], y = match[3];
@@ -308,22 +422,42 @@ function extrairDataProva(texto) {
   return null;
 }
 
-// Tenta extrair numero de questoes por materia
+// =============================================
+//  2b. EXTRACAO DE PESOS/PONTOS/QUESTOES
+//  Busca "Peso", "Pontos", "Valor", "Questoes"
+// =============================================
+
 function extrairPesosPorMateria(texto, materias) {
   var pesos = {};
+  var encontrouAlgumPeso = false;
+
   materias.forEach(function(m) {
-    // Look for patterns like "Direito Administrativo ... 10 questões" or "peso 2"
     var escapedName = m.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    var pesoMatch = texto.match(new RegExp(escapedName + '[^\\d]*?(\\d+)\\s*quest', 'i'));
-    if (pesoMatch) {
-      pesos[m.nome] = parseInt(pesoMatch[1]);
-    } else {
-      var pesoMatch2 = texto.match(new RegExp(escapedName + '[^\\d]*?peso\\s*(\\d+)', 'i'));
-      if (pesoMatch2) {
-        pesos[m.nome] = parseInt(pesoMatch2[1]);
+    // Try multiple patterns in order of specificity
+    var patterns = [
+      new RegExp(escapedName + '[^\\d]{0,40}?(\\d{1,3})\\s*quest[oõ]', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,40}?peso\\s*[:\\-]?\\s*(\\d{1,2})', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,40}?(\\d{1,3})\\s*ponto', 'i'),
+      new RegExp(escapedName + '[^\\d]{0,40}?valor\\s*[:\\-]?\\s*(\\d{1,3})', 'i'),
+      // Reverse: "10 questões de Direito Administrativo"
+      new RegExp('(\\d{1,3})\\s*quest[oõ][^\\n]{0,20}' + escapedName, 'i'),
+    ];
+
+    for (var i = 0; i < patterns.length; i++) {
+      var match = texto.match(patterns[i]);
+      if (match) {
+        var val = parseInt(match[1]);
+        if (val > 0 && val <= 200) {
+          pesos[m.nome] = val;
+          encontrouAlgumPeso = true;
+          break;
+        }
       }
     }
   });
+
+  // Flag to let the UI know if weights were found
+  pesos._encontrouPesos = encontrouAlgumPeso;
   return pesos;
 }
 
