@@ -2893,7 +2893,16 @@
       document.getElementById('timerFeedbackView').classList.add('show');
     }
 
+    var _isSubmitting = false;
+
     async function salvarSessao() {
+      if (_isSubmitting) return;
+      _isSubmitting = true;
+
+      // Show saving feedback
+      var feedbackTitle = document.querySelector('#timerFeedbackView h4');
+      if (feedbackTitle) feedbackTitle.innerHTML = '⏳ Salvando sessão...';
+
       // Capture streak before saving
       var streakAntes = 0;
       var streakEl = document.getElementById('streakCount');
@@ -2944,8 +2953,18 @@
       verificarCelebracoes(streakAntes);
     }
 
+    function disableFeedbackButtons() {
+      document.querySelectorAll('#timerFeedbackView .feedback-option').forEach(function(btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
+      });
+    }
+
     // Feedback: Concluí a aula
     async function feedbackConcluiu() {
+      if (_isSubmitting) return;
+      disableFeedbackButtons();
       await salvarSessao();
       var aulas = getAulasMateria(timerMateria);
       var aula = aulas.find(function(a) { return a.status !== 'concluido'; });
@@ -2968,6 +2987,8 @@
 
     // Feedback: Ainda estou estudando
     async function feedbackEstudando() {
+      if (_isSubmitting) return;
+      disableFeedbackButtons();
       await salvarSessao();
       var aulas = getAulasMateria(timerMateria);
       var aula = aulas.find(function(a) { return a.status === 'pendente'; });
@@ -2990,6 +3011,8 @@
 
     // Feedback: Apenas marque o tempo
     async function feedbackApenasMarcar() {
+      if (_isSubmitting) return;
+      disableFeedbackButtons();
       await salvarSessao();
       fecharTimer();
     }
@@ -3002,8 +3025,15 @@
 
     function fecharTimer() {
       clearInterval(timerInterval);
+      _isSubmitting = false;
       document.getElementById('timerFloat').classList.remove('show');
       document.getElementById('btnTimerFinish').disabled = false;
+      // Re-enable feedback buttons for next session
+      document.querySelectorAll('#timerFeedbackView .feedback-option').forEach(function(btn) {
+        btn.disabled = false;
+        btn.style.opacity = '';
+        btn.style.pointerEvents = '';
+      });
     }
 
     function formatTimer(totalSecs) {
