@@ -457,6 +457,9 @@
             </div>
           </div>
 
+          <!-- Sources badge -->
+          <div id="editalFontes" style="display:none;margin-top:10px"></div>
+
           <div class="form-hint" style="margin-top:8px">Estas materias serao pre-selecionadas no proximo passo.</div>
         </div>
 
@@ -1310,14 +1313,45 @@
           document.getElementById('dataProva').value = dataExtraida;
         }
 
-        // Filter text by cargo name (query-based)
-        _textoEditalFiltrado = window.MentorIA.filtrarTextoPorCargo(_textoEditalCompleto, cargoInput);
-        console.log('[Edital] Texto filtrado para "' + cargoInput + '":', _textoEditalFiltrado.length, 'chars');
+        // STEP A: Extract from PDF
+        document.querySelector('#editalProcessing .loading-subjects').innerHTML =
+          '<span class="spinner"></span> Extraindo materias do edital...';
 
-        // Extract subjects
+        _textoEditalFiltrado = window.MentorIA.filtrarTextoPorCargo(_textoEditalCompleto, cargoInput);
         _materiasExtraidasEdital = window.MentorIA.extrairMateriasDoTexto(_textoEditalFiltrado);
         var pesos = window.MentorIA.extrairPesosPorMateria(_textoEditalFiltrado, _materiasExtraidasEdital);
-        console.log('[Edital] Materias encontradas:', _materiasExtraidasEdital.length);
+        var bancaPDF = window.MentorIA.extrairBanca(_textoEditalCompleto);
+        console.log('[Edital] PDF:', _materiasExtraidasEdital.length, 'materias, banca:', bancaPDF);
+
+        // STEP B: Web triangulation (runs in parallel-ish)
+        document.querySelector('#editalProcessing .loading-subjects').innerHTML =
+          '<span class="spinner"></span> Validando via pesquisa web...';
+
+        var concursoNome = selectedConcurso || cargoInput;
+        var pesquisaWeb = { materias: [], fontes: [], banca: null };
+        try {
+          pesquisaWeb = await window.MentorIA.pesquisarConteudoProgramatico(concursoNome, cargoInput);
+        } catch (e) {
+          console.log('[Web] Pesquisa falhou (offline?):', e.message);
+        }
+
+        // STEP C: Triangulate PDF + Web
+        var triangulacao = window.MentorIA.triangularDados(
+          _materiasExtraidasEdital, pesquisaWeb, bancaPDF, pesos
+        );
+
+        // Convert triangulated result back to _materiasExtraidasEdital format
+        _materiasExtraidasEdital = triangulacao.materias.map(function(m) {
+          return {
+            nome: m.nome,
+            topicos: m.topicos || '',
+            fonte: m.validacao,
+            peso: m.peso || m.pesoIncidencia || 0
+          };
+        });
+
+        // Store triangulation metadata
+        window._triangulacao = triangulacao;
 
         document.getElementById('editalProcessing').style.display = 'none';
         document.getElementById('btnProcessarEdital').disabled = false;
@@ -1327,15 +1361,33 @@
           return;
         }
 
-        // Show results
-        document.getElementById('editalResultTitle').textContent =
-          'Localizei estas materias para o cargo "' + cargoInput + '". Estao corretas?';
-        renderTabelaMaterias(_materiasExtraidasEdital, pesos);
+        // Build title with source info
+        var titleParts = [];
+        if (triangulacao.banca) titleParts.push('Banca: ' + triangulacao.banca);
+        titleParts.push(triangulacao.confianca === 'alta' ? 'Alta confianca' :
+                        triangulacao.confianca === 'media' ? 'Confianca media' : 'Verificar dados');
+
+        document.getElementById('editalResultTitle').innerHTML =
+          'Materias para "<strong>' + cargoInput + '</strong>" '
+          + '<span style="font-size:0.75rem;color:var(--text-light)">(' + titleParts.join(' · ') + ')</span>';
+
+        // Render table with validation badges
+        renderTabelaTriangulada(_materiasExtraidasEdital, pesos, triangulacao);
         document.getElementById('editalMateriasPreview').style.display = '';
 
         // Show peso question if no weights found
-        document.getElementById('editalPesoQuestion').style.display =
-          pesos._encontrouPesos ? 'none' : '';
+        var temPesos = pesos._encontrouPesos || triangulacao.materias.some(function(m) { return m.pesoIncidencia > 0; });
+        document.getElementById('editalPesoQuestion').style.display = temPesos ? 'none' : '';
+
+        // Show sources badge
+        var fontesDiv = document.getElementById('editalFontes');
+        if (fontesDiv) {
+          fontesDiv.style.display = '';
+          fontesDiv.innerHTML = '<span style="font-size:0.72rem;color:var(--text-lighter)">Dados validados via: </span>'
+            + triangulacao.fontes.map(function(f) {
+              return '<span style="font-size:0.72rem;font-weight:600;color:var(--primary);background:rgba(30,136,229,0.08);padding:2px 8px;border-radius:10px;margin:0 2px">' + f + '</span>';
+            }).join('');
+        }
 
       } catch (e) {
         console.error('[Edital] Erro:', e);
@@ -1418,6 +1470,52 @@
         html += '</tr>';
       });
       html += '</table>';
+
+      document.getElementById('editalMateriasTable').innerHTML = html;
+    }
+
+    function renderTabelaTriangulada(materias, pesosEdital, triangulacao) {
+      var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
+      html += '<tr style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-light)">';
+      html += '<td style="padding:8px">Materia</td><td style="padding:8px">Topicos</td>';
+      html += '<td style="padding:8px;text-align:center">Peso</td>';
+      html += '<td style="padding:8px;text-align:center">Fonte</td></tr>';
+
+      var triMaterias = triangulacao ? triangulacao.materias : [];
+
+      materias.forEach(function(m) {
+        var triData = triMaterias.find(function(t) { return t.nome === m.nome; }) || {};
+        var peso = m.peso || (pesosEdital && pesosEdital[m.nome]) || triData.pesoIncidencia || '—';
+        var pesoLabel = peso;
+        var pesoColor = 'var(--primary)';
+        if (triData.pesoIncidencia && !m.peso) {
+          pesoLabel = peso + '*';
+          pesoColor = '#FF9800';
+        }
+
+        // Validation badge
+        var validacao = triData.validacao || m.fonte || 'edital';
+        var badgeHtml = '';
+        if (validacao === 'confirmada') {
+          badgeHtml = '<span style="font-size:0.65rem;font-weight:700;color:var(--success);background:rgba(56,161,105,0.1);padding:2px 6px;border-radius:4px">✓ Confirmada</span>';
+        } else if (validacao === 'edital') {
+          badgeHtml = '<span style="font-size:0.65rem;font-weight:600;color:var(--primary);background:rgba(30,136,229,0.08);padding:2px 6px;border-radius:4px">PDF</span>';
+        } else if (validacao === 'web') {
+          badgeHtml = '<span style="font-size:0.65rem;font-weight:600;color:#FF9800;background:rgba(255,152,0,0.08);padding:2px 6px;border-radius:4px">Web</span>';
+        }
+
+        html += '<tr style="border-bottom:1px solid var(--border)">';
+        html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
+        html += '<td style="padding:8px;color:var(--text-light);font-size:0.75rem">' + (m.topicos || '—') + '</td>';
+        html += '<td style="padding:8px;text-align:center;font-weight:700;color:' + pesoColor + '">' + pesoLabel + '</td>';
+        html += '<td style="padding:8px;text-align:center">' + badgeHtml + '</td>';
+        html += '</tr>';
+      });
+
+      html += '</table>';
+      if (triangulacao && triangulacao.materias.some(function(m) { return m.pesoIncidencia; })) {
+        html += '<p style="font-size:0.68rem;color:var(--text-lighter);margin-top:6px">* Peso estimado por incidencia historica da banca ' + (triangulacao.banca || '') + '</p>';
+      }
 
       document.getElementById('editalMateriasTable').innerHTML = html;
     }

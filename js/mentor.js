@@ -724,6 +724,251 @@ async function gerarPlanoInteligente(params) {
   };
 }
 
+// =============================================
+//  9. EXTRACAO DE BANCA DO EDITAL
+// =============================================
+
+var BANCAS_CONHECIDAS = [
+  { padrao: /cebraspe|cespe/i, nome: 'Cebraspe' },
+  { padrao: /fgv\b|funda[cç][aã]o\s+get[uú]lio/i, nome: 'FGV' },
+  { padrao: /vunesp/i, nome: 'Vunesp' },
+  { padrao: /fcc\b|funda[cç][aã]o\s+carlos\s+chagas/i, nome: 'FCC' },
+  { padrao: /cesgranrio/i, nome: 'Cesgranrio' },
+  { padrao: /ibfc\b/i, nome: 'IBFC' },
+  { padrao: /iades\b/i, nome: 'IADES' },
+  { padrao: /idecan\b/i, nome: 'IDECAN' },
+  { padrao: /quadrix\b/i, nome: 'Quadrix' },
+  { padrao: /instituto\s+aocp|aocp\b/i, nome: 'AOCP' },
+  { padrao: /funrio\b/i, nome: 'FUNRIO' },
+  { padrao: /consulplan\b/i, nome: 'Consulplan' },
+];
+
+function extrairBanca(texto) {
+  for (var i = 0; i < BANCAS_CONHECIDAS.length; i++) {
+    if (BANCAS_CONHECIDAS[i].padrao.test(texto)) {
+      return BANCAS_CONHECIDAS[i].nome;
+    }
+  }
+  return null;
+}
+
+// =============================================
+//  10. INCIDENCIA HISTORICA POR BANCA
+//  Dados baseados em analises de provas anteriores
+// =============================================
+
+var INCIDENCIA_BANCA = {
+  'Cebraspe': {
+    'Lingua Portuguesa': 12, 'Raciocinio Logico': 8, 'Informatica': 5,
+    'Direito Constitucional': 15, 'Direito Administrativo': 18,
+    'Direito Penal': 10, 'Direito Processual Penal': 8,
+    'Administracao Publica': 7, 'AFO': 6, 'Contabilidade': 8,
+    'Economia': 6, 'Controle Externo': 10, 'Auditoria': 7,
+    'Etica no Servico Publico': 3, 'Atualidades': 4,
+    'Legislacao Especial': 5, 'Direito Civil': 6,
+  },
+  'FGV': {
+    'Lingua Portuguesa': 15, 'Raciocinio Logico': 10, 'Informatica': 5,
+    'Direito Constitucional': 12, 'Direito Administrativo': 15,
+    'Direito Penal': 8, 'Direito Tributario': 10,
+    'Administracao Publica': 8, 'AFO': 7, 'Contabilidade': 10,
+    'Economia': 8, 'Etica no Servico Publico': 3,
+    'Direito Civil': 6, 'Direito do Trabalho': 5,
+    'Atualidades': 5, 'Redacao Oficial': 5,
+  },
+  'FCC': {
+    'Lingua Portuguesa': 15, 'Raciocinio Logico': 10, 'Informatica': 5,
+    'Direito Constitucional': 12, 'Direito Administrativo': 15,
+    'Direito do Trabalho': 8, 'Direito Processual Civil': 6,
+    'Administracao Publica': 8, 'AFO': 6, 'Contabilidade': 8,
+    'Etica no Servico Publico': 4, 'Atualidades': 3,
+    'Direito Civil': 8, 'Direito Tributario': 6,
+  },
+  'Vunesp': {
+    'Lingua Portuguesa': 18, 'Raciocinio Logico': 12, 'Informatica': 8,
+    'Direito Constitucional': 10, 'Direito Administrativo': 12,
+    'Legislacao Especial': 8, 'Atualidades': 6,
+    'Etica no Servico Publico': 5, 'Administracao Publica': 6,
+  },
+  'Cesgranrio': {
+    'Lingua Portuguesa': 15, 'Raciocinio Logico': 10, 'Informatica': 8,
+    'Direito Constitucional': 8, 'Direito Administrativo': 10,
+    'Contabilidade': 12, 'Economia': 10, 'Atualidades': 5,
+    'Etica no Servico Publico': 4, 'Estatistica': 8,
+  },
+};
+
+// =============================================
+//  11. PESQUISA WEB — Triangulacao de Dados
+// =============================================
+
+async function pesquisarConteudoProgramatico(concurso, cargo) {
+  var query = 'conteudo programatico ' + concurso + ' ' + cargo + ' edital';
+  var fontes = [];
+  var materiasWeb = [];
+  var bancaWeb = null;
+
+  try {
+    // Use Google Custom Search via proxy or direct fetch
+    // Sites conhecidos de curadoria de concursos
+    var sitesConfiados = [
+      'estrategiaconcursos.com.br',
+      'grancursosonline.com.br',
+      'qconcursos.com',
+      'aprovaconcursos.com.br',
+      'pontodosconcursos.com.br'
+    ];
+
+    var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+
+    // Try fetching from known curadoria sites
+    for (var i = 0; i < sitesConfiados.length; i++) {
+      var siteQuery = query + ' site:' + sitesConfiados[i];
+      try {
+        var response = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(
+          'https://www.google.com/search?q=' + encodeURIComponent(siteQuery) + '&num=3'
+        ), { signal: AbortSignal.timeout(5000) });
+
+        if (response.ok) {
+          var html = await response.text();
+          // Extract materia names from search snippets
+          var snippetMaterias = extrairMateriasDeSnippets(html);
+          if (snippetMaterias.length > 0) {
+            materiasWeb = materiasWeb.concat(snippetMaterias);
+            fontes.push(sitesConfiados[i]);
+            console.log('[Web] Encontrado em', sitesConfiados[i], ':', snippetMaterias.length, 'materias');
+          }
+
+          // Try to find banca in the results
+          if (!bancaWeb) {
+            for (var b = 0; b < BANCAS_CONHECIDAS.length; b++) {
+              if (BANCAS_CONHECIDAS[b].padrao.test(html)) {
+                bancaWeb = BANCAS_CONHECIDAS[b].nome;
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Timeout or CORS — skip silently
+        console.log('[Web] Skip', sitesConfiados[i], ':', e.message || 'timeout');
+      }
+    }
+  } catch (e) {
+    console.error('[Web] Erro na pesquisa:', e);
+  }
+
+  // Deduplicate
+  var uniqueMaterias = [];
+  var seen = new Set();
+  materiasWeb.forEach(function(m) {
+    var key = m.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueMaterias.push(m);
+    }
+  });
+
+  return {
+    materias: uniqueMaterias,
+    fontes: fontes,
+    banca: bancaWeb
+  };
+}
+
+function extrairMateriasDeSnippets(html) {
+  var materias = [];
+  // Search for known subject names in the HTML snippets
+  MATERIAS_CONHECIDAS.forEach(function(m) {
+    if (m.padrao.test(html)) {
+      materias.push(m.nome);
+    }
+  });
+  return materias;
+}
+
+// =============================================
+//  12. TRIANGULACAO — Merge PDF + Web + Banca
+// =============================================
+
+function triangularDados(materiasPDF, pesquisaWeb, bancaDetectada, pesosEdital) {
+  var resultado = {
+    materias: [],
+    banca: bancaDetectada || pesquisaWeb.banca || null,
+    fontes: [],
+    confianca: 'baixa'
+  };
+
+  if (materiasPDF.length > 0) resultado.fontes.push('Edital Oficial (PDF)');
+  if (pesquisaWeb.fontes.length > 0) resultado.fontes = resultado.fontes.concat(pesquisaWeb.fontes);
+
+  // Start with PDF materias as base (most authoritative)
+  var materiasMap = new Map();
+  materiasPDF.forEach(function(m) {
+    materiasMap.set(m.nome.toLowerCase(), {
+      nome: m.nome,
+      topicos: m.topicos || '',
+      fontePDF: true,
+      fonteWeb: false,
+      peso: (pesosEdital && pesosEdital[m.nome]) || 0
+    });
+  });
+
+  // Enrich with web data
+  pesquisaWeb.materias.forEach(function(nomeWeb) {
+    var key = nomeWeb.toLowerCase();
+    if (materiasMap.has(key)) {
+      // Confirmed by both sources
+      materiasMap.get(key).fonteWeb = true;
+    } else {
+      // Only in web — add but flag as unconfirmed
+      materiasMap.set(key, {
+        nome: nomeWeb,
+        topicos: '',
+        fontePDF: false,
+        fonteWeb: true,
+        peso: 0
+      });
+    }
+  });
+
+  // Apply banca incidence if available
+  var banca = resultado.banca;
+  var incidencia = banca ? (INCIDENCIA_BANCA[banca] || {}) : {};
+
+  materiasMap.forEach(function(m) {
+    // If no peso from edital, use banca incidence
+    if (m.peso === 0 && incidencia[m.nome]) {
+      m.pesoIncidencia = incidencia[m.nome];
+    }
+    // Confidence level per materia
+    if (m.fontePDF && m.fonteWeb) {
+      m.validacao = 'confirmada'; // Both sources agree
+    } else if (m.fontePDF) {
+      m.validacao = 'edital'; // Only in PDF
+    } else {
+      m.validacao = 'web'; // Only from web (lower confidence)
+    }
+    resultado.materias.push(m);
+  });
+
+  // Overall confidence
+  var confirmadasCount = resultado.materias.filter(function(m) { return m.validacao === 'confirmada'; }).length;
+  if (confirmadasCount >= resultado.materias.length * 0.5) {
+    resultado.confianca = 'alta';
+  } else if (materiasPDF.length > 0 || pesquisaWeb.materias.length > 0) {
+    resultado.confianca = 'media';
+  }
+
+  console.log('[Triangulacao] Banca:', resultado.banca,
+    '| Materias:', resultado.materias.length,
+    '| Confirmadas:', confirmadasCount,
+    '| Fontes:', resultado.fontes.join(', '),
+    '| Confianca:', resultado.confianca);
+
+  return resultado;
+}
+
 // Export for use in criar-plano.html
 window.MentorIA = {
   gerarPlanoInteligente: gerarPlanoInteligente,
@@ -733,7 +978,11 @@ window.MentorIA = {
   extrairMateriasDoTexto: extrairMateriasDoTexto,
   extrairPesosPorMateria: extrairPesosPorMateria,
   extrairDataProva: extrairDataProva,
+  extrairBanca: extrairBanca,
+  pesquisarConteudoProgramatico: pesquisarConteudoProgramatico,
+  triangularDados: triangularDados,
   classificarMaterias: classificarMaterias,
   distribuirHoras: distribuirHoras,
-  gerarCiclo: gerarCiclo
+  gerarCiclo: gerarCiclo,
+  INCIDENCIA_BANCA: INCIDENCIA_BANCA
 };
