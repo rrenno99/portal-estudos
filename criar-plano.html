@@ -391,52 +391,59 @@
       </div>
 
       <!-- Edital upload (shown when "Outro Concurso" selected) -->
-      <div class="form-group" id="editalUploadGroup" style="display:none">
-        <label>Upload do Edital (PDF)</label>
-        <div class="upload-area" id="editalUploadArea" onclick="document.getElementById('editalFileInput').click()">
-          <div class="upload-icon">📄</div>
-          <div class="upload-text">Clique para selecionar o PDF do edital</div>
-          <div class="upload-filename" id="editalFileName" style="display:none"></div>
+      <div id="editalUploadGroup" style="display:none">
+        <div class="form-group">
+          <label>Qual cargo voce deseja estudar? *</label>
+          <input type="text" class="form-control" id="editalCargoInput" placeholder="Ex: Analista Judiciario - Area Administrativa">
+          <div class="form-hint">Digite o nome exato do cargo como aparece no edital.</div>
         </div>
-        <input type="file" id="editalFileInput" accept=".pdf" style="display:none" onchange="handleEditalUpload(this)">
-        <div class="form-hint">A IA vai analisar o PDF para identificar cargos e materias automaticamente.</div>
+
+        <div class="form-group">
+          <label>Upload do Edital (PDF)</label>
+          <div class="upload-area" id="editalUploadArea" onclick="document.getElementById('editalFileInput').click()">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Clique para selecionar o PDF do edital</div>
+            <div class="upload-filename" id="editalFileName" style="display:none"></div>
+          </div>
+          <input type="file" id="editalFileInput" accept=".pdf" style="display:none" onchange="handleEditalUpload(this)">
+        </div>
+
+        <div style="text-align:center;margin:12px 0">
+          <button class="btn btn-primary" onclick="processarEditalComCargo()" id="btnProcessarEdital" style="display:none">
+            🔍 Analisar edital para este cargo
+          </button>
+        </div>
 
         <!-- Processing indicator -->
-        <div id="editalProcessing" style="display:none;margin-top:12px">
-          <div class="loading-subjects"><span class="spinner"></span> Analisando edital...</div>
+        <div id="editalProcessing" style="display:none">
+          <div class="loading-subjects"><span class="spinner"></span> Buscando materias no edital...</div>
         </div>
 
-        <!-- Cargo selection (shown after PDF processing) -->
-        <div id="cargoSelectionGroup" style="display:none;margin-top:16px">
-          <label style="font-weight:600;font-size:0.85rem;margin-bottom:8px;display:block">Cargos encontrados no edital:</label>
-          <div class="chips" id="cargoChips"></div>
-          <div style="margin-top:10px">
-            <label style="font-size:0.78rem;color:var(--text-light)">Nao encontrou seu cargo? Digite o nome:</label>
-            <div style="display:flex;gap:8px;margin-top:4px">
-              <input type="text" class="form-control" id="cargoBuscaManual" placeholder="Ex: Analista de Controle Externo" style="flex:1">
-              <button class="btn-add-confirm" onclick="buscarCargoManual()" style="white-space:nowrap">Buscar no PDF</button>
-            </div>
+        <!-- Results: materias found -->
+        <div id="editalMateriasPreview" style="display:none;margin-top:16px">
+          <div style="padding:14px;background:rgba(30,136,229,0.05);border:1px solid rgba(30,136,229,0.15);border-radius:var(--radius-sm);margin-bottom:12px">
+            <strong style="font-size:0.88rem;color:var(--secondary)" id="editalResultTitle">Materias encontradas</strong>
+          </div>
+          <div id="editalMateriasTable" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px"></div>
+          <div class="form-hint" style="margin-top:8px">Estas materias serao pre-selecionadas no proximo passo. Voce podera ajustar.</div>
+        </div>
+
+        <!-- Fallback: nothing found -->
+        <div id="editalFallback" style="display:none;margin-top:16px">
+          <div style="padding:14px;background:#FFF5F5;border:1px solid #FED7D7;border-radius:var(--radius-sm);margin-bottom:12px">
+            <strong style="font-size:0.88rem;color:#C53030">Nao localizei os detalhes para esse cargo.</strong>
+            <p style="font-size:0.82rem;color:var(--text-light);margin-top:6px">Tente um termo mais simples (ex: "Analista" em vez de "Analista Judiciario - Area 8") ou cole a lista de materias abaixo.</p>
+          </div>
+          <div class="form-group">
+            <label>Cole aqui a lista de materias do edital (uma por linha)</label>
+            <textarea class="form-control" id="editalMateriasManuais" rows="6" placeholder="Lingua Portuguesa&#10;Raciocinio Logico&#10;Direito Administrativo&#10;Direito Constitucional&#10;..." style="resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+            <button class="btn btn-primary" onclick="aplicarMateriasManual()" style="margin-top:8px;width:100%">Usar estas materias</button>
           </div>
         </div>
 
-        <!-- Materias extracted from edital (shown after cargo selection) -->
-        <div id="editalMateriasPreview" style="display:none;margin-top:16px">
-          <label style="font-weight:600;font-size:0.85rem;margin-bottom:8px;display:block">Materias encontradas para o cargo:</label>
-          <div id="editalMateriasTable" style="background:var(--bg);border-radius:var(--radius-sm);padding:12px"></div>
-          <div class="form-hint" style="margin-top:8px">Estas materias serao adicionadas automaticamente no proximo passo. Voce podera ajustar.</div>
-        </div>
-      </div>
-
-      <div class="form-group" id="editalLinkGroup" style="display:none">
-        <label>Link do concurso ou edital (opcional)</label>
-        <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/...">
-      </div>
-
-      <div class="form-group">
-        <label>Nivel do cargo</label>
-        <div class="chips">
-          <div class="chip" onclick="selectNivel(this)">Nível Médio</div>
-          <div class="chip" onclick="selectNivel(this)">Nível Superior</div>
+        <div class="form-group" style="margin-top:12px">
+          <label>Link do concurso ou edital (opcional)</label>
+          <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/...">
         </div>
       </div>
 
@@ -1042,8 +1049,11 @@
       // Show/hide upload area for "Outro Concurso"
       var isOutro = selectedConcurso.includes('Outro Concurso');
       document.getElementById('editalUploadGroup').style.display = isOutro ? '' : 'none';
-      document.getElementById('editalLinkGroup').style.display = isOutro ? '' : 'none';
-      if (isOutro) selectedConcurso = 'Outro';
+      if (isOutro) selectedConcurso = '';
+      // Reset edital state when switching
+      _materiasExtraidasEdital = [];
+      _textoEditalCompleto = '';
+      _textoEditalFiltrado = '';
     }
 
     function selectNivel(el) {
@@ -1208,11 +1218,10 @@
     //  EDITAL UPLOAD + OUTRO CONCURSO
     // =============================================
     var _textoEditalCompleto = '';
-    var _cargoSelecionado = '';
     var _textoEditalFiltrado = '';
     var _materiasExtraidasEdital = [];
 
-    async function handleEditalUpload(input) {
+    function handleEditalUpload(input) {
       if (!input.files || !input.files[0]) return;
       editalFile = input.files[0];
 
@@ -1221,104 +1230,122 @@
       document.getElementById('editalFileName').textContent = '✓ ' + editalFile.name;
       document.getElementById('editalFileName').style.display = '';
 
-      // Process the PDF immediately
-      document.getElementById('editalProcessing').style.display = '';
-      document.getElementById('cargoSelectionGroup').style.display = 'none';
+      // Show the analyze button
+      document.getElementById('btnProcessarEdital').style.display = '';
+      // Reset previous results
       document.getElementById('editalMateriasPreview').style.display = 'none';
+      document.getElementById('editalFallback').style.display = 'none';
+      _textoEditalCompleto = '';
+    }
+
+    async function processarEditalComCargo() {
+      var cargoInput = document.getElementById('editalCargoInput').value.trim();
+      if (!cargoInput) {
+        alert('Digite o nome do cargo que deseja estudar.');
+        document.getElementById('editalCargoInput').focus();
+        return;
+      }
+      if (!editalFile) {
+        alert('Selecione o PDF do edital primeiro.');
+        return;
+      }
+
+      selectedConcurso = cargoInput;
+
+      // Show processing
+      document.getElementById('editalProcessing').style.display = '';
+      document.getElementById('editalMateriasPreview').style.display = 'none';
+      document.getElementById('editalFallback').style.display = 'none';
+      document.getElementById('btnProcessarEdital').disabled = true;
 
       try {
-        _textoEditalCompleto = await window.MentorIA.extrairTextoPDF(editalFile);
-        console.log('[Edital] Texto extraido:', _textoEditalCompleto.length, 'caracteres');
+        // Extract text if not already done
+        if (!_textoEditalCompleto) {
+          _textoEditalCompleto = await window.MentorIA.extrairTextoPDF(editalFile);
+          console.log('[Edital] Texto extraido:', _textoEditalCompleto.length, 'chars');
+        }
 
         if (_textoEditalCompleto.length < 50) {
-          document.getElementById('editalProcessing').innerHTML = '<p style="color:var(--danger);font-size:0.85rem">Nao foi possivel ler o PDF. Tente outro arquivo ou selecione as materias manualmente.</p>';
+          document.getElementById('editalProcessing').style.display = 'none';
+          document.getElementById('editalFallback').style.display = '';
+          document.getElementById('btnProcessarEdital').disabled = false;
           return;
         }
 
-        // Extract cargos
-        var cargos = window.MentorIA.extrairCargos(_textoEditalCompleto);
-        console.log('[Edital] Cargos encontrados:', cargos.length, cargos);
+        // Try to extract exam date
+        var dataExtraida = window.MentorIA.extrairDataProva(_textoEditalCompleto);
+        if (dataExtraida && !document.getElementById('dataProva').value) {
+          document.getElementById('dataProva').value = dataExtraida;
+        }
+
+        // Filter text by cargo name (query-based)
+        _textoEditalFiltrado = window.MentorIA.filtrarTextoPorCargo(_textoEditalCompleto, cargoInput);
+        console.log('[Edital] Texto filtrado para "' + cargoInput + '":', _textoEditalFiltrado.length, 'chars');
+
+        // Extract subjects
+        _materiasExtraidasEdital = window.MentorIA.extrairMateriasDoTexto(_textoEditalFiltrado);
+        var pesos = window.MentorIA.extrairPesosPorMateria(_textoEditalFiltrado, _materiasExtraidasEdital);
+        console.log('[Edital] Materias encontradas:', _materiasExtraidasEdital.length);
 
         document.getElementById('editalProcessing').style.display = 'none';
-        document.getElementById('cargoSelectionGroup').style.display = '';
+        document.getElementById('btnProcessarEdital').disabled = false;
 
-        var chipsContainer = document.getElementById('cargoChips');
-        if (cargos.length > 0) {
-          chipsContainer.innerHTML = cargos.map(function(c) {
-            return '<div class="chip" onclick="selecionarCargo(this)">' + c + '</div>';
-          }).join('');
-        } else {
-          chipsContainer.innerHTML = '<p style="font-size:0.82rem;color:var(--text-light)">Nenhum cargo identificado automaticamente. Use o campo abaixo para buscar.</p>';
+        if (_materiasExtraidasEdital.length === 0) {
+          // Fallback: nothing found
+          document.getElementById('editalFallback').style.display = '';
+          return;
         }
 
-        // Also try to extract exam date
-        var dataExtraida = window.MentorIA.extrairDataProva(_textoEditalCompleto);
-        if (dataExtraida) {
-          var dataInput = document.getElementById('dataProva');
-          if (dataInput && !dataInput.value) {
-            dataInput.value = dataExtraida;
-            console.log('[Edital] Data da prova extraida:', dataExtraida);
-          }
-        }
-      } catch (e) {
-        console.error('[Edital] Erro ao processar:', e);
-        document.getElementById('editalProcessing').innerHTML = '<p style="color:var(--danger);font-size:0.85rem">Erro ao processar o PDF: ' + e.message + '</p>';
-      }
-    }
+        // Show results
+        document.getElementById('editalResultTitle').textContent =
+          'Localizei estas materias para o cargo "' + cargoInput + '". Estao corretas?';
 
-    function selecionarCargo(el) {
-      document.querySelectorAll('#cargoChips .chip').forEach(function(c) { c.classList.remove('selected'); });
-      el.classList.add('selected');
-      _cargoSelecionado = el.textContent.trim();
-      processarMateriasDoCargo(_cargoSelecionado);
-    }
-
-    function buscarCargoManual() {
-      var input = document.getElementById('cargoBuscaManual').value.trim();
-      if (!input) return;
-      _cargoSelecionado = input;
-      processarMateriasDoCargo(input);
-    }
-
-    function processarMateriasDoCargo(cargo) {
-      if (!_textoEditalCompleto) return;
-
-      // Filter the PDF text to the cargo section
-      _textoEditalFiltrado = window.MentorIA.filtrarTextoPorCargo(_textoEditalCompleto, cargo);
-      console.log('[Edital] Texto filtrado para "' + cargo + '":', _textoEditalFiltrado.length, 'chars');
-
-      // Extract subjects from filtered text
-      _materiasExtraidasEdital = window.MentorIA.extrairMateriasDoTexto(_textoEditalFiltrado);
-      var pesos = window.MentorIA.extrairPesosPorMateria(_textoEditalFiltrado, _materiasExtraidasEdital);
-
-      console.log('[Edital] Materias para cargo:', _materiasExtraidasEdital.length);
-
-      // Show preview table
-      var tableDiv = document.getElementById('editalMateriasTable');
-      if (_materiasExtraidasEdital.length === 0) {
-        tableDiv.innerHTML = '<p style="font-size:0.82rem;color:var(--text-light)">Nenhuma materia identificada para este cargo. As materias serao selecionadas manualmente no proximo passo.</p>';
-      } else {
         var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
-        html += '<tr style="border-bottom:1px solid var(--border);font-weight:600;color:var(--text-light)">';
-        html += '<td style="padding:6px 8px">Materia</td><td style="padding:6px 8px">Topicos</td>';
-        html += '<td style="padding:6px 8px;text-align:center">Questoes</td></tr>';
+        html += '<tr style="border-bottom:2px solid var(--border);font-weight:600;color:var(--text-light)">';
+        html += '<td style="padding:8px">Materia</td><td style="padding:8px">Topicos</td>';
+        html += '<td style="padding:8px;text-align:center">Questoes</td></tr>';
 
         _materiasExtraidasEdital.forEach(function(m) {
           var peso = pesos[m.nome] || '—';
           html += '<tr style="border-bottom:1px solid var(--border)">';
-          html += '<td style="padding:6px 8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
-          html += '<td style="padding:6px 8px;color:var(--text-light);font-size:0.75rem">' + m.topicos + '</td>';
-          html += '<td style="padding:6px 8px;text-align:center;font-weight:700;color:var(--primary)">' + peso + '</td>';
+          html += '<td style="padding:8px;font-weight:600;color:var(--secondary)">' + m.nome + '</td>';
+          html += '<td style="padding:8px;color:var(--text-light);font-size:0.75rem">' + m.topicos + '</td>';
+          html += '<td style="padding:8px;text-align:center;font-weight:700;color:var(--primary)">' + peso + '</td>';
           html += '</tr>';
         });
         html += '</table>';
-        tableDiv.innerHTML = html;
-      }
 
+        document.getElementById('editalMateriasTable').innerHTML = html;
+        document.getElementById('editalMateriasPreview').style.display = '';
+
+      } catch (e) {
+        console.error('[Edital] Erro:', e);
+        document.getElementById('editalProcessing').style.display = 'none';
+        document.getElementById('editalFallback').style.display = '';
+        document.getElementById('btnProcessarEdital').disabled = false;
+      }
+    }
+
+    function aplicarMateriasManual() {
+      var texto = document.getElementById('editalMateriasManuais').value.trim();
+      if (!texto) return;
+
+      var linhas = texto.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 2; });
+      _materiasExtraidasEdital = linhas.map(function(nome) {
+        return { nome: nome, topicos: '' };
+      });
+
+      document.getElementById('editalFallback').style.display = 'none';
+      document.getElementById('editalResultTitle').textContent =
+        _materiasExtraidasEdital.length + ' materias adicionadas manualmente.';
+
+      var html = _materiasExtraidasEdital.map(function(m) {
+        return '<div style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:0.85rem;font-weight:600;color:var(--secondary)">' + m.nome + '</div>';
+      }).join('');
+      document.getElementById('editalMateriasTable').innerHTML = html;
       document.getElementById('editalMateriasPreview').style.display = '';
 
-      // Update concurso name with cargo
-      selectedConcurso = cargo;
+      selectedConcurso = document.getElementById('editalCargoInput').value.trim() || 'Personalizado';
     }
 
     // =============================================
