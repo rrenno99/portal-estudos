@@ -1004,23 +1004,6 @@
     };
 
     // Matérias genéricas (fallback)
-    const MATERIAS_GENERICAS = {
-      basicas: [
-        { nome: 'Língua Portuguesa', topicos: 'Gramática, Interpretação, Redação' },
-        { nome: 'Raciocínio Lógico (RLM)', topicos: 'Lógica, Matemática, Estatística' },
-        { nome: 'Informática', topicos: 'Redes, Segurança, Office' },
-        { nome: 'Atualidades', topicos: 'Economia, Política, Sociedade' },
-      ],
-      especificas: [
-        { nome: 'Direito Administrativo', topicos: 'Atos, Licitação, Servidores' },
-        { nome: 'Direito Constitucional', topicos: 'CF/88, Direitos, Organização' },
-        { nome: 'Direito Penal', topicos: 'Parte Geral, Crimes, Penas' },
-        { nome: 'Direito Processual Penal', topicos: 'Inquérito, Ação, Provas' },
-        { nome: 'Administração Pública', topicos: 'Gestão, Planejamento, Orçamento' },
-        { nome: 'Contabilidade', topicos: 'Balanços, DRE, Patrimônio' },
-      ]
-    };
-
     // =============================================
     //  STATE
     // =============================================
@@ -1053,6 +1036,18 @@
     }
 
     function prevStep(step) {
+      // Clear downstream state when going back
+      if (step <= 2) {
+        // Going back to step 1 or 2: clear perfil list
+        document.getElementById('perfilMateriasList').innerHTML =
+          '<p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:20px">Selecione materias no passo anterior</p>';
+      }
+      if (step <= 1) {
+        // Going back to step 1: if user might change concurso/edital,
+        // also reload subjects when they come back to step 2
+        // (nextStep(2) already calls loadSubjectsForConcurso)
+      }
+
       document.getElementById('step' + currentStep).style.display = 'none';
       document.getElementById('step' + step).style.display = 'block';
       updateProgress(step);
@@ -1112,7 +1107,7 @@
       const basGrid = document.getElementById('basicasGrid');
       const espGrid = document.getElementById('especificasGrid');
 
-      badge.textContent = selectedConcurso ? '📋 ' + selectedConcurso : '📋 Materias genericas';
+      badge.textContent = selectedConcurso ? '📋 ' + selectedConcurso : '📋 Selecione as materias';
 
       const loader = document.getElementById('loadingSubjects');
       loader.style.display = 'block';
@@ -1122,9 +1117,8 @@
       setTimeout(() => {
         loader.style.display = 'none';
 
-        // If we have edital-extracted subjects, use them
+        // If we have edital-extracted subjects, use ONLY them
         if (_materiasExtraidasEdital.length > 0) {
-          // Split: known basic subjects vs rest (specific)
           var basicNames = ['Lingua Portuguesa', 'Lingua Inglesa', 'Raciocinio Logico', 'Informatica', 'Atualidades', 'Redacao Oficial', 'Etica no Servico Publico'];
           var basicas = [];
           var especificas = [];
@@ -1137,25 +1131,21 @@
             }
           });
 
-          basicas.forEach(m => basGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false)));
-          especificas.forEach(m => espGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false)));
-
-          if (basicas.length === 0 && especificas.length === 0) {
-            espGrid.innerHTML = '<p style="color:var(--text-lighter);font-size:0.82rem;padding:8px">Nenhuma materia extraida. Adicione manualmente abaixo.</p>';
-          }
+          basicas.forEach(m => basGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false)));
+          especificas.forEach(m => espGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false)));
           return;
         }
 
-        // Otherwise use pre-defined database
-        const materias = MATERIAS_POR_CONCURSO[selectedConcurso] || MATERIAS_GENERICAS;
+        // If a known concurso was selected (not edital upload), use pre-defined database
+        var materias = MATERIAS_POR_CONCURSO[selectedConcurso];
+        if (materias) {
+          materias.basicas.forEach(m => basGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false)));
+          materias.especificas.forEach(m => espGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false)));
+          return;
+        }
 
-        materias.basicas.forEach(m => {
-          basGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false));
-        });
-
-        materias.especificas.forEach(m => {
-          espGrid.appendChild(createSubjectCard(m.nome, m.topicos, true, false));
-        });
+        // No concurso and no edital: show empty state (no generics)
+        espGrid.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;padding:16px;text-align:center">Nenhuma materia carregada. Volte e selecione um concurso ou suba um edital, ou adicione manualmente abaixo.</p>';
       }, 500);
     }
 
