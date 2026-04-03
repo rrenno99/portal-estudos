@@ -317,6 +317,59 @@
     .trilha-card .trilha-schedule { font-size: 0.72rem; color: var(--text-lighter); margin-top: 8px; font-style: italic; }
     .trilhas-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
+    /* Hour stepper */
+    .hour-stepper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--bg);
+      width: fit-content;
+    }
+    .hour-stepper button {
+      width: 40px;
+      height: 44px;
+      border: none;
+      background: var(--bg-card);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary);
+      cursor: pointer;
+      transition: var(--transition);
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hour-stepper button:hover { background: rgba(30,136,229,0.08); }
+    .hour-stepper button:active { background: rgba(30,136,229,0.15); }
+    .hour-stepper input {
+      width: 60px;
+      height: 44px;
+      border: none;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--secondary);
+      background: var(--bg-card);
+      font-family: inherit;
+      -moz-appearance: textfield;
+    }
+    .hour-stepper input::-webkit-inner-spin-button,
+    .hour-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .hour-stepper input:focus { outline: none; background: #F0F7FF; }
+    .hour-stepper-label {
+      padding: 0 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+
     @media (max-width: 600px) {
       .subjects-grid { grid-template-columns: 1fr; }
       .add-subject-form { flex-direction: column; align-items: stretch; }
@@ -591,32 +644,28 @@
       <p>Informe quando e por quanto tempo você pode estudar durante a semana.</p>
 
       <div class="form-group">
-        <label>Quantas horas por dia você pode estudar?</label>
+        <label>Quantas horas por dia voce pode estudar?</label>
         <div class="form-row">
           <div>
-            <label style="font-size: 0.8rem; color: var(--text-light);">Dias úteis (Seg-Sex)</label>
-            <select class="form-control" id="horasUteis">
-              <option value="1">1 hora</option>
-              <option value="2">2 horas</option>
-              <option value="3" selected>3 horas</option>
-              <option value="4">4 horas</option>
-              <option value="5">5 horas</option>
-              <option value="6">6 horas</option>
-              <option value="8">8 horas (dedicação integral)</option>
-            </select>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Dias uteis (Seg-Sex)</label>
+            <div class="hour-stepper">
+              <button type="button" onclick="ajustarHoras('horasUteis', -0.5)">−</button>
+              <input type="number" id="horasUteis" value="3" min="0" max="16" step="0.5" onchange="validarHoras(this, 3)">
+              <button type="button" onclick="ajustarHoras('horasUteis', 0.5)">+</button>
+              <span class="hour-stepper-label">horas</span>
+            </div>
           </div>
           <div>
-            <label style="font-size: 0.8rem; color: var(--text-light);">Fim de semana (Sáb-Dom)</label>
-            <select class="form-control" id="horasFds">
-              <option value="0">Não estudo</option>
-              <option value="2">2 horas</option>
-              <option value="3">3 horas</option>
-              <option value="4" selected>4 horas</option>
-              <option value="6">6 horas</option>
-              <option value="8">8 horas</option>
-            </select>
+            <label style="font-size: 0.8rem; color: var(--text-light);">Fim de semana (Sab-Dom)</label>
+            <div class="hour-stepper">
+              <button type="button" onclick="ajustarHoras('horasFds', -0.5)">−</button>
+              <input type="number" id="horasFds" value="4" min="0" max="16" step="0.5" onchange="validarHoras(this, 4)">
+              <button type="button" onclick="ajustarHoras('horasFds', 0.5)">+</button>
+              <span class="hour-stepper-label">horas</span>
+            </div>
           </div>
         </div>
+        <div class="form-hint">Ajuste em intervalos de 30 minutos (0,5h). Ex: 4,5h = 4h30min.</div>
       </div>
 
       <div class="form-group">
@@ -1234,6 +1283,25 @@
     // =============================================
     function toggleDay(el) { el.classList.toggle('selected'); }
 
+    function ajustarHoras(inputId, delta) {
+      var input = document.getElementById(inputId);
+      var val = parseFloat(input.value) || 0;
+      val = Math.round((val + delta) * 2) / 2; // snap to 0.5
+      val = Math.max(0, Math.min(16, val));
+      input.value = val;
+    }
+
+    function validarHoras(input, fallback) {
+      var val = parseFloat(input.value);
+      if (isNaN(val) || val < 0) {
+        input.value = fallback;
+        return;
+      }
+      val = Math.round(val * 2) / 2; // snap to 0.5
+      val = Math.max(0, Math.min(16, val));
+      input.value = val;
+    }
+
     function selectTurno(el) {
       el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
@@ -1605,8 +1673,8 @@
       const selectedDays = [];
       document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
 
-      const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
-      const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
+      const horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
+      const horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
       const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
       const diasFds = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFds * horasFds);
@@ -1734,8 +1802,8 @@
       const materiaPerfis = getMateriaPerfis();
       const nome = user.user_metadata?.nome || user.email.split('@')[0];
       const email = user.email;
-      const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
-      const horasFds = parseInt(document.getElementById('horasFds').value) || 0;
+      const horasUteis = parseFloat(document.getElementById('horasUteis').value) || 3;
+      const horasFds = parseFloat(document.getElementById('horasFds').value) || 0;
       const diasUteis = selectedDays.filter(d => !['Sábado','Domingo'].includes(d)).length;
       const diasFdsCount = selectedDays.filter(d => ['Sábado','Domingo'].includes(d)).length;
       const horasSemanais = (diasUteis * horasUteis) + (diasFdsCount * horasFds);
