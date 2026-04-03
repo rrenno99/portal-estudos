@@ -241,9 +241,83 @@
     }
     .review-link-none { color: var(--text-lighter); font-style: italic; }
 
+    /* Upload area */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--bg);
+      margin-top: 8px;
+    }
+    .upload-area:hover { border-color: var(--primary); background: rgba(30,136,229,0.03); }
+    .upload-area.has-file { border-color: var(--success); background: rgba(56,161,105,0.05); }
+    .upload-area .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-area .upload-text { font-size: 0.82rem; color: var(--text-light); }
+    .upload-area .upload-filename { font-size: 0.82rem; font-weight: 600; color: var(--success); margin-top: 6px; }
+
+    /* Nivel selector per subject */
+    .nivel-selector {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .nivel-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: var(--transition);
+      font-family: inherit;
+      color: var(--text-light);
+    }
+    .nivel-btn:hover { border-color: var(--primary); }
+    .nivel-btn.selected { border-color: var(--primary); background: rgba(30,136,229,0.08); color: var(--primary); }
+    .nivel-btn.nivel-avancado.selected { border-color: var(--success); background: rgba(56,161,105,0.08); color: var(--success); }
+
+    /* Fechada checkbox */
+    .fechada-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: var(--text-light);
+      cursor: pointer;
+    }
+    .fechada-toggle input { accent-color: var(--success); }
+    .subject-card.fechada { opacity: 0.55; }
+    .subject-card.fechada .subject-card-info strong { text-decoration: line-through; color: var(--text-light); }
+
+    /* Trilha cards */
+    .trilha-card {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      cursor: pointer;
+      transition: var(--transition);
+      background: var(--bg-card);
+    }
+    .trilha-card:hover { border-color: var(--primary); }
+    .trilha-card.selected { border-color: var(--primary); background: rgba(30,136,229,0.04); box-shadow: 0 0 0 3px rgba(30,136,229,0.08); }
+    .trilha-card .trilha-icon { font-size: 1.4rem; margin-bottom: 6px; }
+    .trilha-card .trilha-name { font-size: 0.9rem; font-weight: 700; color: var(--secondary); }
+    .trilha-card .trilha-level { font-size: 0.72rem; font-weight: 600; color: var(--primary); margin-bottom: 6px; }
+    .trilha-card .trilha-desc { font-size: 0.78rem; color: var(--text-light); line-height: 1.5; }
+    .trilha-card .trilha-schedule { font-size: 0.72rem; color: var(--text-lighter); margin-top: 8px; font-style: italic; }
+    .trilhas-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
     @media (max-width: 600px) {
       .subjects-grid { grid-template-columns: 1fr; }
       .add-subject-form { flex-direction: column; align-items: stretch; }
+      .trilhas-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -261,16 +335,21 @@
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="2">
         <div class="wizard-step-num">2</div>
-        Matérias
+        Materias
       </div>
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="3">
         <div class="wizard-step-num">3</div>
-        Horários
+        Perfil
       </div>
       <div class="wizard-step-line"></div>
       <div class="wizard-step" data-step="4">
         <div class="wizard-step-num">4</div>
+        Horarios
+      </div>
+      <div class="wizard-step-line"></div>
+      <div class="wizard-step" data-step="5">
+        <div class="wizard-step-num">5</div>
         Confirmar
       </div>
     </div>
@@ -304,11 +383,29 @@
           <div class="chip" onclick="selectConcurso(this)">PCDF</div>
           <div class="chip" onclick="selectConcurso(this)">DEPEN</div>
           <div class="chip" onclick="selectConcurso(this)">MPU</div>
+          <div class="chip" onclick="selectConcurso(this)" style="border-style:dashed;color:var(--primary)">+ Outro Concurso (Subir Edital)</div>
         </div>
       </div>
 
+      <!-- Edital upload (shown when "Outro Concurso" selected) -->
+      <div class="form-group" id="editalUploadGroup" style="display:none">
+        <label>Upload do Edital (PDF)</label>
+        <div class="upload-area" id="editalUploadArea" onclick="document.getElementById('editalFileInput').click()">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">Clique para selecionar o PDF do edital</div>
+          <div class="upload-filename" id="editalFileName" style="display:none"></div>
+        </div>
+        <input type="file" id="editalFileInput" accept=".pdf" style="display:none" onchange="handleEditalUpload(this)">
+        <div class="form-hint">O PDF sera processado futuramente pela IA para extrair materias automaticamente.</div>
+      </div>
+
+      <div class="form-group" id="editalLinkGroup" style="display:none">
+        <label>Link do concurso ou edital (opcional)</label>
+        <input type="url" class="form-control" id="editalLink" placeholder="https://www.in.gov.br/...">
+      </div>
+
       <div class="form-group">
-        <label>Nível do cargo</label>
+        <label>Nivel do cargo</label>
         <div class="chips">
           <div class="chip" onclick="selectNivel(this)">Nível Médio</div>
           <div class="chip" onclick="selectNivel(this)">Nível Superior</div>
@@ -371,12 +468,55 @@
 
       <div class="wizard-actions">
         <button class="btn btn-ghost" onclick="prevStep(1)">← Voltar</button>
-        <button class="btn btn-primary" onclick="nextStep(3)">Próximo →</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">Proximo →</button>
       </div>
     </div>
 
-    <!-- STEP 3: Horários -->
+    <!-- STEP 3: Perfil de Bagagem -->
     <div class="wizard-card" id="step3" style="display:none;">
+      <h2>Qual seu nivel em cada materia?</h2>
+      <p>Isso ajuda a IA a priorizar onde voce precisa de mais foco e a montar um ciclo inteligente.</p>
+
+      <div id="perfilMateriasList">
+        <!-- Populated by JS from selected subjects -->
+        <p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:20px">Selecione materias no passo anterior</p>
+      </div>
+
+      <div style="margin-top:24px;padding:16px;background:var(--bg);border-radius:var(--radius-sm)">
+        <h3 style="font-size:0.88rem;font-weight:700;color:var(--secondary);margin-bottom:12px">Escolha sua trilha de revisao</h3>
+        <div class="trilhas-grid">
+          <div class="trilha-card" onclick="selectTrilha(this)" data-trilha="agil">
+            <div class="trilha-icon">🚀</div>
+            <div class="trilha-name">Trilha Agil</div>
+            <div class="trilha-level">Iniciante</div>
+            <div class="trilha-desc">Foco em avancar na teoria. Revisoes semanais para fixar o basico.</div>
+            <div class="trilha-schedule">Revisao: 1x por semana</div>
+          </div>
+          <div class="trilha-card selected" onclick="selectTrilha(this)" data-trilha="consistente">
+            <div class="trilha-icon">⚖️</div>
+            <div class="trilha-name">Trilha Consistente</div>
+            <div class="trilha-level">Intermediario</div>
+            <div class="trilha-desc">Equilibrio entre avanco e consolidacao. Revisoes em 3 e 20 dias.</div>
+            <div class="trilha-schedule">Revisao: 3d e 20d apos a aula</div>
+          </div>
+          <div class="trilha-card" onclick="selectTrilha(this)" data-trilha="blindada">
+            <div class="trilha-icon">🛡️</div>
+            <div class="trilha-name">Trilha Blindada</div>
+            <div class="trilha-level">Avancado</div>
+            <div class="trilha-desc">Foco total em memoria de longo prazo. Revisoes espacadas intensivas.</div>
+            <div class="trilha-schedule">Revisao: 24h, 15d e 30d</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-actions">
+        <button class="btn btn-ghost" onclick="prevStep(2)">← Voltar</button>
+        <button class="btn btn-primary" onclick="nextStep(4)">Proximo →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Horarios -->
+    <div class="wizard-card" id="step4" style="display:none;">
       <h2>Qual sua disponibilidade de estudo?</h2>
       <p>Informe quando e por quanto tempo você pode estudar durante a semana.</p>
 
@@ -433,15 +573,6 @@
       </div>
 
       <div class="form-group">
-        <label>Incluir revisões no plano?</label>
-        <div class="chips">
-          <div class="chip selected" onclick="selectRevisao(this)">Sim, com ciclo inteligente</div>
-          <div class="chip" onclick="selectRevisao(this)">Sim, 1x por semana</div>
-          <div class="chip" onclick="selectRevisao(this)">Não</div>
-        </div>
-      </div>
-
-      <div class="form-group">
         <label>Dia de descanso semanal</label>
         <select class="form-control">
           <option value="dom" selected>Domingo</option>
@@ -452,13 +583,13 @@
       </div>
 
       <div class="wizard-actions">
-        <button class="btn btn-ghost" onclick="prevStep(2)">← Voltar</button>
-        <button class="btn btn-primary" onclick="nextStep(4)">Próximo →</button>
+        <button class="btn btn-ghost" onclick="prevStep(3)">← Voltar</button>
+        <button class="btn btn-primary" onclick="nextStep(5)">Proximo →</button>
       </div>
     </div>
 
-    <!-- STEP 4: Confirmation -->
-    <div class="wizard-card" id="step4" style="display:none;">
+    <!-- STEP 5: Confirmation -->
+    <div class="wizard-card" id="step5" style="display:none;">
       <h2>Resumo do seu Plano</h2>
       <p>Confira os detalhes antes de gerar seu plano personalizado.</p>
 
@@ -512,7 +643,7 @@
       </div>
 
       <div class="wizard-actions">
-        <button class="btn btn-ghost" onclick="prevStep(3)">← Voltar</button>
+        <button class="btn btn-ghost" onclick="prevStep(4)">← Voltar</button>
         <button class="btn btn-primary btn-lg" onclick="gerarPlano()" id="btnGerar">
           🚀 Gerar Meu Plano de Estudos
         </button>
@@ -831,11 +962,17 @@
     // =============================================
     //  STEP NAVIGATION
     // =============================================
+    var selectedTrilha = 'consistente';
+    var editalFile = null;
+
     async function nextStep(step) {
       if (step === 2) {
         loadSubjectsForConcurso();
       }
-      if (step === 4) {
+      if (step === 3) {
+        buildPerfilMaterias();
+      }
+      if (step === 5) {
         await buildReview();
       }
       document.getElementById('step' + currentStep).style.display = 'none';
@@ -873,6 +1010,12 @@
       document.querySelectorAll('#concursoChips .chip').forEach(c => c.classList.remove('selected'));
       el.classList.add('selected');
       selectedConcurso = el.textContent.trim();
+
+      // Show/hide upload area for "Outro Concurso"
+      var isOutro = selectedConcurso.includes('Outro Concurso');
+      document.getElementById('editalUploadGroup').style.display = isOutro ? '' : 'none';
+      document.getElementById('editalLinkGroup').style.display = isOutro ? '' : 'none';
+      if (isOutro) selectedConcurso = 'Outro';
     }
 
     function selectNivel(el) {
@@ -1009,13 +1152,96 @@
       el.classList.add('selected');
     }
 
-    function selectRevisao(el) {
-      el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    // =============================================
+    //  EDITAL UPLOAD + OUTRO CONCURSO
+    // =============================================
+    function handleEditalUpload(input) {
+      if (input.files && input.files[0]) {
+        editalFile = input.files[0];
+        var area = document.getElementById('editalUploadArea');
+        area.classList.add('has-file');
+        document.getElementById('editalFileName').textContent = '✓ ' + editalFile.name;
+        document.getElementById('editalFileName').style.display = '';
+      }
+    }
+
+    // Override selectConcurso to show/hide upload
+    var _originalSelectConcurso = window.selectConcurso;
+
+    // =============================================
+    //  STEP 3: PERFIL DE BAGAGEM
+    // =============================================
+    function buildPerfilMaterias() {
+      var subjects = getSelectedSubjects();
+      var container = document.getElementById('perfilMateriasList');
+
+      if (subjects.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:20px">Nenhuma materia selecionada</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      subjects.forEach(function(s) {
+        var div = document.createElement('div');
+        div.className = 'subject-card';
+        div.setAttribute('data-perfil-materia', s.nome);
+        div.style.marginBottom = '8px';
+
+        div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+          + '<strong style="font-size:0.85rem;color:var(--secondary)">' + s.nome + '</strong>'
+          + '<div class="nivel-selector">'
+          + '  <button class="nivel-btn selected" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="iniciante">Iniciante</button>'
+          + '  <button class="nivel-btn" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="regular">Regular</button>'
+          + '  <button class="nivel-btn nivel-avancado" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="avancado">Avancado</button>'
+          + '</div>'
+          + '</div>'
+          + '<label class="fechada-toggle">'
+          + '  <input type="checkbox" onchange="toggleFechada(this,\'' + s.nome.replace(/'/g, "\\'") + '\')">'
+          + '  Ja estudei esta materia completamente'
+          + '</label>';
+
+        container.appendChild(div);
+      });
+    }
+
+    function selectNivelMateria(btn, materia) {
+      var card = btn.closest('[data-perfil-materia]');
+      card.querySelectorAll('.nivel-btn').forEach(function(b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
+    }
+
+    function toggleFechada(checkbox, materia) {
+      var card = checkbox.closest('[data-perfil-materia]');
+      if (checkbox.checked) {
+        card.classList.add('fechada');
+      } else {
+        card.classList.remove('fechada');
+      }
+    }
+
+    function selectTrilha(el) {
+      document.querySelectorAll('.trilha-card').forEach(function(c) { c.classList.remove('selected'); });
       el.classList.add('selected');
+      selectedTrilha = el.getAttribute('data-trilha');
+    }
+
+    function getMateriaPerfis() {
+      var perfis = [];
+      document.querySelectorAll('[data-perfil-materia]').forEach(function(card) {
+        var materia = card.getAttribute('data-perfil-materia');
+        var nivelBtn = card.querySelector('.nivel-btn.selected');
+        var fechadaCheckbox = card.querySelector('.fechada-toggle input');
+        perfis.push({
+          materia: materia,
+          nivel: nivelBtn ? nivelBtn.getAttribute('data-nivel') : 'iniciante',
+          fechada: fechadaCheckbox ? fechadaCheckbox.checked : false
+        });
+      });
+      return perfis;
     }
 
     // =============================================
-    //  STEP 4: BUILD REVIEW
+    //  STEP 5: BUILD REVIEW
     // =============================================
     function getSelectedSubjects() {
       const subjects = [];
@@ -1051,7 +1277,7 @@
 
       // Find turno
       let turnoText = 'Manhã';
-      document.querySelectorAll('#step3 .chips').forEach(chipsGroup => {
+      document.querySelectorAll('#step4 .chips').forEach(chipsGroup => {
         chipsGroup.querySelectorAll('.chip').forEach(c => {
           if (c.classList.contains('selected') && c.textContent.includes('h)')) {
             turnoText = c.textContent.split(' (')[0];
@@ -1153,7 +1379,7 @@
       document.querySelectorAll('#diasEstudo .chip.selected').forEach(c => selectedDays.push(c.textContent));
 
       let turnoText = 'Manhã';
-      document.querySelectorAll('#step3 .chips').forEach(chipsGroup => {
+      document.querySelectorAll('#step4 .chips').forEach(chipsGroup => {
         chipsGroup.querySelectorAll('.chip').forEach(c => {
           if (c.classList.contains('selected') && c.textContent.includes('h)')) {
             turnoText = c.textContent;
@@ -1162,6 +1388,8 @@
       });
 
       const dataProva = document.getElementById('dataProva').value || null;
+      const editalLink = document.getElementById('editalLink') ? document.getElementById('editalLink').value.trim() : '';
+      const materiaPerfis = getMateriaPerfis();
       const nome = user.user_metadata?.nome || user.email.split('@')[0];
       const email = user.email;
       const horasUteis = parseInt(document.getElementById('horasUteis').value) || 3;
@@ -1195,7 +1423,9 @@
           data_prova: dataProva,
           horas_semanais: horasSemanais,
           turno_preferido: turnoText,
-          dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo'
+          dia_descanso: selectedDays.includes('Domingo') ? 'Nenhum' : 'Domingo',
+          trilha_revisao: selectedTrilha,
+          edital_link: editalLink || null
         };
 
         console.log('[Supabase] Salvando perfil_aluno:', JSON.stringify(perfilData));
@@ -1291,6 +1521,20 @@
         }
 
         console.log('[Supabase] Total de aulas criadas:', aulasSalvas);
+
+        // 3e. Save materia profiles (nivel + fechada)
+        btn.innerHTML = '⏳ Salvando perfil de materias...';
+        await supabase.from('materia_perfil').delete().eq('user_id', user.id);
+
+        if (materiaPerfis.length > 0) {
+          var perfilRows = materiaPerfis.map(function(p) {
+            return { user_id: user.id, materia: p.materia, nivel: p.nivel, fechada: p.fechada };
+          });
+          var { error: perfilMatError } = await supabase.from('materia_perfil').insert(perfilRows);
+          if (perfilMatError) console.error('[Supabase] ERRO materia_perfil:', perfilMatError.message);
+          else console.log('[Supabase] ' + perfilRows.length + ' perfis de materia salvos');
+        }
+
         savedToSupabase = true;
 
       } catch (e) {
@@ -1323,6 +1567,8 @@
         horasFds,
         horasSemanais,
         metaMeses,
+        trilha_revisao: selectedTrilha,
+        materias_perfil: materiaPerfis,
         nome,
         email,
         criadoEm: new Date().toISOString()
@@ -1335,7 +1581,7 @@
       // -----------------------------------------------
       //  5. SHOW SUCCESS (only after Supabase save)
       // -----------------------------------------------
-      document.getElementById('step4').style.display = 'none';
+      document.getElementById('step5').style.display = 'none';
       document.getElementById('stepSuccess').style.display = 'block';
 
       document.getElementById('successConcurso').textContent = selectedConcurso || 'Personalizado';
