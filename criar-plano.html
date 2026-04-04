@@ -370,10 +370,25 @@
       white-space: nowrap;
     }
 
+    /* Importance selector (manual mode) */
+    .importancia-selector {
+      display: flex; gap: 2px; margin-top: 4px;
+    }
+    .importancia-btn {
+      width: 28px; height: 28px; border: 1.5px solid var(--border);
+      border-radius: 4px; background: var(--bg); font-size: 0.72rem;
+      font-weight: 700; cursor: pointer; color: var(--text-lighter);
+      transition: all 0.2s; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .importancia-btn:hover { border-color: var(--primary); }
+    .importancia-btn.selected { border-color: var(--primary); background: var(--primary); color: white; }
+
     @media (max-width: 600px) {
       .subjects-grid { grid-template-columns: 1fr; }
       .add-subject-form { flex-direction: column; align-items: stretch; }
       .trilhas-grid { grid-template-columns: 1fr; }
+      #planosMestresGrid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -412,52 +427,63 @@
 
     <!-- STEP 1: Concurso -->
     <div class="wizard-card" id="step1">
-      <h2>Qual concurso você quer prestar?</h2>
-      <p>Selecione o concurso ou área de interesse para montar seu plano personalizado.</p>
+      <h2>Qual concurso voce quer prestar?</h2>
+      <p>Escolha um plano validado pelo Prof. Renno ou insira suas materias manualmente.</p>
 
+      <!-- Search -->
       <div class="form-group">
         <label>Buscar concurso</label>
-        <input type="text" class="form-control" id="searchConcurso" placeholder="Digite o nome do concurso (ex: TCU, Polícia Federal, INSS...)" oninput="filterConcursos()">
+        <input type="text" class="form-control" id="searchConcurso" placeholder="Digite o nome do concurso (ex: TCU, Policia Federal, INSS...)" oninput="filterPlanos()">
       </div>
 
+      <!-- Planos Mestres (validated by Prof. Renno) -->
       <div class="form-group">
-        <label>Concursos populares</label>
-        <div class="chips" id="concursoChips">
-          <div class="chip" onclick="selectConcurso(this)">Polícia Federal</div>
-          <div class="chip" onclick="selectConcurso(this)">Polícia Civil - GO</div>
-          <div class="chip" onclick="selectConcurso(this)">TRT (Analista)</div>
-          <div class="chip" onclick="selectConcurso(this)">INSS (Técnico)</div>
-          <div class="chip" onclick="selectConcurso(this)">Receita Federal</div>
-          <div class="chip" onclick="selectConcurso(this)">TRF (Analista)</div>
-          <div class="chip" onclick="selectConcurso(this)">Banco do Brasil</div>
-          <div class="chip" onclick="selectConcurso(this)">Caixa Econômica</div>
-          <div class="chip" onclick="selectConcurso(this)">STJ</div>
-          <div class="chip" onclick="selectConcurso(this)">TSE</div>
-          <div class="chip" onclick="selectConcurso(this)">CGU</div>
-          <div class="chip" onclick="selectConcurso(this)">TCU</div>
-          <div class="chip" onclick="selectConcurso(this)">Polícia Rodoviária Federal</div>
-          <div class="chip" onclick="selectConcurso(this)">PCDF</div>
-          <div class="chip" onclick="selectConcurso(this)">DEPEN</div>
-          <div class="chip" onclick="selectConcurso(this)">MPU</div>
-          <div class="chip" onclick="selectConcurso(this)" style="border-style:dashed;color:var(--primary)">+ Outro Concurso (Subir Edital)</div>
+        <label style="display:flex;align-items:center;gap:6px">
+          <span>⭐</span> Planos Validados pelo Prof. Renno
+        </label>
+        <div id="planosMestresGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <p style="color:var(--text-lighter);font-size:0.82rem;padding:12px;grid-column:1/-1;text-align:center">Carregando planos...</p>
         </div>
       </div>
 
-      <!-- Community plan banner (shown when a matching plan is found) -->
-      <div id="communityPlanBanner" style="display:none;padding:14px;background:linear-gradient(135deg,#F0FFF4,#fff);border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:1.2rem">👥</span>
-          <strong style="font-size:0.88rem;color:var(--secondary)" id="communityPlanTitle">Plano encontrado!</strong>
+      <!-- Selected plan preview -->
+      <div id="planoMestrePreview" style="display:none;padding:14px;background:linear-gradient(135deg,rgba(56,161,105,0.06),#fff);border:1px solid rgba(56,161,105,0.2);border-radius:var(--radius-sm);margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span>⭐</span>
+          <strong style="font-size:0.88rem;color:var(--secondary)" id="planoMestreTitulo">—</strong>
         </div>
-        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:10px" id="communityPlanDesc"></p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" onclick="carregarPlanoComunidade()" style="font-size:0.82rem;padding:8px 16px">Carregar materias validadas</button>
-          <button class="btn-add-cancel" onclick="document.getElementById('communityPlanBanner').style.display='none'" style="font-size:0.82rem">Nao, obrigado</button>
+        <div style="font-size:0.78rem;color:var(--text-light)" id="planoMestreInfo"></div>
+      </div>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:12px;margin:20px 0">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:0.78rem;font-weight:600;color:var(--text-lighter)">OU</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <!-- Manual fallback -->
+      <div class="form-group">
+        <button id="btnManualMode" onclick="ativarModoManual()" style="width:100%;padding:12px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:none;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--primary);font-family:inherit;transition:all 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+          Meu concurso nao esta na lista →
+        </button>
+      </div>
+
+      <!-- Manual entry area (hidden by default) -->
+      <div id="manualEntryArea" style="display:none">
+        <div class="form-group">
+          <label>Nome do concurso/cargo</label>
+          <input type="text" class="form-control" id="manualConcursoNome" placeholder="Ex: Concurso BNDES - Analista">
+        </div>
+        <div class="form-group">
+          <label>Materias (uma por linha)</label>
+          <textarea class="form-control" id="manualMaterias" rows="8" placeholder="Lingua Portuguesa&#10;Raciocinio Logico&#10;Direito Administrativo&#10;Contabilidade&#10;Economia&#10;..." style="resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+          <div class="form-hint">Digite uma materia por linha. Na proxima etapa voce podera definir a importancia de cada uma.</div>
         </div>
       </div>
 
-      <!-- Edital upload (shown when "Outro Concurso" selected) -->
-      <div id="editalUploadGroup" style="display:none">
+      <!-- Edital upload (legacy, hidden — kept for existing references) -->
+      <div id="editalUploadGroup" style="display:none"><!-- legacy -->
         <div class="form-group">
           <label>Qual cargo voce deseja estudar? *</label>
           <input type="text" class="form-control" id="editalCargoInput" placeholder="Ex: Analista Judiciario - Area Administrativa">
@@ -601,16 +627,16 @@
       <div class="form-group">
         <label>Data prevista da prova (opcional)</label>
         <input type="date" class="form-control" id="dataProva">
-        <div class="form-hint">Se não souber, deixe em branco. O plano se ajusta automaticamente.</div>
+        <div class="form-hint">Se nao souber, deixe em branco.</div>
       </div>
 
       <div class="wizard-actions">
         <div></div>
-        <button class="btn btn-primary" onclick="nextStep(2)">Próximo →</button>
+        <button class="btn btn-primary" onclick="avancarStep1()" id="btnStep1Next">Proximo →</button>
       </div>
     </div>
 
-    <!-- STEP 2: Matérias -->
+    <!-- STEP 2: Materias -->
     <div class="wizard-card" id="step2" style="display:none;">
       <h2>Quais matérias você precisa estudar?</h2>
       <p>Matérias sugeridas com base no último edital. Você pode desmarcar, reordenar ou adicionar novas.</p>
@@ -1185,30 +1211,150 @@
     }
 
     // =============================================
-    //  STEP 1: CONCURSO
+    //  STEP 1: CONCURSO — Two paths
     // =============================================
-    function selectConcurso(el) {
-      document.querySelectorAll('#concursoChips .chip').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
-      selectedConcurso = el.textContent.trim();
+    var _planosMestres = [];
+    var _planoMestreSelecionado = null;
+    var _modoManual = false;
 
-      var isOutro = selectedConcurso.includes('Outro Concurso');
-      document.getElementById('editalUploadGroup').style.display = isOutro ? '' : 'none';
-      document.getElementById('communityPlanBanner').style.display = 'none';
-      if (isOutro) selectedConcurso = '';
+    async function carregarPlanosMestres() {
+      var grid = document.getElementById('planosMestresGrid');
+      try {
+        var authModule = await import('./js/supabase.js');
+        var sb = authModule.supabase;
+        var { data, error } = await sb
+          .from('planos_mestres')
+          .select('*')
+          .eq('ativo', true)
+          .order('concurso_nome');
 
-      // Reset edital state
-      _materiasExtraidasEdital = [];
-      _textoEditalCompleto = '';
-      _textoEditalFiltrado = '';
-      _rennoPrioridade = false;
-      _rennoFile = null;
-
-      // Search community plans for known concursos
-      if (!isOutro && selectedConcurso) {
-        buscarComunidade(selectedConcurso, selectedConcurso);
+        if (error) throw error;
+        _planosMestres = data || [];
+      } catch (e) {
+        console.log('[Planos] Erro ao carregar:', e.message);
+        _planosMestres = [];
       }
+
+      if (_planosMestres.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-lighter);font-size:0.82rem;padding:12px;grid-column:1/-1;text-align:center">Nenhum plano disponivel ainda. Use o modo manual abaixo.</p>';
+        return;
+      }
+
+      grid.innerHTML = _planosMestres.map(function(p) {
+        var nMaterias = p.materias ? p.materias.length : 0;
+        return '<div class="chip" style="padding:10px 14px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer" onclick="selecionarPlanoMestre(\'' + p.id + '\')" data-plano-id="' + p.id + '">'
+          + '<strong style="font-size:0.85rem">' + p.concurso_nome + '</strong>'
+          + '<span style="font-size:0.68rem;color:var(--text-lighter)">'
+          + (p.cargo ? p.cargo + ' · ' : '')
+          + nMaterias + ' materias'
+          + (p.banca ? ' · ' + p.banca : '')
+          + '</span>'
+          + '</div>';
+      }).join('');
     }
+
+    function selecionarPlanoMestre(id) {
+      _planoMestreSelecionado = _planosMestres.find(function(p) { return p.id === id; });
+      if (!_planoMestreSelecionado) return;
+
+      _modoManual = false;
+      document.getElementById('manualEntryArea').style.display = 'none';
+
+      // Highlight selected
+      document.querySelectorAll('#planosMestresGrid .chip').forEach(function(c) { c.classList.remove('selected'); });
+      var chip = document.querySelector('[data-plano-id="' + id + '"]');
+      if (chip) chip.classList.add('selected');
+
+      // Show preview
+      var preview = document.getElementById('planoMestrePreview');
+      preview.style.display = '';
+
+      var p = _planoMestreSelecionado;
+      var materias = p.materias || [];
+      document.getElementById('planoMestreTitulo').textContent = p.concurso_nome + (p.cargo ? ' — ' + p.cargo : '');
+
+      var info = materias.length + ' materias';
+      if (p.banca) info += ' · Banca: ' + p.banca;
+      if (p.data_prova) {
+        info += ' · Prova: ' + new Date(p.data_prova).toLocaleDateString('pt-BR');
+        document.getElementById('dataProva').value = p.data_prova;
+      }
+      document.getElementById('planoMestreInfo').textContent = info;
+
+      selectedConcurso = p.concurso_nome;
+
+      // Pre-load materias for step 2
+      _materiasExtraidasEdital = materias.map(function(m) {
+        return {
+          nome: m.nome,
+          topicos: Array.isArray(m.topicos) ? m.topicos.join(', ') : (m.topicos || ''),
+          pontos: m.pontos || m.peso || 0,
+          relevancia: m.relevancia || 0,
+          fonte: 'plano_mestre',
+          confianca: 95
+        };
+      });
+    }
+
+    function ativarModoManual() {
+      _modoManual = true;
+      _planoMestreSelecionado = null;
+      document.getElementById('manualEntryArea').style.display = '';
+      document.getElementById('planoMestrePreview').style.display = 'none';
+      document.querySelectorAll('#planosMestresGrid .chip').forEach(function(c) { c.classList.remove('selected'); });
+      document.getElementById('manualConcursoNome').focus();
+    }
+
+    function filterPlanos() {
+      var query = document.getElementById('searchConcurso').value.toLowerCase();
+      document.querySelectorAll('#planosMestresGrid .chip').forEach(function(chip) {
+        var text = chip.textContent.toLowerCase();
+        chip.style.display = (!query || text.indexOf(query) !== -1) ? '' : 'none';
+      });
+    }
+
+    function avancarStep1() {
+      if (_planoMestreSelecionado) {
+        // Plano mestre: skip to step 3 (perfil) since materias are pre-loaded
+        selectedConcurso = _planoMestreSelecionado.concurso_nome;
+        loadSubjectsForConcurso(); // populate step 2 DOM
+        nextStep(3); // skip step 2, go to perfil
+        return;
+      }
+
+      if (_modoManual) {
+        var nome = document.getElementById('manualConcursoNome').value.trim();
+        var textoMaterias = document.getElementById('manualMaterias').value.trim();
+
+        if (!nome) {
+          alert('Digite o nome do concurso.');
+          document.getElementById('manualConcursoNome').focus();
+          return;
+        }
+        if (!textoMaterias) {
+          alert('Digite pelo menos uma materia.');
+          document.getElementById('manualMaterias').focus();
+          return;
+        }
+
+        selectedConcurso = nome;
+        var linhas = textoMaterias.split(/\n/).map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 2; });
+        _materiasExtraidasEdital = linhas.map(function(n) {
+          return { nome: n, topicos: '', fonte: 'manual', confianca: 70 };
+        });
+
+        loadSubjectsForConcurso();
+        nextStep(2); // go to step 2 to adjust materias
+        return;
+      }
+
+      // Nothing selected
+      alert('Selecione um plano validado ou clique em "Meu concurso nao esta na lista" para inserir manualmente.');
+    }
+
+    // Legacy compatibility
+    function selectConcurso(el) { }
+    function filterConcursos() { filterPlanos(); }
 
     function selectNivel(el) {
       el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
@@ -1982,6 +2128,7 @@
     function buildPerfilMaterias() {
       var subjects = getSelectedSubjects();
       var container = document.getElementById('perfilMateriasList');
+      var isManual = _modoManual && !_planoMestreSelecionado;
 
       if (subjects.length === 0) {
         container.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:20px">Nenhuma materia selecionada</p>';
@@ -1994,22 +2141,42 @@
         div.className = 'subject-card';
         div.setAttribute('data-perfil-materia', s.nome);
         div.style.marginBottom = '8px';
+        var escapedNome = s.nome.replace(/'/g, "\\'");
+
+        // Importance selector (only for manual mode without weights)
+        var importanciaHtml = '';
+        if (isManual) {
+          importanciaHtml = '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">'
+            + '<span style="font-size:0.72rem;color:var(--text-light)">Importancia:</span>'
+            + '<div class="importancia-selector">';
+          for (var i = 1; i <= 5; i++) {
+            importanciaHtml += '<button class="importancia-btn' + (i === 3 ? ' selected' : '') + '" onclick="selectImportancia(this,' + i + ',\'' + escapedNome + '\')" data-imp="' + i + '">' + i + '</button>';
+          }
+          importanciaHtml += '</div><span style="font-size:0.65rem;color:var(--text-lighter)">(1=baixa, 5=alta)</span></div>';
+        }
 
         div.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
           + '<strong style="font-size:0.85rem;color:var(--secondary)">' + s.nome + '</strong>'
           + '<div class="nivel-selector">'
-          + '  <button class="nivel-btn selected" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="iniciante">Iniciante</button>'
-          + '  <button class="nivel-btn" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="regular">Regular</button>'
-          + '  <button class="nivel-btn nivel-avancado" onclick="selectNivelMateria(this,\'' + s.nome.replace(/'/g, "\\'") + '\')" data-nivel="avancado">Avancado</button>'
+          + '  <button class="nivel-btn selected" onclick="selectNivelMateria(this,\'' + escapedNome + '\')" data-nivel="iniciante">Iniciante</button>'
+          + '  <button class="nivel-btn" onclick="selectNivelMateria(this,\'' + escapedNome + '\')" data-nivel="regular">Regular</button>'
+          + '  <button class="nivel-btn nivel-avancado" onclick="selectNivelMateria(this,\'' + escapedNome + '\')" data-nivel="avancado">Avancado</button>'
           + '</div>'
           + '</div>'
+          + importanciaHtml
           + '<label class="fechada-toggle">'
-          + '  <input type="checkbox" onchange="toggleFechada(this,\'' + s.nome.replace(/'/g, "\\'") + '\')">'
+          + '  <input type="checkbox" onchange="toggleFechada(this,\'' + escapedNome + '\')">'
           + '  Ja estudei esta materia completamente'
           + '</label>';
 
         container.appendChild(div);
       });
+    }
+
+    function selectImportancia(btn, valor, materia) {
+      var selector = btn.closest('.importancia-selector');
+      selector.querySelectorAll('.importancia-btn').forEach(function(b) { b.classList.remove('selected'); });
+      btn.classList.add('selected');
     }
 
     function selectNivelMateria(btn, materia) {
@@ -2039,10 +2206,12 @@
         var materia = card.getAttribute('data-perfil-materia');
         var nivelBtn = card.querySelector('.nivel-btn.selected');
         var fechadaCheckbox = card.querySelector('.fechada-toggle input');
+        var impBtn = card.querySelector('.importancia-btn.selected');
         perfis.push({
           materia: materia,
           nivel: nivelBtn ? nivelBtn.getAttribute('data-nivel') : 'iniciante',
-          fechada: fechadaCheckbox ? fechadaCheckbox.checked : false
+          fechada: fechadaCheckbox ? fechadaCheckbox.checked : false,
+          importancia: impBtn ? parseInt(impBtn.getAttribute('data-imp')) : 3
         });
       });
       return perfis;
@@ -2709,6 +2878,9 @@
     import { protegerPagina, onAuthStateChange } from './js/auth.js';
 
     protegerPagina();
+
+    // Load planos mestres on page load
+    carregarPlanosMestres();
 
     onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
