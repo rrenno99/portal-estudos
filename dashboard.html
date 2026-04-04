@@ -1988,6 +1988,9 @@
         </div>
 
         <div class="topbar-right">
+          <!-- Admin button (visible only for admin) -->
+          <a href="admin.html" id="topbarAdminBtn" style="display:none;font-size:0.78rem;font-weight:600;color:var(--primary);padding:6px 12px;border:1.5px solid var(--primary);border-radius:20px;text-decoration:none;white-space:nowrap">⚙️ Biblioteca de Planos</a>
+
           <!-- Credits -->
           <div class="credits-badge" id="creditsBadge">
             <span>🪙</span> <span id="creditsValue">0</span> cr
@@ -4614,10 +4617,12 @@
 
         console.log('[Init] Sessão OK:', window._userId, window._userEmail);
 
-        // Show admin button if admin user
+        // Show admin buttons if admin user
         if (window._userEmail === 'rodrigorenno99@gmail.com') {
           var adminBtn = document.getElementById('btnAdminPlanos');
           if (adminBtn) adminBtn.style.display = '';
+          var topbarAdmin = document.getElementById('topbarAdminBtn');
+          if (topbarAdmin) topbarAdmin.style.display = '';
         }
 
         // Auth listener

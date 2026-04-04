@@ -136,17 +136,25 @@
       _sb = window.supabase.createClient(
         'https://hcngacohwiwphcbroint.supabase.co',
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
-        { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true } }
+        { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true, detectSessionInUrl: true } }
       );
 
       var { data: { session } } = await _sb.auth.getSession();
-      if (!session) { window.location.href = 'login.html'; return; }
+      if (!session) {
+        // Try getUser as fallback
+        var { data: { user } } = await _sb.auth.getUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        _userId = user.id;
+        var email = user.email;
+      } else {
+        _userId = session.user.id;
+        var email = session.user.email;
+      }
 
-      _userId = session.user.id;
-      var email = session.user.email;
+      console.log('[Admin] Email logado:', email);
 
       if (ADMIN_EMAILS.indexOf(email) === -1) {
-        document.querySelector('.admin-page').innerHTML = '<div style="text-align:center;padding:60px"><h2 style="color:var(--danger)">Acesso Negado</h2><p>Esta pagina e restrita ao administrador.</p><a href="dashboard.html" class="btn btn-primary" style="margin-top:16px">Voltar ao Dashboard</a></div>';
+        document.querySelector('.admin-page').innerHTML = '<div style="text-align:center;padding:60px"><h2 style="color:#E53E3E">Acesso Negado</h2><p style="margin-top:8px">Esta pagina e restrita ao administrador.</p><p style="font-size:0.78rem;color:var(--text-lighter);margin-top:4px">Email atual: ' + email + '</p><a href="dashboard.html" class="btn btn-primary" style="margin-top:16px">Voltar ao Dashboard</a></div>';
         return;
       }
 
