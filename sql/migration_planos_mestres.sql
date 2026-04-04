@@ -38,3 +38,11 @@ DO $$ BEGIN
   CREATE POLICY "Admin atualiza planos mestres" ON planos_mestres FOR UPDATE
     USING (auth.jwt() ->> 'email' IN ('rodrigorenno99@gmail.com'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Admin deleta planos mestres" ON planos_mestres FOR DELETE
+    USING (auth.jwt() ->> 'email' IN ('rodrigorenno99@gmail.com'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Unique constraint for upsert
+CREATE UNIQUE INDEX IF NOT EXISTS idx_planos_mestres_nome_unique ON planos_mestres(concurso_nome);

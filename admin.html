@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Planos Mestres | Planejador Renno</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+  <script src="js/mentor.js"></script>
+  <style>
+    .admin-page { max-width: 800px; margin: 0 auto; padding: 32px 24px; }
+    .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+    .admin-header h1 { font-size: 1.3rem; font-weight: 800; color: var(--secondary); }
+    .admin-back { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
+
+    .admin-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+    .admin-card h2 { font-size: 1rem; font-weight: 700; color: var(--secondary); margin-bottom: 12px; }
+
+    .dropzone {
+      border: 2.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg);
+    }
+    .dropzone:hover { border-color: var(--primary); background: rgba(30,136,229,0.03); }
+    .dropzone.dragging { border-color: var(--primary); background: rgba(30,136,229,0.06); }
+    .dropzone.has-file { border-color: var(--success); background: rgba(56,161,105,0.04); }
+    .dropzone-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .dropzone-text { font-size: 0.88rem; color: var(--text-light); }
+    .dropzone-filename { font-size: 0.88rem; font-weight: 600; color: var(--success); margin-top: 8px; }
+
+    .preview-box {
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 0.85rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .preview-box table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .preview-box th { text-align: left; padding: 6px 8px; border-bottom: 2px solid var(--border); color: var(--text-light); font-weight: 600; }
+    .preview-box td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+
+    .plan-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .plan-list-item:last-child { border-bottom: none; }
+    .plan-list-name { font-weight: 600; color: var(--secondary); }
+    .plan-list-meta { font-size: 0.75rem; color: var(--text-lighter); }
+
+    .status-msg {
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      margin-top: 16px;
+      display: none;
+    }
+    .status-msg.success { display: block; background: #F0FFF4; border: 1px solid #C6F6D5; color: #276749; }
+    .status-msg.error { display: block; background: #FFF5F5; border: 1px solid #FED7D7; color: #C53030; }
+  </style>
+</head>
+<body>
+  <div class="admin-page">
+    <div class="admin-header">
+      <h1>⚙️ Gerenciar Planos Mestres</h1>
+      <a href="dashboard.html" class="admin-back">← Voltar ao Dashboard</a>
+    </div>
+
+    <!-- Upload -->
+    <div class="admin-card">
+      <h2>Subir Plano (.md)</h2>
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('mdFileInput').click()">
+        <div class="dropzone-icon">📄</div>
+        <div class="dropzone-text">Arraste o arquivo .md aqui ou clique para selecionar</div>
+        <div class="dropzone-filename" id="dropzoneFilename" style="display:none"></div>
+      </div>
+      <input type="file" id="mdFileInput" accept=".md,.markdown,.txt" style="display:none" onchange="handleMdUpload(this)">
+
+      <!-- Preview -->
+      <div id="previewArea" style="display:none">
+        <div class="preview-box">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <strong id="previewTitulo" style="font-size:0.95rem;color:var(--secondary)">—</strong>
+            <span id="previewMeta" style="font-size:0.75rem;color:var(--text-lighter)"></span>
+          </div>
+          <table>
+            <thead><tr><th>Materia</th><th>Questoes</th><th>Peso</th><th>Pontos</th><th>Topicos</th></tr></thead>
+            <tbody id="previewTable"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="salvarPlano()" id="btnSalvar">🚀 Publicar Plano para os Alunos</button>
+          <button class="btn btn-ghost" onclick="limparUpload()">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+
+    <!-- Existing plans -->
+    <div class="admin-card">
+      <h2>Planos Publicados</h2>
+      <div id="planosLista">
+        <p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:16px">Carregando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    var ADMIN_EMAILS = ['rodrigorenno99@gmail.com'];
+    var _sb = null;
+    var _userId = null;
+    var _parsedPlan = null;
+
+    // Init
+    (async function() {
+      _sb = window.supabase.createClient(
+        'https://hcngacohwiwphcbroint.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmdhY29od2l3cGhjYnJvaW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MDc1MjUsImV4cCI6MjA5MDQ4MzUyNX0.Rv9OlD7pltClHO2JyoEk5q7htUfUWc__StgxOQK4uaM',
+        { auth: { persistSession: true, storageKey: 'studyplan-auth', autoRefreshToken: true } }
+      );
+
+      var { data: { session } } = await _sb.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+
+      _userId = session.user.id;
+      var email = session.user.email;
+
+      if (ADMIN_EMAILS.indexOf(email) === -1) {
+        document.querySelector('.admin-page').innerHTML = '<div style="text-align:center;padding:60px"><h2 style="color:var(--danger)">Acesso Negado</h2><p>Esta pagina e restrita ao administrador.</p><a href="dashboard.html" class="btn btn-primary" style="margin-top:16px">Voltar ao Dashboard</a></div>';
+        return;
+      }
+
+      carregarPlanosExistentes();
+    })();
+
+    // Drag and drop
+    var dz = document.getElementById('dropzone');
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dragging'); });
+    dz.addEventListener('dragleave', function() { dz.classList.remove('dragging'); });
+    dz.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dz.classList.remove('dragging');
+      if (e.dataTransfer.files.length > 0) {
+        document.getElementById('mdFileInput').files = e.dataTransfer.files;
+        handleMdUpload(document.getElementById('mdFileInput'));
+      }
+    });
+
+    async function handleMdUpload(input) {
+      if (!input.files || !input.files[0]) return;
+      var file = input.files[0];
+
+      dz.classList.add('has-file');
+      document.getElementById('dropzoneFilename').textContent = '✓ ' + file.name;
+      document.getElementById('dropzoneFilename').style.display = '';
+      document.getElementById('statusMsg').className = 'status-msg';
+
+      var text = await file.text();
+      _parsedPlan = window.MentorIA.parsePlanoMarkdown(text);
+
+      if (!_parsedPlan || !_parsedPlan.materias || _parsedPlan.materias.length === 0) {
+        showStatus('Erro: nao foi possivel extrair materias do arquivo. Verifique o formato.', 'error');
+        return;
+      }
+
+      // Show preview
+      document.getElementById('previewTitulo').textContent = _parsedPlan.concurso + (_parsedPlan.cargo ? ' — ' + _parsedPlan.cargo : '');
+      var meta = _parsedPlan.materias.length + ' materias';
+      if (_parsedPlan.banca) meta += ' · Banca: ' + _parsedPlan.banca;
+      if (_parsedPlan.dataProva) meta += ' · Prova: ' + _parsedPlan.dataProva;
+      document.getElementById('previewMeta').textContent = meta;
+
+      var tbody = document.getElementById('previewTable');
+      tbody.innerHTML = _parsedPlan.materias.map(function(m) {
+        var topicsShort = Array.isArray(m.topicos) ? m.topicos.slice(0, 3).join(', ') : (m.topicos || '—');
+        if (topicsShort.length > 60) topicsShort = topicsShort.substring(0, 57) + '...';
+        return '<tr>'
+          + '<td style="font-weight:600;color:var(--secondary)">' + m.nome + '</td>'
+          + '<td>' + (m.questoes || '—') + '</td>'
+          + '<td>' + (m.peso || '—') + '</td>'
+          + '<td style="font-weight:700;color:var(--primary)">' + (m.pontos || '—') + '</td>'
+          + '<td style="font-size:0.75rem;color:var(--text-light)">' + topicsShort + '</td>'
+          + '</tr>';
+      }).join('');
+
+      document.getElementById('previewArea').style.display = '';
+    }
+
+    async function salvarPlano() {
+      if (!_parsedPlan || !_sb) return;
+      var btn = document.getElementById('btnSalvar');
+      btn.disabled = true;
+      btn.textContent = '⏳ Salvando...';
+
+      try {
+        var materiasJson = _parsedPlan.materias.map(function(m) {
+          return {
+            nome: m.nome,
+            questoes: m.questoes || 0,
+            peso: m.peso || 1,
+            pontos: m.pontos || 0,
+            relevancia: m.relevancia || 0,
+            topicos: Array.isArray(m.topicos) ? m.topicos : (m.topicos ? m.topicos.split(', ') : [])
+          };
+        });
+
+        var { error } = await _sb.from('planos_mestres').upsert({
+          concurso_nome: _parsedPlan.concurso || 'Sem nome',
+          cargo: _parsedPlan.cargo || null,
+          banca: _parsedPlan.banca || null,
+          data_prova: _parsedPlan.dataProva || null,
+          materias: materiasJson,
+          trilha_sugerida: _parsedPlan.trilha || 'consistente',
+          ativo: true,
+          criado_por: _userId
+        }, { onConflict: 'concurso_nome' });
+
+        if (error) throw error;
+
+        showStatus('Plano "' + _parsedPlan.concurso + '" processado e disponivel para os alunos!', 'success');
+        limparUpload();
+        carregarPlanosExistentes();
+
+      } catch (e) {
+        showStatus('Erro ao salvar: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '🚀 Publicar Plano para os Alunos';
+      }
+    }
+
+    function limparUpload() {
+      _parsedPlan = null;
+      document.getElementById('previewArea').style.display = 'none';
+      document.getElementById('dropzone').classList.remove('has-file');
+      document.getElementById('dropzoneFilename').style.display = 'none';
+      document.getElementById('mdFileInput').value = '';
+      document.getElementById('btnSalvar').disabled = false;
+      document.getElementById('btnSalvar').textContent = '🚀 Publicar Plano para os Alunos';
+    }
+
+    async function carregarPlanosExistentes() {
+      var lista = document.getElementById('planosLista');
+      try {
+        var { data, error } = await _sb.from('planos_mestres').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          lista.innerHTML = '<p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:16px">Nenhum plano publicado ainda.</p>';
+          return;
+        }
+
+        lista.innerHTML = data.map(function(p) {
+          var nMat = p.materias ? p.materias.length : 0;
+          var status = p.ativo ? '<span style="color:var(--success);font-weight:600">Ativo</span>' : '<span style="color:var(--text-lighter)">Inativo</span>';
+          return '<div class="plan-list-item">'
+            + '<div>'
+            + '<div class="plan-list-name">' + p.concurso_nome + (p.cargo ? ' — ' + p.cargo : '') + '</div>'
+            + '<div class="plan-list-meta">' + nMat + ' materias · ' + (p.banca || 'Sem banca') + ' · ' + (p.data_prova || 'Sem data') + '</div>'
+            + '</div>'
+            + '<div style="display:flex;align-items:center;gap:12px">'
+            + status
+            + '<button onclick="togglePlano(\'' + p.id + '\',' + !p.ativo + ')" style="font-size:0.75rem;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg);cursor:pointer;font-family:inherit">' + (p.ativo ? 'Desativar' : 'Ativar') + '</button>'
+            + '<button onclick="deletarPlano(\'' + p.id + '\')" style="font-size:0.75rem;padding:4px 10px;border:1px solid #FED7D7;border-radius:4px;background:#FFF5F5;color:#C53030;cursor:pointer;font-family:inherit">Excluir</button>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+      } catch (e) {
+        lista.innerHTML = '<p style="color:#C53030;font-size:0.85rem">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    async function togglePlano(id, ativo) {
+      await _sb.from('planos_mestres').update({ ativo: ativo }).eq('id', id);
+      carregarPlanosExistentes();
+    }
+
+    async function deletarPlano(id) {
+      if (!confirm('Tem certeza que deseja excluir este plano?')) return;
+      await _sb.from('planos_mestres').delete().eq('id', id);
+      carregarPlanosExistentes();
+    }
+
+    function showStatus(msg, type) {
+      var el = document.getElementById('statusMsg');
+      el.textContent = msg;
+      el.className = 'status-msg ' + type;
+    }
+  </script>
+</body>
+</html>

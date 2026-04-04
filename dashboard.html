@@ -2040,6 +2040,9 @@
               <button class="dropdown-item" onclick="removerFoto()">
                 <span class="item-icon">🖼️</span> Remover Foto
               </button>
+              <button class="dropdown-item" id="btnAdminPlanos" style="display:none" onclick="window.location='admin.html'">
+                <span class="item-icon">⚙️</span> Gerenciar Planos (Admin)
+              </button>
               <div class="dropdown-divider"></div>
               <div style="padding:10px 16px;font-size:0.75rem;color:var(--text-lighter)">
                 Plano válido até <strong id="dropdownPlanDate">—</strong>
@@ -4610,6 +4613,12 @@
           : session.user.email.split('@')[0];
 
         console.log('[Init] Sessão OK:', window._userId, window._userEmail);
+
+        // Show admin button if admin user
+        if (window._userEmail === 'rodrigorenno99@gmail.com') {
+          var adminBtn = document.getElementById('btnAdminPlanos');
+          if (adminBtn) adminBtn.style.display = '';
+        }
 
         // Auth listener
         sb.auth.onAuthStateChange(function(ev) {
