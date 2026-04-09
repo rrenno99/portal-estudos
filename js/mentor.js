@@ -1196,6 +1196,26 @@ function triangularDados(materiasPDF, pesquisaWeb, bancaDetectada, pesosEdital) 
 //  12b. MARKDOWN PLAN PARSER (Admin .md files)
 // =============================================
 
+// Parse a date string in DD/MM/YYYY or YYYY-MM-DD format → ISO YYYY-MM-DD
+function normalizarData(str) {
+  if (!str) return null;
+  str = str.trim().replace(/\*+/g, '');
+
+  // ISO format: 2026-08-15
+  var iso = str.match(/^(20\d{2})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (iso) {
+    return iso[1] + '-' + String(iso[2]).padStart(2, '0') + '-' + String(iso[3]).padStart(2, '0');
+  }
+
+  // BR format: 15/08/2026 or 15-08-2026
+  var br = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})$/);
+  if (br) {
+    return br[3] + '-' + String(br[2]).padStart(2, '0') + '-' + String(br[1]).padStart(2, '0');
+  }
+
+  return null;
+}
+
 function parsePlanoMarkdown(mdText) {
   var resultado = {
     concurso: '',
@@ -1204,32 +1224,71 @@ function parsePlanoMarkdown(mdText) {
     dataProva: null,
     trilha: 'consistente',
     materias: [],
-    totalPontos: 0
+    totalPontos: 0,
+    erros: []
   };
 
   var linhas = mdText.split(/\n/);
-  var secaoAtual = null; // 'estrutura' | 'conteudo'
+  var bodyStart = 0;
+
+  // ===== FRONTMATTER: parse YAML between --- delimiters =====
+  var hasFrontmatter = false;
+  if (linhas[0] && linhas[0].trim() === '---') {
+    hasFrontmatter = true;
+    for (var fi = 1; fi < linhas.length; fi++) {
+      if (linhas[fi].trim() === '---') {
+        bodyStart = fi + 1;
+        break;
+      }
+      // Parse key: value
+      var fmMatch = linhas[fi].match(/^([A-Za-z_]+)\s*:\s*(.+)$/);
+      if (fmMatch) {
+        var fmKey = fmMatch[1].trim().toUpperCase();
+        var fmVal = fmMatch[2].trim();
+        switch (fmKey) {
+          case 'CONCURSO': resultado.concurso = fmVal; break;
+          case 'CARGO': resultado.cargo = fmVal; break;
+          case 'BANCA': resultado.banca = fmVal; break;
+          case 'DATA_PROVA':
+            resultado.dataProva = normalizarData(fmVal);
+            if (!resultado.dataProva) {
+              resultado.erros.push('DATA_PROVA invalida no header: "' + fmVal + '". Use DD/MM/AAAA ou AAAA-MM-DD.');
+            }
+            break;
+          case 'TRILHA': resultado.trilha = fmVal.toLowerCase(); break;
+        }
+      }
+    }
+  }
+
+  // Validate required frontmatter fields
+  if (hasFrontmatter && !resultado.dataProva) {
+    resultado.erros.push('Data da prova nao identificada no cabecalho do arquivo. Adicione DATA_PROVA: DD/MM/AAAA no bloco ---.');
+  }
+
+  // ===== BODY: parse markdown content =====
+  var secaoAtual = null;
   var materiaConteudoAtual = null;
 
-  for (var i = 0; i < linhas.length; i++) {
+  for (var i = bodyStart; i < linhas.length; i++) {
     var linha = linhas[i].trim();
 
-    // H1: concurso name
+    // H1: concurso name (fallback if not in frontmatter)
     var h1 = linha.match(/^#\s+(.+)$/);
     if (h1) {
       var parts = h1[1].split(/\s*[-–—]\s*/);
-      resultado.concurso = parts[0].trim();
-      if (parts[1]) resultado.cargo = parts[1].trim();
+      if (!resultado.concurso) resultado.concurso = parts[0].trim();
+      if (parts[1] && !resultado.cargo) resultado.cargo = parts[1].trim();
       continue;
     }
 
-    // Metadata: **Key:** Value
+    // Metadata: **Key:** Value (fallback if not in frontmatter)
     var meta = linha.match(/^\*?\*?(\w[\w\s]+)\*?\*?:\s*(.+)$/);
-    if (meta) {
+    if (meta && !hasFrontmatter) {
       var key = meta[1].trim().toLowerCase();
       var val = meta[2].trim().replace(/\*+/g, '');
-      if (/banca/.test(key)) resultado.banca = val;
-      else if (/data/.test(key)) resultado.dataProva = val;
+      if (/banca/.test(key) && !resultado.banca) resultado.banca = val;
+      else if (/data/.test(key) && !resultado.dataProva) resultado.dataProva = normalizarData(val);
       else if (/trilha/.test(key)) resultado.trilha = val.toLowerCase();
       continue;
     }
@@ -1690,6 +1749,7 @@ window.MentorIA = {
   distribuirHoras: distribuirHoras,
   gerarCiclo: gerarCiclo,
   parsePlanoMarkdown: parsePlanoMarkdown,
+  normalizarData: normalizarData,
   fetchTextoDeUrl: fetchTextoDeUrl,
   googleDocsToExportUrl: googleDocsToExportUrl,
   detectarAnaliseRenno: detectarAnaliseRenno,

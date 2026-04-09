@@ -186,27 +186,49 @@
       var text = await file.text();
       _parsedPlan = window.MentorIA.parsePlanoMarkdown(text);
 
+      // Show errors from parser
+      if (_parsedPlan.erros && _parsedPlan.erros.length > 0) {
+        showStatus('Aviso: ' + _parsedPlan.erros.join(' | '), 'error');
+      }
+
       if (!_parsedPlan || !_parsedPlan.materias || _parsedPlan.materias.length === 0) {
-        showStatus('Erro: nao foi possivel extrair materias do arquivo. Verifique o formato.', 'error');
+        showStatus('Erro: nao foi possivel extrair materias do arquivo. Verifique o formato do .md.\n\nFormato esperado:\n---\nCONCURSO: Nome\nDATA_PROVA: DD/MM/AAAA\nBANCA: Nome\n---\n\n## Estrutura das Provas\n| Materia | Questoes | Peso | Pontos |', 'error');
         return;
       }
 
-      // Show preview
-      document.getElementById('previewTitulo').textContent = _parsedPlan.concurso + (_parsedPlan.cargo ? ' — ' + _parsedPlan.cargo : '');
-      var meta = _parsedPlan.materias.length + ' materias';
-      if (_parsedPlan.banca) meta += ' · Banca: ' + _parsedPlan.banca;
-      if (_parsedPlan.dataProva) meta += ' · Prova: ' + _parsedPlan.dataProva;
-      document.getElementById('previewMeta').textContent = meta;
+      // Build preview header
+      var titulo = _parsedPlan.concurso || 'Sem nome';
+      if (_parsedPlan.cargo) titulo += ' — ' + _parsedPlan.cargo;
+      document.getElementById('previewTitulo').textContent = titulo;
 
+      var metaParts = [_parsedPlan.materias.length + ' materias'];
+      if (_parsedPlan.banca) metaParts.push('Banca: ' + _parsedPlan.banca);
+
+      // Data da prova with countdown
+      if (_parsedPlan.dataProva) {
+        var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
+        var hoje = new Date(); hoje.setHours(0,0,0,0);
+        var diasRestantes = Math.ceil((dataObj - hoje) / (1000*60*60*24));
+        var dataFormatada = dataObj.toLocaleDateString('pt-BR');
+        metaParts.push('Prova: ' + dataFormatada + ' (' + diasRestantes + ' dias)');
+      } else {
+        metaParts.push('⚠ SEM DATA DA PROVA');
+      }
+
+      if (_parsedPlan.trilha) metaParts.push('Trilha: ' + _parsedPlan.trilha);
+      document.getElementById('previewMeta').innerHTML = metaParts.join(' · ');
+
+      // Build table
       var tbody = document.getElementById('previewTable');
       tbody.innerHTML = _parsedPlan.materias.map(function(m) {
         var topicsShort = Array.isArray(m.topicos) ? m.topicos.slice(0, 3).join(', ') : (m.topicos || '—');
         if (topicsShort.length > 60) topicsShort = topicsShort.substring(0, 57) + '...';
+        var pctLabel = m.relevancia ? ' (' + m.relevancia + '%)' : '';
         return '<tr>'
           + '<td style="font-weight:600;color:var(--secondary)">' + m.nome + '</td>'
           + '<td>' + (m.questoes || '—') + '</td>'
           + '<td>' + (m.peso || '—') + '</td>'
-          + '<td style="font-weight:700;color:var(--primary)">' + (m.pontos || '—') + '</td>'
+          + '<td style="font-weight:700;color:var(--primary)">' + (m.pontos || '—') + pctLabel + '</td>'
           + '<td style="font-size:0.75rem;color:var(--text-light)">' + topicsShort + '</td>'
           + '</tr>';
       }).join('');
