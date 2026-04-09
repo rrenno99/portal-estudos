@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/provisioning.js": {
+      "runtime": "@vercel/node@3"
+    }
+  }
+}
