@@ -772,44 +772,6 @@
     /* =========================================
        QUICK ACCESS
     ========================================= */
-    .quick-access {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-
-    .quick-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      transition: var(--transition);
-      flex: 1;
-      min-width: 100px;
-      box-shadow: var(--shadow);
-    }
-
-    .quick-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-md);
-      border-color: var(--primary);
-    }
-
-    .quick-card .icon { font-size: 1.6rem; }
-
-    .quick-card span {
-      font-size: 0.78rem;
-      font-weight: 600;
-      color: var(--text);
-      text-align: center;
-    }
-
     /* =========================================
        PROGRESS SECTION
     ========================================= */
@@ -1789,7 +1751,6 @@
       .sidebar.mobile-open .sidebar-section-label { opacity: 1; }
       .main-content { margin-left: 0 !important; }
       .stats-row { grid-template-columns: 1fr 1fr; }
-      .quick-card { min-width: 80px; padding: 12px; }
       .dashboard-body { padding: 16px 16px 40px; }
       .credits-badge { display: none; }
       .user-name-label { display: none; }
@@ -2138,34 +2099,6 @@
           </div>
         </div>
 
-        <!-- Quick Access -->
-        <div class="quick-access">
-          <div class="quick-card">
-            <div class="icon">🎥</div>
-            <span>Vídeo Aulas</span>
-          </div>
-          <div class="quick-card">
-            <div class="icon">📄</div>
-            <span>Resumos</span>
-          </div>
-          <div class="quick-card">
-            <div class="icon">📊</div>
-            <span>Análise de Questões</span>
-          </div>
-          <div class="quick-card">
-            <div class="icon">📑</div>
-            <span>PDFs</span>
-          </div>
-          <div class="quick-card" onclick="window.location='criar-plano.html'">
-            <div class="icon">➕</div>
-            <span>Novo Plano</span>
-          </div>
-          <div class="quick-card">
-            <div class="icon">⚙️</div>
-            <span>Configurações</span>
-          </div>
-        </div>
-
         <!-- Progress Section -->
         <div class="progress-section">
           <div class="progress-header">
@@ -2181,22 +2114,7 @@
           </div>
         </div>
 
-        <!-- Weekly Calendar -->
-        <div class="calendar-section" id="calendarSection">
-          <div class="calendar-header">
-            <h3>📅 Cronograma Semanal</h3>
-            <div class="calendar-nav">
-              <button onclick="shiftWeek(-1)">◀</button>
-              <span class="week-label" id="weekLabel">30 Mar — 05 Abr</span>
-              <button onclick="shiftWeek(1)">▶</button>
-            </div>
-          </div>
-          <div class="weekly-calendar" id="weeklyCalendar">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
-        <!-- Two Col: Subjects + Activity -->
+        <!-- Fila de Estudos (primary focus) -->
         <div class="dashboard-two-col">
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2218,6 +2136,18 @@
           </div>
         </div>
 
+        <!-- Weekly Calendar -->
+        <div class="calendar-section" id="calendarSection">
+          <div class="calendar-header">
+            <h3>📅 Cronograma Semanal</h3>
+            <div class="calendar-nav">
+              <button onclick="shiftWeek(-1)">◀</button>
+              <span class="week-label" id="weekLabel">—</span>
+              <button onclick="shiftWeek(1)">▶</button>
+            </div>
+          </div>
+          <div class="weekly-calendar" id="weeklyCalendar"></div>
+        </div>
 
       </div><!-- /.dashboard-body -->
     </div><!-- /.main-content -->
