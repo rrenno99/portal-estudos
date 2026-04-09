@@ -2114,28 +2114,6 @@
           </div>
         </div>
 
-        <!-- Fila de Estudos (primary focus) -->
-        <div class="dashboard-two-col">
-          <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-              <h3>📚 Fila de Estudos</h3>
-              <button onclick="reiniciarCiclo()" class="btn-ghost" style="font-size:0.72rem;color:var(--text-lighter);padding:4px 8px" title="Reiniciar o ciclo do zero">↻ Reiniciar Ciclo</button>
-            </div>
-            <p id="cicloInfo" style="font-size:0.75rem;color:var(--text-light);margin-bottom:8px"></p>
-            <div id="subjectsListDynamic">
-              <!-- Rendered by JS from plan data -->
-              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando matérias...</p>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>🕐 Atividade Recente</h3>
-            <div id="activityFeed">
-              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando atividades...</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Weekly Calendar -->
         <div class="calendar-section" id="calendarSection">
           <div class="calendar-header">
@@ -2147,6 +2125,27 @@
             </div>
           </div>
           <div class="weekly-calendar" id="weeklyCalendar"></div>
+        </div>
+
+        <!-- Fila de Estudos + Atividade Recente -->
+        <div class="dashboard-two-col">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <h3>📚 Fila de Estudos</h3>
+              <button onclick="reiniciarCiclo()" class="btn-ghost" style="font-size:0.72rem;color:var(--text-lighter);padding:4px 8px" title="Reiniciar o ciclo do zero">↻ Reiniciar Ciclo</button>
+            </div>
+            <p id="cicloInfo" style="font-size:0.75rem;color:var(--text-light);margin-bottom:8px"></p>
+            <div id="subjectsListDynamic">
+              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando matérias...</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>🕐 Atividade Recente</h3>
+            <div id="activityFeed">
+              <p style="color:var(--text-lighter);font-size:0.85rem;padding:16px 0;text-align:center">Carregando atividades...</p>
+            </div>
+          </div>
         </div>
 
       </div><!-- /.dashboard-body -->
