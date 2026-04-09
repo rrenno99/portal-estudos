@@ -1240,6 +1240,53 @@
     .aula-tag.estudando { background: #FFF3E0; color: #E65100; }
     .aula-tag.concluido { background: #E8F5E9; color: #2E7D32; }
 
+    .aula-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .aula-action-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.75rem;
+      color: var(--text-lighter);
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .aula-action-btn:hover { color: var(--primary); }
+    .aula-action-btn.delete:hover { color: #E53E3E; }
+
+    .aula-nome-edit {
+      flex: 1;
+      padding: 2px 6px;
+      border: 1.5px solid var(--primary);
+      border-radius: 4px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg-card);
+      outline: none;
+    }
+
+    .aula-add-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 0;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .aula-add-btn:hover { opacity: 0.7; }
+
     .aulas-summary {
       font-size: 0.73rem;
       color: var(--text-lighter);
@@ -2734,23 +2781,30 @@
         item.setAttribute('data-materia', nome);
 
         let aulasHtml = '';
+        aulasHtml = '<div class="aulas-panel">';
         if (total > 0) {
-          aulasHtml = '<div class="aulas-panel">';
           aulas.sort((a, b) => a.numero - b.numero).forEach(a => {
             const statusCls = a.status;
             const icon = a.status === 'concluido' ? '✓' : a.status === 'estudando' ? '▶' : '';
+            const canDelete = a.status === 'pendente';
             aulasHtml += `
-              <div class="aula-row">
+              <div class="aula-row" data-aula-materia="${escapedName}" data-aula-num="${a.numero}">
                 <button class="aula-status-btn ${statusCls}" onclick="event.stopPropagation(); toggleAulaStatus('${escapedName}', ${a.numero})" title="Clique para mudar status">
                   ${icon}
                 </button>
-                <span class="aula-nome ${statusCls}">${a.titulo || 'Aula ' + a.numero}</span>
+                <span class="aula-nome ${statusCls}" onclick="event.stopPropagation(); editarTituloAula('${escapedName}', ${a.numero}, this)" title="Clique para renomear" style="cursor:text">${a.titulo || 'Aula ' + a.numero}</span>
                 <span class="aula-tag ${statusCls}">${a.status === 'concluido' ? 'Concluída' : a.status === 'estudando' ? 'Estudando' : 'Pendente'}</span>
+                <div class="aula-actions">
+                  ${canDelete ? '<button class="aula-action-btn delete" onclick="event.stopPropagation(); deletarAula(\'' + escapedName + '\',' + a.numero + ')" title="Excluir aula">🗑</button>' : ''}
+                </div>
               </div>`;
           });
           aulasHtml += `<div class="aulas-summary">${concluidas} concluídas · ${estudando} estudando · ${total - concluidas - estudando} pendentes</div>`;
-          aulasHtml += '</div>';
+        } else {
+          aulasHtml += '<p style="font-size:0.78rem;color:var(--text-lighter);padding:6px 0">Nenhuma aula cadastrada.</p>';
         }
+        aulasHtml += `<button class="aula-add-btn" onclick="event.stopPropagation(); adicionarAula('${escapedName}')">+ Adicionar Aula</button>`;
+        aulasHtml += '</div>';
 
         const queueLabel = isAtual
           ? '<span style="font-size:0.68rem;font-weight:700;color:var(--primary);background:rgba(30,136,229,0.1);padding:2px 6px;border-radius:4px;margin-left:6px">PRÓXIMA</span>'
@@ -2813,6 +2867,130 @@
         if (error) console.error('[Supabase] Erro ao atualizar aula:', error.message);
       } catch (e) {
         console.error('[Aula] Erro:', e);
+      }
+    }
+
+    // =============================================
+    //  MANAGE AULAS (Add, Delete, Rename)
+    // =============================================
+
+    async function adicionarAula(materia) {
+      var aulas = getAulasMateria(materia);
+      var novoNumero = aulas.length > 0 ? Math.max.apply(null, aulas.map(function(a) { return a.numero; })) + 1 : 1;
+      var novaAula = { materia: materia, numero: novoNumero, titulo: 'Aula ' + novoNumero, status: 'pendente' };
+
+      // Add to cache
+      if (!aulasCache[materia]) aulasCache[materia] = [];
+      aulasCache[materia].push(novaAula);
+
+      renderSubjectsList();
+      calcularEstatisticas();
+
+      // Save to Supabase
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
+        var { error } = await sb.from('aulas_materia').insert([{
+          user_id: window._userId,
+          materia: materia,
+          numero: novoNumero,
+          titulo: novaAula.titulo,
+          status: 'pendente'
+        }]);
+        if (error) console.error('[Aula] Erro ao adicionar:', error.message);
+        else console.log('[Aula] Adicionada:', materia, novoNumero);
+      } catch (e) {
+        console.error('[Aula] Erro:', e);
+      }
+    }
+
+    async function deletarAula(materia, numero) {
+      var aulas = getAulasMateria(materia);
+      var idx = aulas.findIndex(function(a) { return a.numero === numero; });
+      if (idx === -1) return;
+
+      // Only allow deleting pending aulas
+      if (aulas[idx].status !== 'pendente') return;
+
+      // Remove from cache
+      aulas.splice(idx, 1);
+
+      renderSubjectsList();
+      calcularEstatisticas();
+
+      // Delete from Supabase
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return;
+        var { error } = await sb.from('aulas_materia').delete()
+          .eq('user_id', window._userId)
+          .eq('materia', materia)
+          .eq('numero', numero);
+        if (error) console.error('[Aula] Erro ao deletar:', error.message);
+        else console.log('[Aula] Deletada:', materia, numero);
+      } catch (e) {
+        console.error('[Aula] Erro:', e);
+      }
+    }
+
+    function editarTituloAula(materia, numero, spanEl) {
+      var aulas = getAulasMateria(materia);
+      var aula = aulas.find(function(a) { return a.numero === numero; });
+      if (!aula) return;
+
+      var tituloAtual = aula.titulo || 'Aula ' + numero;
+
+      // Replace span with input
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = tituloAtual;
+      input.className = 'aula-nome-edit';
+      input.onclick = function(e) { e.stopPropagation(); };
+
+      input.onkeydown = function(e) {
+        if (e.key === 'Enter') salvar();
+        if (e.key === 'Escape') cancelar();
+      };
+      input.onblur = function() { setTimeout(salvar, 100); };
+
+      spanEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      function salvar() {
+        var novoTitulo = input.value.trim() || tituloAtual;
+        aula.titulo = novoTitulo;
+
+        // Re-create span
+        var novoSpan = document.createElement('span');
+        novoSpan.className = 'aula-nome ' + aula.status;
+        novoSpan.textContent = novoTitulo;
+        novoSpan.style.cursor = 'text';
+        novoSpan.title = 'Clique para renomear';
+        novoSpan.onclick = function(e) { e.stopPropagation(); editarTituloAula(materia, numero, novoSpan); };
+        if (input.parentNode) input.replaceWith(novoSpan);
+
+        // Save to Supabase
+        var sb = window._supabase;
+        if (sb && window._userId) {
+          sb.from('aulas_materia').update({ titulo: novoTitulo })
+            .eq('user_id', window._userId)
+            .eq('materia', materia)
+            .eq('numero', numero)
+            .then(function(res) {
+              if (res.error) console.error('[Aula] Erro ao renomear:', res.error.message);
+            });
+        }
+      }
+
+      function cancelar() {
+        var novoSpan = document.createElement('span');
+        novoSpan.className = 'aula-nome ' + aula.status;
+        novoSpan.textContent = tituloAtual;
+        novoSpan.style.cursor = 'text';
+        novoSpan.title = 'Clique para renomear';
+        novoSpan.onclick = function(e) { e.stopPropagation(); editarTituloAula(materia, numero, novoSpan); };
+        if (input.parentNode) input.replaceWith(novoSpan);
       }
     }
 
