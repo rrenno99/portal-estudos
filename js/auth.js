@@ -7,11 +7,13 @@ import { supabase } from './supabase.js';
 export async function verificarAutorizacao(email) {
   const { data, error } = await supabase
     .from('usuarios_autorizados')
-    .select('email')
+    .select('email, subscription_status')
     .eq('email', email.toLowerCase().trim())
     .single();
 
   if (error || !data) return false;
+  // Allow if status is 'active' or if column doesn't exist yet (backwards compat)
+  if (data.subscription_status && data.subscription_status !== 'active') return false;
   return true;
 }
 
