@@ -1232,15 +1232,18 @@ function parsePlanoMarkdown(mdText) {
   var bodyStart = 0;
 
   // ===== FRONTMATTER: parse YAML between --- delimiters =====
-  var hasFrontmatter = false;
+  // REQUIRED: file MUST start with ---
+  resultado.hasFrontmatter = false;
+
   if (linhas[0] && linhas[0].trim() === '---') {
-    hasFrontmatter = true;
+    resultado.hasFrontmatter = true;
+    var frontmatterClosed = false;
     for (var fi = 1; fi < linhas.length; fi++) {
       if (linhas[fi].trim() === '---') {
         bodyStart = fi + 1;
+        frontmatterClosed = true;
         break;
       }
-      // Parse key: value
       var fmMatch = linhas[fi].match(/^([A-Za-z_]+)\s*:\s*(.+)$/);
       if (fmMatch) {
         var fmKey = fmMatch[1].trim().toUpperCase();
@@ -1252,18 +1255,29 @@ function parsePlanoMarkdown(mdText) {
           case 'DATA_PROVA':
             resultado.dataProva = normalizarData(fmVal);
             if (!resultado.dataProva) {
-              resultado.erros.push('DATA_PROVA invalida no header: "' + fmVal + '". Use DD/MM/AAAA ou AAAA-MM-DD.');
+              resultado.erros.push('DATA_PROVA invalida: "' + fmVal + '". Use DD/MM/AAAA ou AAAA-MM-DD.');
             }
             break;
           case 'TRILHA': resultado.trilha = fmVal.toLowerCase(); break;
         }
       }
     }
+    if (!frontmatterClosed) {
+      resultado.erros.push('Frontmatter aberto: falta o segundo --- de fechamento.');
+    }
+  } else {
+    // NO FRONTMATTER = REJECTED
+    resultado.erros.push('Erro: Arquivo fora do Padrao Estruturado Renno. O arquivo deve comecar com --- seguido dos campos obrigatorios.');
   }
 
-  // Validate required frontmatter fields
-  if (hasFrontmatter && !resultado.dataProva) {
-    resultado.erros.push('Data da prova nao identificada no cabecalho do arquivo. Adicione DATA_PROVA: DD/MM/AAAA no bloco ---.');
+  // Validate required fields
+  if (resultado.hasFrontmatter) {
+    if (!resultado.concurso) {
+      resultado.erros.push('Campo CONCURSO obrigatorio no cabecalho. Adicione CONCURSO: Nome do Concurso');
+    }
+    if (!resultado.dataProva) {
+      resultado.erros.push('Campo DATA_PROVA obrigatorio no cabecalho. Adicione DATA_PROVA: DD/MM/AAAA');
+    }
   }
 
   // ===== BODY: parse markdown content =====
@@ -1273,23 +1287,12 @@ function parsePlanoMarkdown(mdText) {
   for (var i = bodyStart; i < linhas.length; i++) {
     var linha = linhas[i].trim();
 
-    // H1: concurso name (fallback if not in frontmatter)
+    // H1: concurso name (enrichment only — frontmatter is truth)
     var h1 = linha.match(/^#\s+(.+)$/);
     if (h1) {
       var parts = h1[1].split(/\s*[-–—]\s*/);
       if (!resultado.concurso) resultado.concurso = parts[0].trim();
       if (parts[1] && !resultado.cargo) resultado.cargo = parts[1].trim();
-      continue;
-    }
-
-    // Metadata: **Key:** Value (fallback if not in frontmatter)
-    var meta = linha.match(/^\*?\*?(\w[\w\s]+)\*?\*?:\s*(.+)$/);
-    if (meta && !hasFrontmatter) {
-      var key = meta[1].trim().toLowerCase();
-      var val = meta[2].trim().replace(/\*+/g, '');
-      if (/banca/.test(key) && !resultado.banca) resultado.banca = val;
-      else if (/data/.test(key) && !resultado.dataProva) resultado.dataProva = normalizarData(val);
-      else if (/trilha/.test(key)) resultado.trilha = val.toLowerCase();
       continue;
     }
 

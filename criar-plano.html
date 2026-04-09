@@ -1276,7 +1276,10 @@
       var info = materias.length + ' materias';
       if (p.banca) info += ' · Banca: ' + p.banca;
       if (p.data_prova) {
-        info += ' · Prova: ' + new Date(p.data_prova).toLocaleDateString('pt-BR');
+        var dataObj = new Date(p.data_prova + 'T00:00:00');
+        var dias = Math.ceil((dataObj - new Date().setHours(0,0,0,0)) / 86400000);
+        info += ' · Prova: ' + dataObj.toLocaleDateString('pt-BR') + ' (' + dias + ' dias)';
+        // FORCE data_prova from plano mestre (priority max)
         document.getElementById('dataProva').value = p.data_prova;
       }
       document.getElementById('planoMestreInfo').textContent = info;

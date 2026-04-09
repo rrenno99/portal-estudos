@@ -186,13 +186,26 @@
       var text = await file.text();
       _parsedPlan = window.MentorIA.parsePlanoMarkdown(text);
 
-      // Show errors from parser
-      if (_parsedPlan.erros && _parsedPlan.erros.length > 0) {
-        showStatus('Aviso: ' + _parsedPlan.erros.join(' | '), 'error');
+      // STRICT CONTRACT: reject if no frontmatter or missing required fields
+      if (!_parsedPlan.hasFrontmatter) {
+        showStatus('Erro: Arquivo fora do Padrao Estruturado Renno.\n\nO arquivo DEVE comecar com:\n---\nCONCURSO: Nome do Concurso\nCARGO: Nome do Cargo\nDATA_PROVA: DD/MM/AAAA\nBANCA: Nome da Banca\nTRILHA: consistente\n---', 'error');
+        _parsedPlan = null;
+        limparUpload();
+        return;
       }
 
-      if (!_parsedPlan || !_parsedPlan.materias || _parsedPlan.materias.length === 0) {
-        showStatus('Erro: nao foi possivel extrair materias do arquivo. Verifique o formato do .md.\n\nFormato esperado:\n---\nCONCURSO: Nome\nDATA_PROVA: DD/MM/AAAA\nBANCA: Nome\n---\n\n## Estrutura das Provas\n| Materia | Questoes | Peso | Pontos |', 'error');
+      // Show validation errors (but allow preview if materias exist)
+      if (_parsedPlan.erros && _parsedPlan.erros.length > 0) {
+        showStatus(_parsedPlan.erros.join('\n'), 'error');
+        if (!_parsedPlan.concurso || !_parsedPlan.dataProva) {
+          // Missing required → block
+          _parsedPlan = null;
+          return;
+        }
+      }
+
+      if (!_parsedPlan.materias || _parsedPlan.materias.length === 0) {
+        showStatus('Erro: Nenhuma materia encontrada.\n\nAdicione a secao:\n## Estrutura das Provas\n| Materia | Questoes | Peso | Pontos |\n|---------|----------|------|--------|\n| Nome | 10 | 1 | 10 |', 'error');
         return;
       }
 
@@ -267,7 +280,14 @@
 
         if (error) throw error;
 
-        showStatus('Plano "' + _parsedPlan.concurso + '" processado e disponivel para os alunos!', 'success');
+        var successMsg = '✅ Plano "' + _parsedPlan.concurso + '" processado e disponivel para os alunos!';
+        if (_parsedPlan.dataProva) {
+          var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
+          var dias = Math.ceil((dataObj - new Date().setHours(0,0,0,0)) / 86400000);
+          successMsg += '\n📅 Data da prova: ' + dataObj.toLocaleDateString('pt-BR') + ' (' + dias + ' dias)';
+        }
+        successMsg += '\n📚 ' + materiasJson.length + ' materias | ' + _parsedPlan.totalPontos + ' pontos totais';
+        showStatus(successMsg, 'success');
         limparUpload();
         carregarPlanosExistentes();
 
