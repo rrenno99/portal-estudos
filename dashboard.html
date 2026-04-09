@@ -1748,45 +1748,6 @@
     /* =========================================
        MURAL DE AVISOS
     ========================================= */
-    .avisos-section {
-      background: var(--bg-card);
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      padding: 20px;
-      margin-top: 24px;
-    }
-
-    .aviso-item {
-      display: flex;
-      gap: 12px;
-      padding: 14px 16px;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: var(--transition);
-    }
-    .aviso-item:last-child { margin-bottom: 0; }
-    .aviso-item:hover { transform: translateX(4px); }
-
-    .aviso-item.warning { background: #FFF8F0; border-left: 4px solid var(--primary); }
-    .aviso-item.success { background: #F0FFF4; border-left: 4px solid var(--success); }
-    .aviso-item.info    { background: #EBF8FF; border-left: 4px solid var(--info); }
-
-    .aviso-tag {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 4px;
-    }
-    .aviso-item.warning .aviso-tag { color: var(--primary); }
-    .aviso-item.success .aviso-tag { color: var(--success); }
-    .aviso-item.info    .aviso-tag { color: var(--info); }
-
-    .aviso-text { font-size: 0.83rem; color: var(--text-light); line-height: 1.5; }
-    .aviso-date { font-size: 0.73rem; color: var(--text-lighter); margin-top: 4px; }
-
     /* Sidebar logout button */
     .sidebar-logout-btn {
       background: none;
@@ -2257,31 +2218,6 @@
           </div>
         </div>
 
-        <!-- Mural de Avisos -->
-        <div class="avisos-section">
-          <h3 style="font-size:0.95rem;font-weight:700;color:var(--secondary);margin-bottom:16px">📌 Mural de Avisos</h3>
-          <div class="aviso-item warning">
-            <div>
-              <div class="aviso-tag">Atenção</div>
-              <div class="aviso-text">Resumo de Direito para a próxima fase do concurso está disponível para download na seção de PDFs.</div>
-              <div class="aviso-date">17/03/2025</div>
-            </div>
-          </div>
-          <div class="aviso-item success">
-            <div>
-              <div class="aviso-tag">Parabéns!</div>
-              <div class="aviso-text">Você completou sua meta de estudo por 5 dias consecutivos! Continue assim!</div>
-              <div class="aviso-date">15/03/2025</div>
-            </div>
-          </div>
-          <div class="aviso-item info">
-            <div>
-              <div class="aviso-tag">Novidade</div>
-              <div class="aviso-text">Simulado exclusivo PCGO disponível com 80 questões. Teste seus conhecimentos!</div>
-              <div class="aviso-date">10/03/2025</div>
-            </div>
-          </div>
-        </div>
 
       </div><!-- /.dashboard-body -->
     </div><!-- /.main-content -->
