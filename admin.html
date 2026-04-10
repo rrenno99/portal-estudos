@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin — Planos Mestres | Planejador Renno</title>
+  <title>Admin — Painel de Controle | Planejador Renno</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -75,14 +75,94 @@
     }
     .status-msg.success { display: block; background: #F0FFF4; border: 1px solid #C6F6D5; color: #276749; }
     .status-msg.error { display: block; background: #FFF5F5; border: 1px solid #FED7D7; color: #C53030; }
+
+    /* --- Admin Tabs --- */
+    .admin-tabs { display: flex; gap: 0; margin-bottom: 32px; border-bottom: 2px solid var(--border); }
+    .admin-tab {
+      padding: 10px 20px; font-size: 0.88rem; font-weight: 600; color: var(--text-light);
+      cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent;
+      margin-bottom: -2px; transition: all 0.2s; font-family: inherit;
+    }
+    .admin-tab:hover { color: var(--primary); }
+    .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .admin-section { display: none; }
+    .admin-section.active { display: block; }
+
+    /* --- Gestao de Alunos --- */
+    .alunos-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .alunos-toolbar h2 { margin: 0; }
+    .alunos-search {
+      padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 0.82rem; font-family: inherit; width: 220px; background: var(--bg);
+    }
+    .alunos-search:focus { outline: none; border-color: var(--primary); }
+
+    .alunos-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .alunos-table th {
+      text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border);
+      color: var(--text-light); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .alunos-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .alunos-table tr:hover { background: rgba(30,136,229,0.02); }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-active { background: #F0FFF4; color: #276749; }
+    .badge-inactive { background: #FFF5F5; color: #C53030; }
+    .badge-expired { background: #FFFAF0; color: #C05621; }
+
+    .alunos-table .actions-cell { white-space: nowrap; }
+    .alunos-table .actions-cell button {
+      font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+      font-family: inherit; border: 1px solid var(--border); background: var(--bg); margin-right: 4px;
+    }
+    .alunos-table .actions-cell button:hover { border-color: var(--primary); color: var(--primary); }
+    .alunos-table .actions-cell .btn-danger { border-color: #FED7D7; background: #FFF5F5; color: #C53030; }
+    .alunos-table .actions-cell .btn-danger:hover { background: #FED7D7; }
+
+    .empty-state { text-align: center; padding: 32px; color: var(--text-lighter); font-size: 0.85rem; }
+
+    /* --- Modal --- */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-card); border-radius: var(--radius); padding: 28px;
+      width: 100%; max-width: 440px; box-shadow: var(--shadow-lg);
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    .modal h3 { font-size: 1.05rem; font-weight: 700; color: var(--secondary); margin-bottom: 20px; }
+    .modal label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-light); margin-bottom: 4px; }
+    .modal input {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 0.85rem; font-family: inherit; margin-bottom: 14px; box-sizing: border-box;
+    }
+    .modal input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,136,229,0.1); }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+    .modal .status-msg { margin-top: 12px; margin-bottom: 0; }
+
+    .alunos-count { font-size: 0.75rem; color: var(--text-lighter); font-weight: 400; margin-left: 8px; }
   </style>
 </head>
 <body>
   <div class="admin-page">
     <div class="admin-header">
-      <h1>⚙️ Gerenciar Planos Mestres</h1>
+      <h1>⚙️ Painel de Administrador</h1>
       <a href="dashboard.html" class="admin-back">← Voltar ao Dashboard</a>
     </div>
+
+    <!-- Tabs -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('planos')">Planos Mestres</button>
+      <button class="admin-tab" onclick="switchTab('alunos')">Gestao de Alunos</button>
+    </div>
+
+    <!-- ==================== TAB: PLANOS MESTRES ==================== -->
+    <div class="admin-section active" id="section-planos">
 
     <!-- Upload -->
     <div class="admin-card">
@@ -122,7 +202,50 @@
         <p style="color:var(--text-lighter);font-size:0.85rem;text-align:center;padding:16px">Carregando...</p>
       </div>
     </div>
-  </div>
+
+    </div><!-- /section-planos -->
+
+    <!-- ==================== TAB: GESTAO DE ALUNOS ==================== -->
+    <div class="admin-section" id="section-alunos">
+
+    <div class="admin-card">
+      <div class="alunos-toolbar">
+        <h2>Alunos Cadastrados <span class="alunos-count" id="alunosCount"></span></h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" class="alunos-search" id="alunosBusca" placeholder="Buscar por nome ou e-mail..." oninput="filtrarAlunos()">
+          <button class="btn btn-primary btn-sm" onclick="abrirModal()">+ Cadastrar Aluno</button>
+        </div>
+      </div>
+
+      <div id="alunosTabela">
+        <p class="empty-state">Carregando...</p>
+      </div>
+    </div>
+
+    </div><!-- /section-alunos -->
+
+    <!-- Modal: Cadastrar Aluno -->
+    <div class="modal-overlay" id="modalAluno">
+      <div class="modal">
+        <h3>Cadastrar Novo Aluno</h3>
+        <label for="alunoNome">Nome</label>
+        <input type="text" id="alunoNome" placeholder="Nome completo do aluno">
+
+        <label for="alunoEmail">E-mail</label>
+        <input type="email" id="alunoEmail" placeholder="aluno@email.com">
+
+        <label for="alunoValidade">Data de Validade (expiracao do acesso)</label>
+        <input type="date" id="alunoValidade">
+
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="fecharModal()">Cancelar</button>
+          <button class="btn btn-primary" id="btnSalvarAluno" onclick="salvarAluno()">Salvar Aluno</button>
+        </div>
+        <div class="status-msg" id="modalStatus"></div>
+      </div>
+    </div>
+
+  </div><!-- /admin-page -->
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
@@ -354,6 +477,229 @@
       var el = document.getElementById('statusMsg');
       el.textContent = msg;
       el.className = 'status-msg ' + type;
+    }
+
+    // =============================================
+    //  TABS
+    // =============================================
+    function switchTab(tab) {
+      document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.admin-section').forEach(function(s) { s.classList.remove('active'); });
+
+      if (tab === 'alunos') {
+        document.querySelectorAll('.admin-tab')[1].classList.add('active');
+        document.getElementById('section-alunos').classList.add('active');
+        carregarAlunos();
+      } else {
+        document.querySelectorAll('.admin-tab')[0].classList.add('active');
+        document.getElementById('section-planos').classList.add('active');
+      }
+    }
+
+    // =============================================
+    //  GESTAO DE ALUNOS
+    // =============================================
+    var _alunosCache = [];
+
+    async function carregarAlunos() {
+      var container = document.getElementById('alunosTabela');
+      try {
+        var { data, error } = await _sb.from('usuarios_autorizados')
+          .select('*')
+          .order('activated_at', { ascending: false });
+
+        if (error) throw error;
+        _alunosCache = data || [];
+        renderizarAlunos(_alunosCache);
+      } catch (e) {
+        container.innerHTML = '<p style="color:#C53030;font-size:0.85rem;text-align:center">Erro ao carregar: ' + e.message + '</p>';
+      }
+    }
+
+    function renderizarAlunos(alunos) {
+      var container = document.getElementById('alunosTabela');
+      document.getElementById('alunosCount').textContent = '(' + alunos.length + ')';
+
+      if (!alunos || alunos.length === 0) {
+        container.innerHTML = '<p class="empty-state">Nenhum aluno cadastrado ainda.</p>';
+        return;
+      }
+
+      var hoje = new Date();
+      hoje.setHours(0,0,0,0);
+
+      var html = '<table class="alunos-table"><thead><tr>'
+        + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Validade</th><th>Cadastro</th><th>Acoes</th>'
+        + '</tr></thead><tbody>';
+
+      alunos.forEach(function(a) {
+        var status = a.subscription_status || 'active';
+        var expirado = false;
+
+        if (a.expires_at) {
+          var expDate = new Date(a.expires_at);
+          if (expDate < hoje) {
+            expirado = true;
+            status = 'expired';
+          }
+        }
+
+        var badgeClass = status === 'active' ? 'badge-active' : (status === 'expired' ? 'badge-expired' : 'badge-inactive');
+        var badgeText = status === 'active' ? 'Ativo' : (status === 'expired' ? 'Expirado' : 'Inativo');
+
+        var validadeStr = a.expires_at ? new Date(a.expires_at).toLocaleDateString('pt-BR') : '—';
+        var cadastroStr = a.activated_at ? new Date(a.activated_at).toLocaleDateString('pt-BR') : '—';
+        var nomeDisplay = a.nome || '<span style="color:var(--text-lighter)">—</span>';
+
+        var isActive = (status === 'active');
+        var toggleLabel = isActive ? 'Desativar' : 'Ativar';
+        var toggleStatus = isActive ? 'inactive' : 'active';
+
+        html += '<tr>'
+          + '<td style="font-weight:600;color:var(--secondary)">' + nomeDisplay + '</td>'
+          + '<td>' + a.email + '</td>'
+          + '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>'
+          + '<td>' + validadeStr + '</td>'
+          + '<td>' + cadastroStr + '</td>'
+          + '<td class="actions-cell">'
+          + '<button onclick="toggleAluno(\'' + a.email + '\',\'' + toggleStatus + '\')">' + toggleLabel + '</button>'
+          + '<button class="btn-danger" onclick="excluirAluno(\'' + a.email + '\')">Excluir</button>'
+          + '</td></tr>';
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function filtrarAlunos() {
+      var termo = document.getElementById('alunosBusca').value.toLowerCase().trim();
+      if (!termo) { renderizarAlunos(_alunosCache); return; }
+      var filtrados = _alunosCache.filter(function(a) {
+        return a.email.toLowerCase().includes(termo) || (a.nome && a.nome.toLowerCase().includes(termo));
+      });
+      renderizarAlunos(filtrados);
+    }
+
+    // --- Modal ---
+    function abrirModal() {
+      document.getElementById('alunoNome').value = '';
+      document.getElementById('alunoEmail').value = '';
+      document.getElementById('alunoValidade').value = '';
+      document.getElementById('modalStatus').className = 'status-msg';
+      document.getElementById('btnSalvarAluno').disabled = false;
+      document.getElementById('btnSalvarAluno').textContent = 'Salvar Aluno';
+      document.getElementById('modalAluno').classList.add('open');
+    }
+
+    function fecharModal() {
+      document.getElementById('modalAluno').classList.remove('open');
+    }
+
+    // Close modal on overlay click
+    document.getElementById('modalAluno').addEventListener('click', function(e) {
+      if (e.target === this) fecharModal();
+    });
+
+    async function salvarAluno() {
+      var nome = document.getElementById('alunoNome').value.trim();
+      var email = document.getElementById('alunoEmail').value.trim().toLowerCase();
+      var validade = document.getElementById('alunoValidade').value;
+      var statusEl = document.getElementById('modalStatus');
+      var btn = document.getElementById('btnSalvarAluno');
+
+      // Validate
+      if (!email) {
+        statusEl.textContent = 'E-mail e obrigatorio.';
+        statusEl.className = 'status-msg error';
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        statusEl.textContent = 'E-mail invalido.';
+        statusEl.className = 'status-msg error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      try {
+        // Check if email already exists
+        var { data: existing } = await _sb.from('usuarios_autorizados')
+          .select('email')
+          .eq('email', email)
+          .single();
+
+        if (existing) {
+          statusEl.textContent = 'Este e-mail ja esta cadastrado.';
+          statusEl.className = 'status-msg error';
+          btn.disabled = false;
+          btn.textContent = 'Salvar Aluno';
+          return;
+        }
+
+        // Insert new authorized user
+        var insertData = {
+          email: email,
+          nome: nome || null,
+          subscription_status: 'active',
+          source: 'manual',
+          plan_type: 'standard',
+          activated_at: new Date().toISOString()
+        };
+
+        if (validade) {
+          insertData.expires_at = new Date(validade + 'T23:59:59').toISOString();
+        }
+
+        var { error } = await _sb.from('usuarios_autorizados').insert(insertData);
+        if (error) throw error;
+
+        statusEl.textContent = 'Aluno cadastrado com sucesso!';
+        statusEl.className = 'status-msg success';
+
+        setTimeout(function() {
+          fecharModal();
+          carregarAlunos();
+        }, 800);
+
+      } catch (e) {
+        statusEl.textContent = 'Erro: ' + e.message;
+        statusEl.className = 'status-msg error';
+        btn.disabled = false;
+        btn.textContent = 'Salvar Aluno';
+      }
+    }
+
+    async function toggleAluno(email, novoStatus) {
+      try {
+        var updateData = { subscription_status: novoStatus };
+        if (novoStatus === 'active') {
+          updateData.activated_at = new Date().toISOString();
+          updateData.deactivated_at = null;
+        } else {
+          updateData.deactivated_at = new Date().toISOString();
+        }
+
+        var { error } = await _sb.from('usuarios_autorizados')
+          .update(updateData)
+          .eq('email', email);
+
+        if (error) throw error;
+        carregarAlunos();
+      } catch (e) {
+        alert('Erro ao atualizar: ' + e.message);
+      }
+    }
+
+    async function excluirAluno(email) {
+      if (!confirm('Tem certeza que deseja excluir o aluno ' + email + '?\n\nEle perdera o acesso ao sistema.')) return;
+      try {
+        var { error } = await _sb.from('usuarios_autorizados').delete().eq('email', email);
+        if (error) throw error;
+        carregarAlunos();
+      } catch (e) {
+        alert('Erro ao excluir: ' + e.message);
+      }
     }
   </script>
 </body>
