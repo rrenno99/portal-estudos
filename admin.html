@@ -11,7 +11,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
   <script src="js/mentor.js"></script>
   <style>
-    .admin-page { max-width: 800px; margin: 0 auto; padding: 32px 24px; }
+    .admin-page { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
     .admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
     .admin-header h1 { font-size: 1.3rem; font-weight: 800; color: var(--secondary); }
     .admin-back { font-size: 0.85rem; color: var(--primary); font-weight: 600; }
@@ -97,25 +97,43 @@
     }
     .alunos-search:focus { outline: none; border-color: var(--primary); }
 
+    .alunos-table-wrapper {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden;
+    }
     .alunos-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     .alunos-table th {
-      text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border);
-      color: var(--text-light); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;
+      text-align: left; padding: 10px 12px; background: var(--bg);
+      border-bottom: 2px solid var(--border);
+      color: var(--text-light); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;
     }
-    .alunos-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .alunos-table td {
+      padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle;
+      line-height: 1.6;
+    }
+    .alunos-table tr:last-child td { border-bottom: none; }
     .alunos-table tr:hover { background: rgba(30,136,229,0.02); }
 
     .badge {
-      display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600;
+      display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px;
+      font-size: 0.7rem; font-weight: 600; line-height: 1.4;
     }
     .badge-active { background: #F0FFF4; color: #276749; }
     .badge-inactive { background: #FFF5F5; color: #C53030; }
     .badge-expired { background: #FFFAF0; color: #C05621; }
 
-    .alunos-table .actions-cell { white-space: nowrap; }
+    .alunos-table .actions-cell {
+      white-space: nowrap; padding: 8px 12px;
+    }
+    .alunos-table .actions-cell .actions-group {
+      display: inline-flex; gap: 4px; align-items: center; flex-wrap: nowrap;
+    }
     .alunos-table .actions-cell button {
-      font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; cursor: pointer;
-      font-family: inherit; border: 1px solid var(--border); background: var(--bg); margin-right: 4px;
+      font-size: 0.7rem; padding: 4px 10px; height: 26px;
+      border-radius: 4px; cursor: pointer; font-family: inherit;
+      border: 1px solid var(--border); background: var(--bg);
+      display: inline-flex; align-items: center; justify-content: center;
+      white-space: nowrap; transition: all 0.15s;
     }
     .alunos-table .actions-cell button:hover { border-color: var(--primary); color: var(--primary); }
     .alunos-table .actions-cell .btn-danger { border-color: #FED7D7; background: #FFF5F5; color: #C53030; }
@@ -577,7 +595,7 @@
       var hoje = new Date();
       hoje.setHours(0,0,0,0);
 
-      var html = '<table class="alunos-table"><thead><tr>'
+      var html = '<div class="alunos-table-wrapper"><table class="alunos-table"><thead><tr>'
         + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Perfil</th><th>Validade</th><th>Acoes</th>'
         + '</tr></thead><tbody>';
 
@@ -627,11 +645,11 @@
           + '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>'
           + '<td>' + perfilBadge + '</td>'
           + '<td>' + validadeStr + '</td>'
-          + '<td class="actions-cell">' + actions + '</td>'
+          + '<td class="actions-cell"><div class="actions-group">' + actions + '</div></td>'
           + '</tr>';
       });
 
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       container.innerHTML = html;
     }
 
