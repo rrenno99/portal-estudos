@@ -70,6 +70,21 @@ export async function login(email, senha) {
   });
 
   if (error) throw error;
+
+  // Track login: update last_login and increment login_count
+  const normalizedEmail = email.toLowerCase().trim();
+  supabase.from('usuarios_autorizados')
+    .select('login_count')
+    .eq('email', normalizedEmail)
+    .single()
+    .then(({ data: row }) => {
+      const currentCount = (row && row.login_count) || 0;
+      supabase.from('usuarios_autorizados')
+        .update({ last_login: new Date().toISOString(), login_count: currentCount + 1 })
+        .eq('email', normalizedEmail)
+        .then(() => {});
+    });
+
   return data;
 }
 

@@ -179,6 +179,27 @@
 
     .badge-admin { background: #EBF4FF; color: #1E88E5; }
 
+    /* --- KPI Summary Cards --- */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow); text-align: center;
+    }
+    .kpi-value {
+      font-size: 2rem; font-weight: 800; line-height: 1.1; margin-bottom: 4px;
+    }
+    .kpi-label {
+      font-size: 0.78rem; color: var(--text-light); font-weight: 500;
+    }
+    .kpi-card.kpi-total .kpi-value { color: var(--primary); }
+    .kpi-card.kpi-active .kpi-value { color: var(--success); }
+    .kpi-card.kpi-churn .kpi-value { color: #E53E3E; }
+    .kpi-sublabel {
+      font-size: 0.68rem; color: var(--text-lighter); margin-top: 2px;
+    }
+
     .alunos-table .actions-cell .btn-resend { border-color: #D0E3F7; background: #F0F7FF; color: #1E88E5; }
     .alunos-table .actions-cell .btn-resend:hover { background: #D0E3F7; }
     .alunos-table .actions-cell .btn-admin { border-color: #E2E8F0; background: #EBF4FF; color: #1E88E5; }
@@ -244,6 +265,24 @@
 
     <!-- ==================== TAB: GESTAO DE ALUNOS ==================== -->
     <div class="admin-section" id="section-alunos">
+
+    <!-- KPI Summary -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-total">
+        <div class="kpi-value" id="kpiTotal">—</div>
+        <div class="kpi-label">Total de Alunos</div>
+      </div>
+      <div class="kpi-card kpi-active">
+        <div class="kpi-value" id="kpiAtivos">—</div>
+        <div class="kpi-label">Ativos Hoje</div>
+        <div class="kpi-sublabel">Logaram nas ultimas 24h</div>
+      </div>
+      <div class="kpi-card kpi-churn">
+        <div class="kpi-value" id="kpiChurn">—</div>
+        <div class="kpi-label">Risco de Churn</div>
+        <div class="kpi-sublabel">Sem login ha 7+ dias</div>
+      </div>
+    </div>
 
     <div class="admin-card">
       <div class="alunos-toolbar">
@@ -577,10 +616,36 @@
         }
 
         _alunosCache = alunos;
+        atualizarKPIs(alunos);
         renderizarAlunos(_alunosCache);
       } catch (e) {
         container.innerHTML = '<p style="color:#C53030;font-size:0.85rem;text-align:center">Erro ao carregar: ' + e.message + '</p>';
       }
+    }
+
+    function atualizarKPIs(alunos) {
+      var agora = new Date();
+      var ha24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000);
+      var ha7d = new Date(agora.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      var total = alunos.length;
+      var ativosHoje = 0;
+      var churn = 0;
+
+      alunos.forEach(function(a) {
+        if (a.last_login) {
+          var lastLogin = new Date(a.last_login);
+          if (lastLogin >= ha24h) ativosHoje++;
+          if (lastLogin < ha7d) churn++;
+        } else {
+          // Never logged in = churn risk
+          churn++;
+        }
+      });
+
+      document.getElementById('kpiTotal').textContent = total;
+      document.getElementById('kpiAtivos').textContent = ativosHoje;
+      document.getElementById('kpiChurn').textContent = churn;
     }
 
     function renderizarAlunos(alunos) {
@@ -596,7 +661,7 @@
       hoje.setHours(0,0,0,0);
 
       var html = '<div class="alunos-table-wrapper"><table class="alunos-table"><thead><tr>'
-        + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Perfil</th><th>Validade</th><th>Acoes</th>'
+        + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Plano</th><th>Ultimo Acesso</th><th>Freq.</th><th>Acoes</th>'
         + '</tr></thead><tbody>';
 
       alunos.forEach(function(a) {
@@ -610,12 +675,31 @@
         var badgeClass = status === 'active' ? 'badge-active' : (status === 'expired' ? 'badge-expired' : 'badge-inactive');
         var badgeText = status === 'active' ? 'Ativo' : (status === 'expired' ? 'Expirado' : 'Inativo');
 
-        var validadeStr = a.expires_at ? new Date(a.expires_at).toLocaleDateString('pt-BR') : '—';
         var nomeDisplay = a.nome || '<span style="color:var(--text-lighter);font-style:italic">Sem nome</span>';
+        if (a.is_admin) nomeDisplay += ' <span class="badge badge-admin">Admin</span>';
 
-        // Admin badge
-        var perfilBadge = '';
-        if (a.is_admin) perfilBadge = '<span class="badge badge-admin">Admin</span>';
+        // Plano / Source
+        var planoDisplay = a.plan_type || 'standard';
+        if (a.source && a.source !== 'manual') planoDisplay += ' <span style="font-size:0.65rem;color:var(--text-lighter)">via ' + a.source + '</span>';
+
+        // Ultimo Acesso
+        var lastLoginDisplay;
+        if (a.last_login) {
+          var ll = new Date(a.last_login);
+          var agora = new Date();
+          var diffMs = agora - ll;
+          var diffH = Math.floor(diffMs / 3600000);
+          var diffD = Math.floor(diffMs / 86400000);
+          if (diffH < 1) lastLoginDisplay = '<span style="color:var(--success);font-weight:600">Agora</span>';
+          else if (diffH < 24) lastLoginDisplay = '<span style="color:var(--success)">' + diffH + 'h atras</span>';
+          else if (diffD <= 7) lastLoginDisplay = diffD + 'd atras';
+          else lastLoginDisplay = '<span style="color:#E53E3E">' + diffD + 'd atras</span>';
+        } else {
+          lastLoginDisplay = '<span style="color:var(--text-lighter)">Nunca</span>';
+        }
+
+        // Frequencia
+        var freqDisplay = (a.login_count || 0) + 'x';
 
         var isActive = (status === 'active');
         var toggleLabel = isActive ? 'Desativar' : 'Ativar';
@@ -643,8 +727,9 @@
           + '<td style="font-weight:600;color:var(--secondary)">' + nomeDisplay + '</td>'
           + '<td>' + a.email + '</td>'
           + '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>'
-          + '<td>' + perfilBadge + '</td>'
-          + '<td>' + validadeStr + '</td>'
+          + '<td>' + planoDisplay + '</td>'
+          + '<td>' + lastLoginDisplay + '</td>'
+          + '<td style="text-align:center;font-weight:600">' + freqDisplay + '</td>'
           + '<td class="actions-cell"><div class="actions-group">' + actions + '</div></td>'
           + '</tr>';
       });
