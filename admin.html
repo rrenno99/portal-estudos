@@ -99,9 +99,10 @@
 
     .alunos-table-wrapper {
       border: 1px solid var(--border); border-radius: var(--radius);
-      overflow: hidden;
+      overflow-x: auto; overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
     }
-    .alunos-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .alunos-table { min-width: 820px; width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     .alunos-table th {
       text-align: left; padding: 10px 12px; background: var(--bg);
       border-bottom: 2px solid var(--border);
@@ -204,6 +205,23 @@
     .alunos-table .actions-cell .btn-resend:hover { background: #D0E3F7; }
     .alunos-table .actions-cell .btn-admin { border-color: #E2E8F0; background: #EBF4FF; color: #1E88E5; }
     .alunos-table .actions-cell .btn-admin:hover { background: #D0E3F7; }
+    .alunos-table .actions-cell .btn-edit { border-color: #E2E8F0; background: #FAFAFA; color: var(--text-light); }
+    .alunos-table .actions-cell .btn-edit:hover { border-color: var(--primary); color: var(--primary); background: #F0F7FF; }
+
+    .modal select {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 0.85rem; font-family: inherit; margin-bottom: 14px; box-sizing: border-box;
+      background: var(--bg-card); color: var(--text);
+    }
+    .modal select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,136,229,0.1); }
+
+    @media (max-width: 768px) {
+      .admin-page { padding: 16px 12px; }
+      .kpi-grid { grid-template-columns: 1fr; gap: 10px; }
+      .alunos-toolbar { flex-direction: column; gap: 10px; align-items: stretch; }
+      .alunos-toolbar > div { justify-content: stretch; }
+      .alunos-search { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -318,6 +336,37 @@
           <button class="btn btn-primary" id="btnSalvarAluno" onclick="salvarAluno()">Salvar Aluno</button>
         </div>
         <div class="status-msg" id="modalStatus"></div>
+      </div>
+    </div>
+
+    <!-- Modal: Editar Aluno -->
+    <div class="modal-overlay" id="modalEditar">
+      <div class="modal">
+        <h3>Editar Aluno</h3>
+        <input type="hidden" id="editOriginalEmail">
+
+        <label for="editNome">Nome</label>
+        <input type="text" id="editNome" placeholder="Nome completo">
+
+        <label for="editEmail">E-mail</label>
+        <input type="email" id="editEmail" placeholder="aluno@email.com">
+
+        <label for="editPlano">Plano</label>
+        <select id="editPlano">
+          <option value="standard">Standard</option>
+          <option value="premium">Premium</option>
+          <option value="vip">VIP</option>
+          <option value="trial">Trial</option>
+        </select>
+
+        <label for="editValidade">Data de Validade</label>
+        <input type="date" id="editValidade">
+
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="fecharModalEditar()">Cancelar</button>
+          <button class="btn btn-primary" id="btnSalvarEdicao" onclick="salvarEdicao()">Salvar Alteracoes</button>
+        </div>
+        <div class="status-msg" id="editStatus"></div>
       </div>
     </div>
 
@@ -709,15 +758,16 @@
         var safeEmail = a.email.replace(/'/g, "\\'");
 
         // Action buttons
-        var actions = '<button onclick="toggleAluno(\'' + safeEmail + '\',\'' + toggleStatus + '\')">' + toggleLabel + '</button>'
+        var actions = '<button class="btn-edit" onclick="abrirEdicao(\'' + safeEmail + '\')" title="Editar">&#9998; Editar</button>'
+          + '<button onclick="toggleAluno(\'' + safeEmail + '\',\'' + toggleStatus + '\')">' + toggleLabel + '</button>'
           + '<button class="btn-resend" onclick="reenviarAcesso(\'' + safeEmail + '\', this)" title="Reenviar e-mail de acesso">&#9993; Reenviar</button>';
 
         // Admin toggle — only master admin can promote/demote, and not yourself
         if (_isMasterAdmin && a.email !== MASTER_ADMIN) {
           if (a.is_admin) {
-            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', false)">Remover Admin</button>';
+            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', false)">- Admin</button>';
           } else {
-            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', true)">Tornar Admin</button>';
+            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', true)">+ Admin</button>';
           }
         }
 
@@ -918,6 +968,120 @@
         carregarAlunos();
       } catch (e) {
         showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
+    // =============================================
+    //  EDITAR ALUNO
+    // =============================================
+    function abrirEdicao(email) {
+      var aluno = _alunosCache.find(function(a) { return a.email === email; });
+      if (!aluno) return;
+
+      document.getElementById('editOriginalEmail').value = aluno.email;
+      document.getElementById('editNome').value = aluno.nome || '';
+      document.getElementById('editEmail').value = aluno.email;
+      document.getElementById('editPlano').value = aluno.plan_type || 'standard';
+
+      // Format expires_at for date input (YYYY-MM-DD)
+      if (aluno.expires_at) {
+        var d = new Date(aluno.expires_at);
+        document.getElementById('editValidade').value = d.toISOString().split('T')[0];
+      } else {
+        document.getElementById('editValidade').value = '';
+      }
+
+      document.getElementById('editStatus').className = 'status-msg';
+      document.getElementById('btnSalvarEdicao').disabled = false;
+      document.getElementById('btnSalvarEdicao').textContent = 'Salvar Alteracoes';
+      document.getElementById('modalEditar').classList.add('open');
+    }
+
+    function fecharModalEditar() {
+      document.getElementById('modalEditar').classList.remove('open');
+    }
+
+    document.getElementById('modalEditar').addEventListener('click', function(e) {
+      if (e.target === this) fecharModalEditar();
+    });
+
+    async function salvarEdicao() {
+      var originalEmail = document.getElementById('editOriginalEmail').value;
+      var novoNome = document.getElementById('editNome').value.trim();
+      var novoEmail = document.getElementById('editEmail').value.trim().toLowerCase();
+      var novoPlano = document.getElementById('editPlano').value;
+      var novaValidade = document.getElementById('editValidade').value;
+      var statusEl = document.getElementById('editStatus');
+      var btn = document.getElementById('btnSalvarEdicao');
+
+      if (!novoEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novoEmail)) {
+        statusEl.textContent = 'E-mail invalido.';
+        statusEl.className = 'status-msg error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+      statusEl.className = 'status-msg';
+
+      try {
+        var emailChanged = (novoEmail !== originalEmail);
+
+        // If email changed, check if new email already exists
+        if (emailChanged) {
+          var { data: exists } = await _sb.from('usuarios_autorizados')
+            .select('email').eq('email', novoEmail).single();
+          if (exists) {
+            statusEl.textContent = 'Este e-mail ja esta cadastrado por outro aluno.';
+            statusEl.className = 'status-msg error';
+            btn.disabled = false;
+            btn.textContent = 'Salvar Alteracoes';
+            return;
+          }
+        }
+
+        // Build update data for usuarios_autorizados
+        var updateData = {
+          nome: novoNome || null,
+          plan_type: novoPlano
+        };
+
+        if (emailChanged) updateData.email = novoEmail;
+        if (novaValidade) {
+          updateData.expires_at = new Date(novaValidade + 'T23:59:59').toISOString();
+        } else {
+          updateData.expires_at = null;
+        }
+
+        var { error: dbErr } = await _sb.from('usuarios_autorizados')
+          .update(updateData)
+          .eq('email', originalEmail);
+
+        if (dbErr) throw new Error('Erro DB: ' + dbErr.message);
+
+        // If email changed, also update perfil_aluno
+        if (emailChanged) {
+          await _sb.from('perfil_aluno')
+            .update({ email: novoEmail })
+            .eq('email', originalEmail);
+        }
+
+        // Update name in perfil_aluno if provided
+        if (novoNome) {
+          await _sb.from('perfil_aluno')
+            .update({ nome: novoNome })
+            .eq('email', emailChanged ? novoEmail : originalEmail);
+        }
+
+        showToast('Dados atualizados com sucesso.', 'success');
+        fecharModalEditar();
+        carregarAlunos();
+
+      } catch (e) {
+        statusEl.textContent = 'Erro: ' + e.message;
+        statusEl.className = 'status-msg error';
+        btn.disabled = false;
+        btn.textContent = 'Salvar Alteracoes';
       }
     }
 
