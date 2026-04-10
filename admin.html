@@ -600,6 +600,8 @@
       if (e.target === this) fecharModal();
     });
 
+    var PROVISIONING_KEY = 'prv_R3nn0_2026_s3cr3t_k3y_x7m9p2';
+
     async function salvarAluno() {
       var nome = document.getElementById('alunoNome').value.trim();
       var email = document.getElementById('alunoEmail').value.trim().toLowerCase();
@@ -620,47 +622,48 @@
       }
 
       btn.disabled = true;
-      btn.textContent = 'Salvando...';
+      btn.textContent = 'Cadastrando...';
+      statusEl.className = 'status-msg';
 
       try {
-        // Check if email already exists
-        var { data: existing } = await _sb.from('usuarios_autorizados')
-          .select('email')
-          .eq('email', email)
-          .single();
-
-        if (existing) {
-          statusEl.textContent = 'Este e-mail ja esta cadastrado.';
-          statusEl.className = 'status-msg error';
-          btn.disabled = false;
-          btn.textContent = 'Salvar Aluno';
-          return;
-        }
-
-        // Insert new authorized user
-        var insertData = {
-          email: email,
-          nome: nome || null,
-          subscription_status: 'active',
-          source: 'manual',
-          plan_type: 'standard',
-          activated_at: new Date().toISOString()
-        };
-
+        var body = { email: email, nome: nome || null };
         if (validade) {
-          insertData.expires_at = new Date(validade + 'T23:59:59').toISOString();
+          body.expires_at = new Date(validade + 'T23:59:59').toISOString();
         }
 
-        var { error } = await _sb.from('usuarios_autorizados').insert(insertData);
-        if (error) throw error;
+        var response = await fetch('/api/create-student', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': PROVISIONING_KEY
+          },
+          body: JSON.stringify(body)
+        });
 
-        statusEl.textContent = 'Aluno cadastrado com sucesso!';
+        var result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Erro ao cadastrar');
+        }
+
+        // Show success with password info
+        var msg = 'Aluno cadastrado com sucesso!\nSenha provisoria: ' + result.senha;
+        if (result.email_sent) {
+          msg += '\n\nE-mail de boas-vindas enviado para ' + email;
+        } else {
+          msg += '\n\n⚠ E-mail nao enviado' + (result.email_error ? ': ' + result.email_error : '') + '\nAnote a senha e repasse manualmente.';
+        }
+
+        statusEl.textContent = msg;
         statusEl.className = 'status-msg success';
+        statusEl.style.whiteSpace = 'pre-line';
 
+        // Keep modal open longer so admin can see the password
         setTimeout(function() {
           fecharModal();
+          statusEl.style.whiteSpace = '';
           carregarAlunos();
-        }, 800);
+        }, 5000);
 
       } catch (e) {
         statusEl.textContent = 'Erro: ' + e.message;
