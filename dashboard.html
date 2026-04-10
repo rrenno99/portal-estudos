@@ -1958,7 +1958,7 @@
 
         <div class="topbar-right">
           <!-- Admin button (visible only for admin) -->
-          <a href="admin.html" id="topbarAdminBtn" style="display:none;font-size:0.78rem;font-weight:600;color:var(--primary);padding:6px 12px;border:1.5px solid var(--primary);border-radius:20px;text-decoration:none;white-space:nowrap">⚙️ Biblioteca de Planos</a>
+          <a href="admin.html" id="topbarAdminBtn" style="display:none;font-size:0.78rem;font-weight:600;color:var(--primary);padding:6px 12px;border:1.5px solid var(--primary);border-radius:20px;text-decoration:none;white-space:nowrap">⚙️ Painel Admin</a>
 
           <!-- Credits -->
           <div class="credits-badge" id="creditsBadge">
@@ -2013,7 +2013,7 @@
                 <span class="item-icon">🖼️</span> Remover Foto
               </button>
               <button class="dropdown-item" id="btnAdminPlanos" style="display:none" onclick="window.location='admin.html'">
-                <span class="item-icon">⚙️</span> Gerenciar Planos (Admin)
+                <span class="item-icon">⚙️</span> Painel Admin
               </button>
               <div class="dropdown-divider"></div>
               <div style="padding:10px 16px;font-size:0.75rem;color:var(--text-lighter)">
@@ -4660,13 +4660,23 @@
 
         console.log('[Init] Sessão OK:', window._userId, window._userEmail);
 
-        // Show admin buttons if admin user
-        if (window._userEmail === 'rodrigorenno99@gmail.com') {
-          var adminBtn = document.getElementById('btnAdminPlanos');
-          if (adminBtn) adminBtn.style.display = '';
-          var topbarAdmin = document.getElementById('topbarAdminBtn');
-          if (topbarAdmin) topbarAdmin.style.display = '';
-        }
+        // Show admin buttons if admin user (master or is_admin in DB)
+        (async function checkAdmin() {
+          var isAdmin = (window._userEmail === 'rodrigorenno99@gmail.com');
+          if (!isAdmin) {
+            var { data: adminCheck } = await window._supabase.from('usuarios_autorizados')
+              .select('is_admin')
+              .eq('email', window._userEmail)
+              .single();
+            isAdmin = adminCheck && adminCheck.is_admin === true;
+          }
+          if (isAdmin) {
+            var adminBtn = document.getElementById('btnAdminPlanos');
+            if (adminBtn) adminBtn.style.display = '';
+            var topbarAdmin = document.getElementById('topbarAdminBtn');
+            if (topbarAdmin) topbarAdmin.style.display = '';
+          }
+        })();
 
         // Auth listener
         sb.auth.onAuthStateChange(function(ev) {
