@@ -146,6 +146,25 @@
     .modal .status-msg { margin-top: 12px; margin-bottom: 0; }
 
     .alunos-count { font-size: 0.75rem; color: var(--text-lighter); font-weight: 400; margin-left: 8px; }
+
+    /* --- Toast --- */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 2000;
+      padding: 12px 20px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500;
+      color: #fff; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(12px);
+      transition: all 0.3s ease; pointer-events: none; max-width: 380px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .toast.toast-success { background: #276749; }
+    .toast.toast-error { background: #C53030; }
+    .toast.toast-info { background: #1E88E5; }
+
+    .badge-admin { background: #EBF4FF; color: #1E88E5; }
+
+    .alunos-table .actions-cell .btn-resend { border-color: #D0E3F7; background: #F0F7FF; color: #1E88E5; }
+    .alunos-table .actions-cell .btn-resend:hover { background: #D0E3F7; }
+    .alunos-table .actions-cell .btn-admin { border-color: #E2E8F0; background: #EBF4FF; color: #1E88E5; }
+    .alunos-table .actions-cell .btn-admin:hover { background: #D0E3F7; }
   </style>
 </head>
 <body>
@@ -249,9 +268,11 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    var ADMIN_EMAILS = ['rodrigorenno99@gmail.com'];
+    var MASTER_ADMIN = 'rodrigorenno99@gmail.com';
     var _sb = null;
     var _userId = null;
+    var _userEmail = null;
+    var _isMasterAdmin = false;
     var _parsedPlan = null;
 
     // Init
@@ -264,20 +285,30 @@
 
       var { data: { session } } = await _sb.auth.getSession();
       if (!session) {
-        // Try getUser as fallback
         var { data: { user } } = await _sb.auth.getUser();
         if (!user) { window.location.href = 'login.html'; return; }
         _userId = user.id;
-        var email = user.email;
+        _userEmail = user.email;
       } else {
         _userId = session.user.id;
-        var email = session.user.email;
+        _userEmail = session.user.email;
       }
 
-      console.log('[Admin] Email logado:', email);
+      _isMasterAdmin = (_userEmail === MASTER_ADMIN);
+      console.log('[Admin] Email logado:', _userEmail, '| Master:', _isMasterAdmin);
 
-      if (ADMIN_EMAILS.indexOf(email) === -1) {
-        document.querySelector('.admin-page').innerHTML = '<div style="text-align:center;padding:60px"><h2 style="color:#E53E3E">Acesso Negado</h2><p style="margin-top:8px">Esta pagina e restrita ao administrador.</p><p style="font-size:0.78rem;color:var(--text-lighter);margin-top:4px">Email atual: ' + email + '</p><a href="dashboard.html" class="btn btn-primary" style="margin-top:16px">Voltar ao Dashboard</a></div>';
+      // Check admin access: master admin OR is_admin=true in DB
+      var isAdmin = _isMasterAdmin;
+      if (!isAdmin) {
+        var { data: adminCheck } = await _sb.from('usuarios_autorizados')
+          .select('is_admin')
+          .eq('email', _userEmail)
+          .single();
+        isAdmin = adminCheck && adminCheck.is_admin === true;
+      }
+
+      if (!isAdmin) {
+        document.querySelector('.admin-page').innerHTML = '<div style="text-align:center;padding:60px"><h2 style="color:#E53E3E">Acesso Negado</h2><p style="margin-top:8px">Esta pagina e restrita ao administrador.</p><p style="font-size:0.78rem;color:var(--text-lighter);margin-top:4px">Email atual: ' + _userEmail + '</p><a href="dashboard.html" class="btn btn-primary" style="margin-top:16px">Voltar ao Dashboard</a></div>';
         return;
       }
 
@@ -509,7 +540,25 @@
           .order('activated_at', { ascending: false });
 
         if (error) throw error;
-        _alunosCache = data || [];
+        var alunos = data || [];
+
+        // Fallback: buscar nomes do perfil_aluno para quem esta sem nome
+        var semNome = alunos.filter(function(a) { return !a.nome; }).map(function(a) { return a.email; });
+        if (semNome.length > 0) {
+          var { data: perfis } = await _sb.from('perfil_aluno')
+            .select('email, nome')
+            .in('email', semNome);
+
+          if (perfis && perfis.length > 0) {
+            var perfilMap = {};
+            perfis.forEach(function(p) { perfilMap[p.email] = p.nome; });
+            alunos.forEach(function(a) {
+              if (!a.nome && perfilMap[a.email]) a.nome = perfilMap[a.email];
+            });
+          }
+        }
+
+        _alunosCache = alunos;
         renderizarAlunos(_alunosCache);
       } catch (e) {
         container.innerHTML = '<p style="color:#C53030;font-size:0.85rem;text-align:center">Erro ao carregar: ' + e.message + '</p>';
@@ -529,42 +578,57 @@
       hoje.setHours(0,0,0,0);
 
       var html = '<table class="alunos-table"><thead><tr>'
-        + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Validade</th><th>Cadastro</th><th>Acoes</th>'
+        + '<th>Nome</th><th>E-mail</th><th>Status</th><th>Perfil</th><th>Validade</th><th>Acoes</th>'
         + '</tr></thead><tbody>';
 
       alunos.forEach(function(a) {
         var status = a.subscription_status || 'active';
-        var expirado = false;
 
         if (a.expires_at) {
           var expDate = new Date(a.expires_at);
-          if (expDate < hoje) {
-            expirado = true;
-            status = 'expired';
-          }
+          if (expDate < hoje && status === 'active') status = 'expired';
         }
 
         var badgeClass = status === 'active' ? 'badge-active' : (status === 'expired' ? 'badge-expired' : 'badge-inactive');
         var badgeText = status === 'active' ? 'Ativo' : (status === 'expired' ? 'Expirado' : 'Inativo');
 
         var validadeStr = a.expires_at ? new Date(a.expires_at).toLocaleDateString('pt-BR') : '—';
-        var cadastroStr = a.activated_at ? new Date(a.activated_at).toLocaleDateString('pt-BR') : '—';
-        var nomeDisplay = a.nome || '<span style="color:var(--text-lighter)">—</span>';
+        var nomeDisplay = a.nome || '<span style="color:var(--text-lighter);font-style:italic">Sem nome</span>';
+
+        // Admin badge
+        var perfilBadge = '';
+        if (a.is_admin) perfilBadge = '<span class="badge badge-admin">Admin</span>';
 
         var isActive = (status === 'active');
         var toggleLabel = isActive ? 'Desativar' : 'Ativar';
         var toggleStatus = isActive ? 'inactive' : 'active';
 
+        // Escape email for onclick
+        var safeEmail = a.email.replace(/'/g, "\\'");
+
+        // Action buttons
+        var actions = '<button onclick="toggleAluno(\'' + safeEmail + '\',\'' + toggleStatus + '\')">' + toggleLabel + '</button>'
+          + '<button class="btn-resend" onclick="reenviarAcesso(\'' + safeEmail + '\', this)" title="Reenviar e-mail de acesso">&#9993; Reenviar</button>';
+
+        // Admin toggle — only master admin can promote/demote, and not yourself
+        if (_isMasterAdmin && a.email !== MASTER_ADMIN) {
+          if (a.is_admin) {
+            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', false)">Remover Admin</button>';
+          } else {
+            actions += '<button class="btn-admin" onclick="toggleAdmin(\'' + safeEmail + '\', true)">Tornar Admin</button>';
+          }
+        }
+
+        actions += '<button class="btn-danger" onclick="excluirAluno(\'' + safeEmail + '\')">Excluir</button>';
+
         html += '<tr>'
           + '<td style="font-weight:600;color:var(--secondary)">' + nomeDisplay + '</td>'
           + '<td>' + a.email + '</td>'
           + '<td><span class="badge ' + badgeClass + '">' + badgeText + '</span></td>'
+          + '<td>' + perfilBadge + '</td>'
           + '<td>' + validadeStr + '</td>'
-          + '<td>' + cadastroStr + '</td>'
-          + '<td class="actions-cell">'
-          + '<button onclick="toggleAluno(\'' + a.email + '\',\'' + toggleStatus + '\')">' + toggleLabel + '</button>'
-          + '<button class="btn-danger" onclick="excluirAluno(\'' + a.email + '\')">Excluir</button>'
-          + '</td></tr>';
+          + '<td class="actions-cell">' + actions + '</td>'
+          + '</tr>';
       });
 
       html += '</tbody></table>';
@@ -699,10 +763,82 @@
       try {
         var { error } = await _sb.from('usuarios_autorizados').delete().eq('email', email);
         if (error) throw error;
+        showToast('Aluno removido.', 'success');
         carregarAlunos();
       } catch (e) {
-        alert('Erro ao excluir: ' + e.message);
+        showToast('Erro ao excluir: ' + e.message, 'error');
       }
+    }
+
+    // =============================================
+    //  REENVIAR ACESSO
+    // =============================================
+    async function reenviarAcesso(email, btnEl) {
+      if (btnEl) { btnEl.disabled = true; btnEl.textContent = 'Enviando...'; }
+
+      try {
+        var response = await fetch('/api/resend-access', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': PROVISIONING_KEY },
+          body: JSON.stringify({ email: email })
+        });
+
+        var result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Erro');
+
+        if (result.email_sent) {
+          showToast('E-mail de acesso reenviado para ' + email, 'success');
+        } else {
+          showToast('Senha redefinida, mas e-mail falhou. Senha: ' + (result.senha || '—'), 'info');
+        }
+      } catch (e) {
+        showToast('Erro: ' + e.message, 'error');
+      } finally {
+        if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '&#9993; Reenviar'; }
+      }
+    }
+
+    // =============================================
+    //  ADMIN TOGGLE (master only)
+    // =============================================
+    async function toggleAdmin(email, promover) {
+      var acao = promover ? 'promover' : 'remover admin de';
+      if (!confirm('Deseja ' + acao + ' ' + email + '?')) return;
+
+      try {
+        var { error } = await _sb.from('usuarios_autorizados')
+          .update({ is_admin: promover })
+          .eq('email', email);
+
+        if (error) throw error;
+        showToast(promover ? email + ' agora e admin.' : 'Admin removido de ' + email, 'success');
+        carregarAlunos();
+      } catch (e) {
+        showToast('Erro: ' + e.message, 'error');
+      }
+    }
+
+    // =============================================
+    //  TOAST
+    // =============================================
+    function showToast(msg, type) {
+      var existing = document.getElementById('adminToast');
+      if (existing) existing.remove();
+
+      var toast = document.createElement('div');
+      toast.id = 'adminToast';
+      toast.className = 'toast toast-' + (type || 'info');
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() { toast.classList.add('show'); });
+      });
+
+      setTimeout(function() {
+        toast.classList.remove('show');
+        setTimeout(function() { toast.remove(); }, 300);
+      }, 4000);
     }
   </script>
 </body>
