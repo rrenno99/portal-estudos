@@ -1346,6 +1346,22 @@
       font-weight: 600;
       margin-top: 2px;
     }
+    .link-saved-badge:hover { color: var(--primary); }
+    .link-add-btn {
+      display: inline-block;
+      font-size: 0.68rem;
+      color: var(--text-lighter);
+      font-weight: 500;
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-top: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .link-add-btn:hover { color: var(--primary); border-color: var(--primary); background: rgba(30,136,229,0.04); }
 
     /* Avatar with photo */
     .user-avatar img {
@@ -2183,15 +2199,11 @@
   <!-- MODAL: Editar Aula -->
   <div class="link-modal-overlay" id="editAulaOverlay" onclick="if(event.target===this)fecharEditAula()">
     <div class="link-modal">
-      <h3>Editar aula</h3>
-      <p class="modal-subtitle">Renomeie a aula e cole o link do material que sera aberto ao iniciar</p>
+      <h3>Renomear aula</h3>
+      <p class="modal-subtitle">O link do material e definido no nivel da materia, nao por aula.</p>
       <div class="form-group">
         <label for="editAulaTitulo">Titulo da aula</label>
         <input type="text" class="form-control" id="editAulaTitulo" placeholder="Ex: Principios constitucionais">
-      </div>
-      <div class="form-group">
-        <label for="editAulaLink">Link do material</label>
-        <input type="url" class="form-control" id="editAulaLink" placeholder="https://... (opcional)">
       </div>
       <input type="hidden" id="editAulaMateria">
       <input type="hidden" id="editAulaNumero">
@@ -2709,13 +2721,17 @@
 
         const btnLabel = isAtual ? 'Estudar Agora' : 'Iniciar Estudos';
 
+        var linkBadge = hasLink
+          ? '<span class="link-saved-badge" onclick="event.stopPropagation(); abrirLinkModal(\'' + escapedName + '\')" title="Clique para editar o link" style="cursor:pointer">✓ ' + (linkData.titulo || 'Link salvo') + ' <span style="opacity:0.6;font-size:0.7em">✎</span></span>'
+          : '<button class="link-add-btn" onclick="event.stopPropagation(); abrirLinkModal(\'' + escapedName + '\')" title="Cadastrar link do material">+ Link do material</button>';
+
         item.innerHTML = `
           <span class="subject-expand-icon" onclick="toggleExpandSubject(this.closest('.subject-item'))">▶</span>
           <div class="subject-color" style="background:${color.bg}"></div>
           <div class="subject-info" onclick="toggleExpandSubject(this.closest('.subject-item'))">
             <strong>${nome}${queueLabel}</strong>
             <span>${statusText}</span>
-            ${hasLink ? '<span class="link-saved-badge">✓ ' + (linkData.titulo || 'Link salvo') + '</span>' : ''}
+            ${linkBadge}
           </div>
           <div class="subject-progress">
             <span>${pct}%</span>
@@ -2902,7 +2918,6 @@
       document.getElementById('editAulaMateria').value = materia;
       document.getElementById('editAulaNumero').value = numero;
       document.getElementById('editAulaTitulo').value = aula.titulo || ('Aula ' + numero);
-      document.getElementById('editAulaLink').value = aula.material_link || '';
       document.getElementById('btnSalvarEditAula').disabled = false;
       document.getElementById('btnSalvarEditAula').textContent = 'Salvar';
       document.getElementById('editAulaOverlay').classList.add('show');
@@ -2917,7 +2932,6 @@
       var materia = document.getElementById('editAulaMateria').value;
       var numero = parseInt(document.getElementById('editAulaNumero').value, 10);
       var novoTitulo = document.getElementById('editAulaTitulo').value.trim() || ('Aula ' + numero);
-      var novoLink = document.getElementById('editAulaLink').value.trim();
       var btn = document.getElementById('btnSalvarEditAula');
 
       var aulas = getAulasMateria(materia);
@@ -2927,17 +2941,14 @@
       btn.disabled = true;
       btn.textContent = 'Salvando...';
 
-      // Update cache immediately
       aula.titulo = novoTitulo;
-      aula.material_link = novoLink || null;
       renderSubjectsList();
 
-      // Persist to Supabase
       try {
         var sb = window._supabase;
         if (sb && window._userId) {
           var { error } = await sb.from('aulas_materia')
-            .update({ titulo: novoTitulo, material_link: novoLink || null })
+            .update({ titulo: novoTitulo })
             .eq('user_id', window._userId)
             .eq('materia', materia)
             .eq('numero', numero);
@@ -2953,22 +2964,36 @@
     }
 
     // =============================================
-    //  INICIAR AULA (play button: timer + link)
+    //  INICIAR AULA (play button: timer + link da materia)
     // =============================================
     function iniciarAula(materia, numero) {
-      var aulas = getAulasMateria(materia);
-      var aula = aulas.find(function(a) { return a.numero === numero; });
-      if (!aula) return;
+      var links = getLinksStorage();
+      var linkData = links[materia];
 
-      // Open material_link in new tab (if set)
-      if (aula.material_link) {
-        window.open(aula.material_link, '_blank');
+      if (linkData && linkData.url) {
+        window.open(linkData.url, '_blank');
       } else {
-        showDashToast('Nenhum link de material cadastrado para esta aula');
+        showDashToast('Nenhum link de material cadastrado para ' + materia);
       }
 
-      // Start Pomodoro timer (reuses existing flow)
-      iniciarEstudos(materia);
+      // Start Pomodoro (iniciarEstudos also opens the link — we suppress the double-open
+      // by temporarily routing through the same flow; since iniciarEstudos reads the same
+      // links table, calling it directly would open the link twice. Inline the timer open.)
+      abrirTimerParaMateria(materia);
+    }
+
+    // Helper: opens the timer window (same behavior as iniciarEstudos, minus link open)
+    function abrirTimerParaMateria(materia) {
+      var w = 420, h = 560;
+      var left = window.screenX + window.outerWidth - w - 40;
+      var top = window.screenY + 60;
+      var features = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top;
+      features += ',resizable=yes,scrollbars=no,menubar=no,toolbar=no,location=no,status=no';
+
+      if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
+      _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
+
+      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia);
     }
 
     // =============================================
@@ -4282,13 +4307,18 @@
     }
 
     function abrirLinkModal(materia) {
+      var links = getLinksStorage();
+      var existing = links[materia] || {};
+      var isEdit = !!existing.url;
+
       document.getElementById('linkMateriaHidden').value = materia;
-      document.getElementById('linkModalTitle').textContent = 'Cadastrar link — ' + materia;
-      document.getElementById('linkModalSubtitle').textContent = 'Cole o link do seu material (Estratégia, Gran, etc.) para ' + materia;
-      document.getElementById('linkUrlInput').value = '';
-      document.getElementById('linkTituloInput').value = '';
+      document.getElementById('linkModalTitle').textContent = (isEdit ? 'Editar link — ' : 'Cadastrar link — ') + materia;
+      document.getElementById('linkModalSubtitle').textContent = 'Cole o link do material (Estratégia, Gran, etc.) que será aberto ao iniciar qualquer aula de ' + materia + '.';
+      document.getElementById('linkUrlInput').value = existing.url || '';
+      document.getElementById('linkTituloInput').value = existing.titulo || '';
+      document.getElementById('btnSalvarLink').textContent = isEdit ? 'Salvar alterações' : 'Salvar e abrir';
       document.getElementById('linkModalOverlay').classList.add('show');
-      setTimeout(() => document.getElementById('linkUrlInput').focus(), 100);
+      setTimeout(function() { document.getElementById('linkUrlInput').focus(); }, 100);
     }
 
     function fecharLinkModal() {
@@ -4302,12 +4332,16 @@
       if (!url) { document.getElementById('linkUrlInput').focus(); return; }
 
       const links = getLinksStorage();
+      const wasEdit = !!(links[materia] && links[materia].url);
       links[materia] = { url, titulo: titulo || materia };
       saveLinksStorage(links);
       salvarLinkSupabase(materia, url, titulo);
       renderSubjectsList();
       fecharLinkModal();
-      window.open(url, '_blank');
+
+      // Only auto-open on first save, not on edits
+      if (!wasEdit) window.open(url, '_blank');
+      else showDashToast('Link atualizado. Todas as aulas de ' + materia + ' agora abrem este link.');
     }
 
     document.addEventListener('keydown', (e) => {
