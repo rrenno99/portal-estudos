@@ -215,6 +215,94 @@
     }
     .modal select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(30,136,229,0.1); }
 
+    /* --- Plan Editor (review & edit before publish) --- */
+    .plan-editor { margin-top: 16px; }
+    .plan-editor-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; padding: 14px 16px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 16px;
+    }
+    .plan-editor-header h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--secondary); }
+    .plan-editor-header .meta { font-size: 0.72rem; color: var(--text-lighter); }
+
+    .materia-card {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 14px 16px; margin-bottom: 12px; background: var(--bg-card);
+    }
+    .materia-card-head {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    }
+    .materia-nome-input {
+      flex: 1; padding: 7px 10px; font-size: 0.88rem; font-weight: 600;
+      border: 1px solid var(--border); border-radius: 4px; font-family: inherit;
+      color: var(--secondary); background: var(--bg-card);
+    }
+    .materia-nome-input:focus { outline: none; border-color: var(--primary); }
+
+    .materia-meta-row {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+      margin-bottom: 12px; font-size: 0.78rem;
+    }
+    .materia-meta-row label {
+      display: inline-flex; align-items: center; gap: 6px; color: var(--text-light); font-weight: 500;
+    }
+    .materia-meta-row input {
+      padding: 5px 8px; font-size: 0.78rem; border: 1px solid var(--border);
+      border-radius: 4px; font-family: inherit; background: var(--bg-card);
+    }
+    .materia-meta-row input:focus { outline: none; border-color: var(--primary); }
+    .materia-meta-row .peso-input { width: 56px; }
+    .materia-meta-row .link-input { width: 100%; }
+    .aulas-count { color: var(--text-lighter); font-size: 0.72rem; }
+
+    .aulas-section {
+      border-top: 1px solid var(--border); padding-top: 10px; margin-top: 6px;
+    }
+    .aulas-section-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-lighter); font-weight: 600; margin-bottom: 6px;
+    }
+    .aula-edit-row {
+      display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    }
+    .aula-edit-num {
+      font-size: 0.72rem; color: var(--text-lighter); width: 22px; text-align: right;
+    }
+    .aula-edit-input {
+      flex: 1; padding: 5px 9px; font-size: 0.8rem;
+      border: 1px solid var(--border); border-radius: 4px; font-family: inherit;
+      background: var(--bg-card);
+    }
+    .aula-edit-input:focus { outline: none; border-color: var(--primary); }
+
+    .icon-btn-remove {
+      background: none; border: 1px solid transparent; border-radius: 4px;
+      font-size: 0.85rem; color: var(--text-lighter); cursor: pointer;
+      width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; padding: 0; font-family: inherit;
+    }
+    .icon-btn-remove:hover { color: #C53030; border-color: #FED7D7; background: #FFF5F5; }
+
+    .btn-add-line {
+      font-size: 0.75rem; color: var(--primary); background: none;
+      border: 1px dashed var(--border); border-radius: 4px; padding: 5px 12px;
+      cursor: pointer; margin-top: 6px; font-family: inherit; transition: all 0.15s;
+    }
+    .btn-add-line:hover { border-color: var(--primary); background: rgba(30,136,229,0.04); }
+
+    .btn-add-materia {
+      display: block; width: 100%; padding: 10px;
+      border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--primary); font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all 0.15s; margin-top: 8px;
+    }
+    .btn-add-materia:hover { border-color: var(--primary); background: rgba(30,136,229,0.04); }
+
+    .editor-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+    }
+
     @media (max-width: 768px) {
       .admin-page { padding: 16px 12px; }
       .kpi-grid { grid-template-columns: 1fr; gap: 10px; }
@@ -250,21 +338,27 @@
       </div>
       <input type="file" id="mdFileInput" accept=".md,.markdown,.txt" style="display:none" onchange="handleMdUpload(this)">
 
-      <!-- Preview -->
+      <!-- Preview & Edit -->
       <div id="previewArea" style="display:none">
-        <div class="preview-box">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <strong id="previewTitulo" style="font-size:0.95rem;color:var(--secondary)">—</strong>
-            <span id="previewMeta" style="font-size:0.75rem;color:var(--text-lighter)"></span>
+        <div class="plan-editor">
+          <div class="plan-editor-header">
+            <div>
+              <h3 id="previewTitulo">—</h3>
+              <div class="meta" id="previewMeta"></div>
+            </div>
+            <div class="meta" style="text-align:right;white-space:nowrap">
+              Revise e edite antes de publicar
+            </div>
           </div>
-          <table>
-            <thead><tr><th>Materia</th><th>Questoes</th><th>Peso</th><th>Pontos</th><th>Topicos</th></tr></thead>
-            <tbody id="previewTable"></tbody>
-          </table>
-        </div>
-        <div style="margin-top:16px;display:flex;gap:8px">
-          <button class="btn btn-primary" onclick="salvarPlano()" id="btnSalvar">🚀 Publicar Plano para os Alunos</button>
-          <button class="btn btn-ghost" onclick="limparUpload()">Cancelar</button>
+
+          <div id="editorMaterias"></div>
+
+          <button class="btn-add-materia" onclick="addMateria()">+ Adicionar Materia</button>
+
+          <div class="editor-actions">
+            <button class="btn btn-ghost" onclick="limparUpload()">Cancelar</button>
+            <button class="btn btn-primary" onclick="salvarPlano()" id="btnSalvar">✓ Confirmar e Publicar Plano</button>
+          </div>
         </div>
       </div>
 
@@ -491,39 +585,176 @@
       if (_parsedPlan.trilha) metaParts.push('Trilha: ' + _parsedPlan.trilha);
       document.getElementById('previewMeta').innerHTML = metaParts.join(' · ');
 
-      // Build table
-      var tbody = document.getElementById('previewTable');
-      tbody.innerHTML = _parsedPlan.materias.map(function(m) {
-        var topicsShort = Array.isArray(m.topicos) ? m.topicos.slice(0, 3).join(', ') : (m.topicos || '—');
-        if (topicsShort.length > 60) topicsShort = topicsShort.substring(0, 57) + '...';
-        var pctLabel = m.relevancia ? ' (' + m.relevancia + '%)' : '';
-        return '<tr>'
-          + '<td style="font-weight:600;color:var(--secondary)">' + m.nome + '</td>'
-          + '<td>' + (m.questoes || '—') + '</td>'
-          + '<td>' + (m.peso || '—') + '</td>'
-          + '<td style="font-weight:700;color:var(--primary)">' + (m.pontos || '—') + pctLabel + '</td>'
-          + '<td style="font-size:0.75rem;color:var(--text-light)">' + topicsShort + '</td>'
-          + '</tr>';
+      // Normalize materias: ensure topicos is array, add material_link field
+      _parsedPlan.materias.forEach(function(m) {
+        if (!Array.isArray(m.topicos)) {
+          m.topicos = m.topicos ? String(m.topicos).split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+        }
+        if (typeof m.material_link === 'undefined') m.material_link = '';
+      });
+
+      renderEditor();
+      document.getElementById('previewArea').style.display = '';
+    }
+
+    // =============================================
+    //  PLAN EDITOR
+    // =============================================
+    function renderEditor() {
+      var container = document.getElementById('editorMaterias');
+      if (!_parsedPlan || !Array.isArray(_parsedPlan.materias)) { container.innerHTML = ''; return; }
+
+      container.innerHTML = _parsedPlan.materias.map(function(m, idx) {
+        var aulas = Array.isArray(m.topicos) ? m.topicos : [];
+        var aulasHtml = aulas.map(function(titulo, aidx) {
+          var safe = String(titulo || '').replace(/"/g, '&quot;');
+          return '<div class="aula-edit-row">'
+            + '<span class="aula-edit-num">' + (aidx + 1) + '.</span>'
+            + '<input class="aula-edit-input" type="text" value="' + safe + '" '
+            + 'oninput="updateAula(' + idx + ',' + aidx + ', this.value)" placeholder="Nome da aula">'
+            + '<button class="icon-btn-remove" onclick="removeAula(' + idx + ',' + aidx + ')" title="Remover aula">&times;</button>'
+            + '</div>';
+        }).join('');
+
+        var safeNome = String(m.nome || '').replace(/"/g, '&quot;');
+        var safeLink = String(m.material_link || '').replace(/"/g, '&quot;');
+
+        return '<div class="materia-card" data-midx="' + idx + '">'
+          + '<div class="materia-card-head">'
+          +   '<input class="materia-nome-input" type="text" value="' + safeNome + '" '
+          +   'oninput="updateMateria(' + idx + ', \'nome\', this.value)" placeholder="Nome da materia">'
+          +   '<button class="icon-btn-remove" onclick="removeMateria(' + idx + ')" title="Remover materia">&#128465;</button>'
+          + '</div>'
+          + '<div class="materia-meta-row">'
+          +   '<label>Peso: <input class="peso-input" type="number" min="0" step="0.5" value="' + (m.peso || 1) + '" '
+          +   'oninput="updateMateria(' + idx + ', \'peso\', parseFloat(this.value) || 0)"></label>'
+          +   '<label style="display:flex;gap:6px;align-items:center">Link do material: <input class="link-input" type="url" value="' + safeLink + '" '
+          +   'oninput="updateMateria(' + idx + ', \'material_link\', this.value)" placeholder="https://... (opcional)"></label>'
+          +   '<span class="aulas-count">' + aulas.length + ' aula' + (aulas.length === 1 ? '' : 's') + '</span>'
+          + '</div>'
+          + '<div class="aulas-section">'
+          +   '<div class="aulas-section-label">Aulas</div>'
+          +   (aulasHtml || '<div style="font-size:0.75rem;color:var(--text-lighter);padding:4px 0">Nenhuma aula. Adicione abaixo.</div>')
+          +   '<button class="btn-add-line" onclick="addAula(' + idx + ')">+ Adicionar aula</button>'
+          + '</div>'
+          + '</div>';
       }).join('');
 
-      document.getElementById('previewArea').style.display = '';
+      // Update materias count in header meta
+      var meta = document.getElementById('previewMeta');
+      if (meta) {
+        var parts = [_parsedPlan.materias.length + ' materias'];
+        if (_parsedPlan.banca) parts.push('Banca: ' + _parsedPlan.banca);
+        if (_parsedPlan.dataProva) parts.push('Prova: ' + new Date(_parsedPlan.dataProva + 'T00:00:00').toLocaleDateString('pt-BR'));
+        meta.textContent = parts.join(' · ');
+      }
+    }
+
+    function updateMateria(idx, field, value) {
+      if (!_parsedPlan.materias[idx]) return;
+      _parsedPlan.materias[idx][field] = value;
+      // For fields affecting header (peso doesn't), no re-render needed — keeps focus
+    }
+
+    function updateAula(midx, aidx, value) {
+      var m = _parsedPlan.materias[midx];
+      if (!m || !Array.isArray(m.topicos)) return;
+      m.topicos[aidx] = value;
+    }
+
+    function addMateria() {
+      if (!_parsedPlan) _parsedPlan = { materias: [] };
+      if (!_parsedPlan.materias) _parsedPlan.materias = [];
+      _parsedPlan.materias.push({
+        nome: 'Nova materia',
+        peso: 1,
+        questoes: 0,
+        pontos: 0,
+        relevancia: 0,
+        topicos: [],
+        material_link: ''
+      });
+      renderEditor();
+      // Focus the new materia name input
+      setTimeout(function() {
+        var cards = document.querySelectorAll('.materia-card');
+        var last = cards[cards.length - 1];
+        if (last) {
+          var inp = last.querySelector('.materia-nome-input');
+          if (inp) { inp.focus(); inp.select(); }
+        }
+      }, 10);
+    }
+
+    function removeMateria(idx) {
+      var m = _parsedPlan.materias[idx];
+      if (!m) return;
+      if (!confirm('Remover a materia "' + (m.nome || 'sem nome') + '" e suas ' + (m.topicos || []).length + ' aulas?')) return;
+      _parsedPlan.materias.splice(idx, 1);
+      renderEditor();
+    }
+
+    function addAula(midx) {
+      var m = _parsedPlan.materias[midx];
+      if (!m) return;
+      if (!Array.isArray(m.topicos)) m.topicos = [];
+      m.topicos.push('Aula ' + (m.topicos.length + 1));
+      renderEditor();
+      // Focus the new aula input
+      setTimeout(function() {
+        var card = document.querySelector('.materia-card[data-midx="' + midx + '"]');
+        if (card) {
+          var inputs = card.querySelectorAll('.aula-edit-input');
+          var last = inputs[inputs.length - 1];
+          if (last) { last.focus(); last.select(); }
+        }
+      }, 10);
+    }
+
+    function removeAula(midx, aidx) {
+      var m = _parsedPlan.materias[midx];
+      if (!m || !Array.isArray(m.topicos)) return;
+      m.topicos.splice(aidx, 1);
+      renderEditor();
     }
 
     async function salvarPlano() {
       if (!_parsedPlan || !_sb) return;
       var btn = document.getElementById('btnSalvar');
+
+      // Validation
+      if (!_parsedPlan.materias || _parsedPlan.materias.length === 0) {
+        showStatus('Adicione pelo menos uma materia antes de publicar.', 'error');
+        return;
+      }
+      var materiaSemNome = _parsedPlan.materias.find(function(m) { return !m.nome || !m.nome.trim(); });
+      if (materiaSemNome) {
+        showStatus('Todas as materias precisam de um nome.', 'error');
+        return;
+      }
+      var nomes = _parsedPlan.materias.map(function(m) { return m.nome.trim().toLowerCase(); });
+      var dup = nomes.find(function(n, i) { return nomes.indexOf(n) !== i; });
+      if (dup) {
+        showStatus('Existem materias com o mesmo nome: "' + dup + '". Os nomes devem ser unicos.', 'error');
+        return;
+      }
+
       btn.disabled = true;
       btn.textContent = '⏳ Salvando...';
 
       try {
         var materiasJson = _parsedPlan.materias.map(function(m) {
+          var topicos = Array.isArray(m.topicos)
+            ? m.topicos.map(function(t) { return String(t || '').trim(); }).filter(Boolean)
+            : [];
           return {
-            nome: m.nome,
+            nome: m.nome.trim(),
             questoes: m.questoes || 0,
             peso: m.peso || 1,
             pontos: m.pontos || 0,
             relevancia: m.relevancia || 0,
-            topicos: Array.isArray(m.topicos) ? m.topicos : (m.topicos ? m.topicos.split(', ') : [])
+            topicos: topicos,
+            material_link: (m.material_link || '').trim() || null
           };
         });
 
@@ -540,13 +771,14 @@
 
         if (error) throw error;
 
-        var successMsg = '✅ Plano "' + _parsedPlan.concurso + '" processado e disponivel para os alunos!';
+        var totalAulas = materiasJson.reduce(function(acc, m) { return acc + m.topicos.length; }, 0);
+        var successMsg = '✅ Plano "' + (_parsedPlan.concurso || 'Sem nome') + '" publicado para os alunos!';
         if (_parsedPlan.dataProva) {
           var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
           var dias = Math.ceil((dataObj - new Date().setHours(0,0,0,0)) / 86400000);
           successMsg += '\n📅 Data da prova: ' + dataObj.toLocaleDateString('pt-BR') + ' (' + dias + ' dias)';
         }
-        successMsg += '\n📚 ' + materiasJson.length + ' materias | ' + _parsedPlan.totalPontos + ' pontos totais';
+        successMsg += '\n📚 ' + materiasJson.length + ' materias · ' + totalAulas + ' aulas';
         showStatus(successMsg, 'success');
         limparUpload();
         carregarPlanosExistentes();
@@ -554,7 +786,7 @@
       } catch (e) {
         showStatus('Erro ao salvar: ' + e.message, 'error');
         btn.disabled = false;
-        btn.textContent = '🚀 Publicar Plano para os Alunos';
+        btn.textContent = '✓ Confirmar e Publicar Plano';
       }
     }
 
@@ -564,8 +796,11 @@
       document.getElementById('dropzone').classList.remove('has-file');
       document.getElementById('dropzoneFilename').style.display = 'none';
       document.getElementById('mdFileInput').value = '';
-      document.getElementById('btnSalvar').disabled = false;
-      document.getElementById('btnSalvar').textContent = '🚀 Publicar Plano para os Alunos';
+      var btn = document.getElementById('btnSalvar');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '✓ Confirmar e Publicar Plano';
+      }
     }
 
     async function carregarPlanosExistentes() {
