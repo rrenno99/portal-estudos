@@ -218,12 +218,32 @@
     /* --- Plan Editor (review & edit before publish) --- */
     .plan-editor { margin-top: 16px; }
     .plan-editor-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 12px; padding: 14px 16px; background: var(--bg);
+      padding: 16px; background: var(--bg);
       border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 16px;
     }
-    .plan-editor-header h3 { margin: 0 0 4px; font-size: 0.95rem; color: var(--secondary); }
-    .plan-editor-header .meta { font-size: 0.72rem; color: var(--text-lighter); }
+    .plan-editor-header .editor-mode-badge {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--primary);
+      background: rgba(30,136,229,0.1); padding: 3px 8px; border-radius: 4px;
+      display: inline-block; margin-bottom: 10px;
+    }
+    .plan-editor-header .editor-mode-badge.edit { color: #C05621; background: rgba(236,178,23,0.1); }
+    .header-grid {
+      display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 10px;
+    }
+    .header-grid label {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-light);
+      text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;
+    }
+    .header-grid input {
+      width: 100%; padding: 7px 10px; font-size: 0.85rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      font-family: inherit; background: var(--bg-card); box-sizing: border-box;
+    }
+    .header-grid input:focus { outline: none; border-color: var(--primary); }
+    @media (max-width: 640px) {
+      .header-grid { grid-template-columns: 1fr 1fr; }
+    }
 
     .materia-card {
       border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -342,13 +362,30 @@
       <div id="previewArea" style="display:none">
         <div class="plan-editor">
           <div class="plan-editor-header">
-            <div>
-              <h3 id="previewTitulo">—</h3>
-              <div class="meta" id="previewMeta"></div>
+            <div class="editor-mode-badge" id="editorModeBadge">Revise e edite antes de publicar</div>
+            <div class="header-grid">
+              <div>
+                <label for="editConcurso">Concurso</label>
+                <input id="editConcurso" type="text" placeholder="Ex: TCU 2026"
+                  oninput="updateHeader('concurso', this.value)">
+              </div>
+              <div>
+                <label for="editCargo">Cargo</label>
+                <input id="editCargo" type="text" placeholder="Ex: Auditor"
+                  oninput="updateHeader('cargo', this.value)">
+              </div>
+              <div>
+                <label for="editBanca">Banca</label>
+                <input id="editBanca" type="text" placeholder="Ex: CEBRASPE"
+                  oninput="updateHeader('banca', this.value)">
+              </div>
+              <div>
+                <label for="editDataProva">Data da prova</label>
+                <input id="editDataProva" type="date"
+                  oninput="updateHeader('dataProva', this.value)">
+              </div>
             </div>
-            <div class="meta" style="text-align:right;white-space:nowrap">
-              Revise e edite antes de publicar
-            </div>
+            <div class="meta" id="previewMeta" style="font-size:0.72rem;color:var(--text-lighter);margin-top:10px"></div>
           </div>
 
           <div id="editorMaterias"></div>
@@ -474,6 +511,8 @@
     var _userEmail = null;
     var _isMasterAdmin = false;
     var _parsedPlan = null;
+    var _editingPlanId = null; // null = new (from .md upload), string = editing existing
+    var _planosCache = [];
 
     // Init
     (async function() {
@@ -563,28 +602,6 @@
         return;
       }
 
-      // Build preview header
-      var titulo = _parsedPlan.concurso || 'Sem nome';
-      if (_parsedPlan.cargo) titulo += ' — ' + _parsedPlan.cargo;
-      document.getElementById('previewTitulo').textContent = titulo;
-
-      var metaParts = [_parsedPlan.materias.length + ' materias'];
-      if (_parsedPlan.banca) metaParts.push('Banca: ' + _parsedPlan.banca);
-
-      // Data da prova with countdown
-      if (_parsedPlan.dataProva) {
-        var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
-        var hoje = new Date(); hoje.setHours(0,0,0,0);
-        var diasRestantes = Math.ceil((dataObj - hoje) / (1000*60*60*24));
-        var dataFormatada = dataObj.toLocaleDateString('pt-BR');
-        metaParts.push('Prova: ' + dataFormatada + ' (' + diasRestantes + ' dias)');
-      } else {
-        metaParts.push('⚠ SEM DATA DA PROVA');
-      }
-
-      if (_parsedPlan.trilha) metaParts.push('Trilha: ' + _parsedPlan.trilha);
-      document.getElementById('previewMeta').innerHTML = metaParts.join(' · ');
-
       // Normalize materias: ensure topicos is array, add material_link field
       _parsedPlan.materias.forEach(function(m) {
         if (!Array.isArray(m.topicos)) {
@@ -593,8 +610,62 @@
         if (typeof m.material_link === 'undefined') m.material_link = '';
       });
 
+      // Fresh upload → not editing
+      _editingPlanId = null;
+      fillEditorHeader();
       renderEditor();
+      setEditorMode(false);
       document.getElementById('previewArea').style.display = '';
+    }
+
+    // =============================================
+    //  EDITOR HEADER HELPERS
+    // =============================================
+    function updateHeader(field, value) {
+      if (!_parsedPlan) return;
+      _parsedPlan[field] = value;
+      refreshMeta();
+    }
+
+    function refreshMeta() {
+      var meta = document.getElementById('previewMeta');
+      if (!meta || !_parsedPlan) return;
+      var parts = [];
+      if (_parsedPlan.materias) parts.push(_parsedPlan.materias.length + ' materias');
+      if (_parsedPlan.banca) parts.push('Banca: ' + _parsedPlan.banca);
+      if (_parsedPlan.dataProva) {
+        var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
+        if (!isNaN(dataObj)) {
+          var hoje = new Date(); hoje.setHours(0,0,0,0);
+          var dias = Math.ceil((dataObj - hoje) / 86400000);
+          parts.push('Prova: ' + dataObj.toLocaleDateString('pt-BR') + ' (' + dias + ' dias)');
+        }
+      }
+      if (_parsedPlan.trilha) parts.push('Trilha: ' + _parsedPlan.trilha);
+      meta.textContent = parts.join(' · ');
+    }
+
+    function fillEditorHeader() {
+      if (!_parsedPlan) return;
+      document.getElementById('editConcurso').value = _parsedPlan.concurso || '';
+      document.getElementById('editCargo').value = _parsedPlan.cargo || '';
+      document.getElementById('editBanca').value = _parsedPlan.banca || '';
+      document.getElementById('editDataProva').value = _parsedPlan.dataProva || '';
+      refreshMeta();
+    }
+
+    function setEditorMode(isEditing) {
+      var badge = document.getElementById('editorModeBadge');
+      var btn = document.getElementById('btnSalvar');
+      if (isEditing) {
+        badge.textContent = '✎ Editando plano publicado';
+        badge.classList.add('edit');
+        if (btn) btn.textContent = '💾 Salvar Alteracoes';
+      } else {
+        badge.textContent = 'Revise e edite antes de publicar';
+        badge.classList.remove('edit');
+        if (btn) btn.textContent = '✓ Confirmar e Publicar Plano';
+      }
     }
 
     // =============================================
@@ -640,14 +711,7 @@
           + '</div>';
       }).join('');
 
-      // Update materias count in header meta
-      var meta = document.getElementById('previewMeta');
-      if (meta) {
-        var parts = [_parsedPlan.materias.length + ' materias'];
-        if (_parsedPlan.banca) parts.push('Banca: ' + _parsedPlan.banca);
-        if (_parsedPlan.dataProva) parts.push('Prova: ' + new Date(_parsedPlan.dataProva + 'T00:00:00').toLocaleDateString('pt-BR'));
-        meta.textContent = parts.join(' · ');
-      }
+      refreshMeta();
     }
 
     function updateMateria(idx, field, value) {
@@ -758,21 +822,36 @@
           };
         });
 
-        var { error } = await _sb.from('planos_mestres').upsert({
-          concurso_nome: _parsedPlan.concurso || 'Sem nome',
-          cargo: _parsedPlan.cargo || null,
-          banca: _parsedPlan.banca || null,
+        var payload = {
+          concurso_nome: (_parsedPlan.concurso || 'Sem nome').trim(),
+          cargo: (_parsedPlan.cargo || '').trim() || null,
+          banca: (_parsedPlan.banca || '').trim() || null,
           data_prova: _parsedPlan.dataProva || null,
           materias: materiasJson,
-          trilha_sugerida: _parsedPlan.trilha || 'consistente',
-          ativo: true,
-          criado_por: _userId
-        }, { onConflict: 'concurso_nome' });
+          trilha_sugerida: _parsedPlan.trilha || 'consistente'
+        };
+
+        var error;
+        if (_editingPlanId) {
+          // Update by ID: allows renaming concurso_nome without losing identity
+          var res = await _sb.from('planos_mestres')
+            .update(payload)
+            .eq('id', _editingPlanId);
+          error = res.error;
+        } else {
+          // New plan from upload: upsert on concurso_nome for idempotent re-upload
+          payload.ativo = true;
+          payload.criado_por = _userId;
+          var res = await _sb.from('planos_mestres')
+            .upsert(payload, { onConflict: 'concurso_nome' });
+          error = res.error;
+        }
 
         if (error) throw error;
 
         var totalAulas = materiasJson.reduce(function(acc, m) { return acc + m.topicos.length; }, 0);
-        var successMsg = '✅ Plano "' + (_parsedPlan.concurso || 'Sem nome') + '" publicado para os alunos!';
+        var verb = _editingPlanId ? 'atualizado' : 'publicado';
+        var successMsg = '✅ Plano "' + payload.concurso_nome + '" ' + verb + ' com sucesso!';
         if (_parsedPlan.dataProva) {
           var dataObj = new Date(_parsedPlan.dataProva + 'T00:00:00');
           var dias = Math.ceil((dataObj - new Date().setHours(0,0,0,0)) / 86400000);
@@ -792,15 +871,19 @@
 
     function limparUpload() {
       _parsedPlan = null;
+      _editingPlanId = null;
       document.getElementById('previewArea').style.display = 'none';
       document.getElementById('dropzone').classList.remove('has-file');
       document.getElementById('dropzoneFilename').style.display = 'none';
       document.getElementById('mdFileInput').value = '';
+      // Clear header inputs
+      ['editConcurso', 'editCargo', 'editBanca', 'editDataProva'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
       var btn = document.getElementById('btnSalvar');
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = '✓ Confirmar e Publicar Plano';
-      }
+      if (btn) btn.disabled = false;
+      setEditorMode(false);
     }
 
     async function carregarPlanosExistentes() {
@@ -814,18 +897,26 @@
           return;
         }
 
+        // Cache for editing lookup
+        _planosCache = data;
+
         lista.innerHTML = data.map(function(p) {
           var nMat = p.materias ? p.materias.length : 0;
+          var nAulas = (p.materias || []).reduce(function(acc, m) {
+            return acc + (Array.isArray(m.topicos) ? m.topicos.length : 0);
+          }, 0);
           var status = p.ativo ? '<span style="color:var(--success);font-weight:600">Ativo</span>' : '<span style="color:var(--text-lighter)">Inativo</span>';
+          var btnStyleBase = 'font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:inherit';
           return '<div class="plan-list-item">'
             + '<div>'
             + '<div class="plan-list-name">' + p.concurso_nome + (p.cargo ? ' — ' + p.cargo : '') + '</div>'
-            + '<div class="plan-list-meta">' + nMat + ' materias · ' + (p.banca || 'Sem banca') + ' · ' + (p.data_prova || 'Sem data') + '</div>'
+            + '<div class="plan-list-meta">' + nMat + ' materias · ' + nAulas + ' aulas · ' + (p.banca || 'Sem banca') + ' · ' + (p.data_prova || 'Sem data') + '</div>'
             + '</div>'
-            + '<div style="display:flex;align-items:center;gap:12px">'
+            + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
             + status
-            + '<button onclick="togglePlano(\'' + p.id + '\',' + !p.ativo + ')" style="font-size:0.75rem;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg);cursor:pointer;font-family:inherit">' + (p.ativo ? 'Desativar' : 'Ativar') + '</button>'
-            + '<button onclick="deletarPlano(\'' + p.id + '\')" style="font-size:0.75rem;padding:4px 10px;border:1px solid #FED7D7;border-radius:4px;background:#FFF5F5;color:#C53030;cursor:pointer;font-family:inherit">Excluir</button>'
+            + '<button onclick="editarPlano(\'' + p.id + '\')" style="' + btnStyleBase + ';border:1px solid #D0E3F7;background:#F0F7FF;color:#1E88E5">✎ Editar</button>'
+            + '<button onclick="togglePlano(\'' + p.id + '\',' + !p.ativo + ')" style="' + btnStyleBase + ';border:1px solid var(--border);background:var(--bg)">' + (p.ativo ? 'Desativar' : 'Ativar') + '</button>'
+            + '<button onclick="deletarPlano(\'' + p.id + '\')" style="' + btnStyleBase + ';border:1px solid #FED7D7;background:#FFF5F5;color:#C53030">Excluir</button>'
             + '</div>'
             + '</div>';
         }).join('');
@@ -843,6 +934,50 @@
       if (!confirm('Tem certeza que deseja excluir este plano?')) return;
       await _sb.from('planos_mestres').delete().eq('id', id);
       carregarPlanosExistentes();
+    }
+
+    function editarPlano(id) {
+      var plano = _planosCache.find(function(p) { return p.id === id; });
+      if (!plano) { showStatus('Plano nao encontrado na cache. Recarregue a pagina.', 'error'); return; }
+
+      // Load plan data into _parsedPlan shape the editor expects
+      _parsedPlan = {
+        concurso: plano.concurso_nome || '',
+        cargo: plano.cargo || '',
+        banca: plano.banca || '',
+        dataProva: plano.data_prova || '',
+        trilha: plano.trilha_sugerida || 'consistente',
+        materias: (plano.materias || []).map(function(m) {
+          return {
+            nome: m.nome || '',
+            questoes: m.questoes || 0,
+            peso: m.peso || 1,
+            pontos: m.pontos || 0,
+            relevancia: m.relevancia || 0,
+            topicos: Array.isArray(m.topicos)
+              ? m.topicos.slice()
+              : (m.topicos ? String(m.topicos).split(',').map(function(s) { return s.trim(); }).filter(Boolean) : []),
+            material_link: m.material_link || ''
+          };
+        })
+      };
+      _editingPlanId = id;
+
+      // Hide dropzone success indicator from any previous upload
+      document.getElementById('dropzone').classList.remove('has-file');
+      document.getElementById('dropzoneFilename').style.display = 'none';
+      document.getElementById('statusMsg').className = 'status-msg';
+
+      fillEditorHeader();
+      renderEditor();
+      setEditorMode(true);
+      document.getElementById('previewArea').style.display = '';
+
+      // Scroll to editor
+      setTimeout(function() {
+        var el = document.getElementById('previewArea');
+        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
     }
 
     function showStatus(msg, type) {
