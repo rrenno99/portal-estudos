@@ -1220,6 +1220,9 @@
     }
     .aula-action-btn:hover { color: var(--primary); }
     .aula-action-btn.delete:hover { color: #E53E3E; }
+    .aula-action-btn.edit { opacity: 0.35; font-size: 0.78rem; line-height: 1; }
+    .aula-row:hover .aula-action-btn.edit { opacity: 1; }
+    .aula-action-btn.edit:hover { color: var(--primary); opacity: 1; }
 
     .aula-nome-edit {
       flex: 1;
@@ -2658,6 +2661,7 @@
                   ${icon}
                 </button>
                 <span class="aula-nome ${statusCls}" onclick="event.stopPropagation(); editarTituloAula('${escapedName}', ${a.numero}, this)" title="Clique para renomear" style="cursor:text">${a.titulo || 'Aula ' + a.numero}</span>
+                <button class="aula-action-btn edit" onclick="event.stopPropagation(); editarTituloAula('${escapedName}', ${a.numero}, this.previousElementSibling)" title="Renomear aula">✎</button>
                 <span class="aula-tag ${statusCls}">${a.status === 'concluido' ? 'Concluída' : a.status === 'estudando' ? 'Estudando' : 'Pendente'}</span>
                 <div class="aula-actions">
                   ${canDelete ? '<button class="aula-action-btn delete" onclick="event.stopPropagation(); deletarAula(\'' + escapedName + '\',' + a.numero + ')" title="Excluir aula">🗑</button>' : ''}
