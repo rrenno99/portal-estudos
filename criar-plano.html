@@ -1288,9 +1288,14 @@
 
       // Pre-load materias for step 2
       _materiasExtraidasEdital = materias.map(function(m) {
+        var topicosArr = Array.isArray(m.topicos)
+          ? m.topicos.slice()
+          : (m.topicos ? String(m.topicos).split(',').map(function(s) { return s.trim(); }).filter(Boolean) : []);
         return {
           nome: m.nome,
-          topicos: Array.isArray(m.topicos) ? m.topicos.join(', ') : (m.topicos || ''),
+          topicos: topicosArr.join(', '),          // display string (used elsewhere)
+          topicosList: topicosArr,                 // structured list of aula titles
+          material_link: m.material_link || '',    // inherited template link
           pontos: m.pontos || m.peso || 0,
           relevancia: m.relevancia || 0,
           fonte: 'plano_mestre',
@@ -1404,8 +1409,8 @@
             }
           });
 
-          basicas.forEach(m => basGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false)));
-          especificas.forEach(m => espGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false)));
+          basicas.forEach(m => basGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false, (m.topicosList && m.topicosList.length) || undefined, m.material_link || '')));
+          especificas.forEach(m => espGrid.appendChild(createSubjectCard(m.nome, m.topicos || '', true, false, (m.topicosList && m.topicosList.length) || undefined, m.material_link || '')));
           return;
         }
 
@@ -1422,10 +1427,13 @@
       }, 500);
     }
 
-    function createSubjectCard(nome, topicos, checked, isCustom) {
+    function createSubjectCard(nome, topicos, checked, isCustom, initialAulas, initialLink) {
       const card = document.createElement('div');
       card.className = 'subject-card' + (checked ? ' selected' : '') + (isCustom ? ' custom' : '');
       card.setAttribute('data-subject', nome);
+
+      var aulasValue = (typeof initialAulas === 'number' && initialAulas > 0) ? initialAulas : 10;
+      var linkValue = initialLink || '';
 
       card.innerHTML = `
         <div class="subject-card-header" onclick="toggleSubjectCard(this.parentElement)">
@@ -1439,11 +1447,11 @@
         <div class="subject-extra-fields">
           <div class="subject-aulas-field">
             <label>📚 Nº de aulas</label>
-            <input type="number" min="1" max="200" value="10" data-aulas-for="${nome}" onclick="event.stopPropagation()">
+            <input type="number" min="1" max="200" value="${aulasValue}" data-aulas-for="${nome}" onclick="event.stopPropagation()">
           </div>
           <div class="subject-link-field">
             <label>🔗 Link do curso (Estratégia, Gran, etc.)</label>
-            <input type="url" placeholder="https://app.estrategiaconcursos.com.br/..." data-link-for="${nome}">
+            <input type="url" value="${linkValue}" placeholder="https://app.estrategiaconcursos.com.br/..." data-link-for="${nome}">
           </div>
         </div>
       `;
@@ -2756,20 +2764,33 @@
           console.error('[Supabase] ERRO ao deletar links antigos:', deleteError.code, deleteError.message);
         }
 
+        // Build template lookup: if a plano_mestre was selected, every materia
+        // inherits its topicos (aula titles) and material_link from the template.
+        var templateMap = {};
+        if (_planoMestreSelecionado && Array.isArray(_planoMestreSelecionado.materias)) {
+          _planoMestreSelecionado.materias.forEach(function(m) {
+            templateMap[m.nome] = m;
+          });
+        }
+
         // 3c. Insert ALL selected subjects (with or without link)
         let linksSalvos = 0;
         for (let i = 0; i < subjects.length; i++) {
           const s = subjects[i];
+          const tm = templateMap[s.nome];
+
+          // Link priority: user-entered > template material_link > empty
+          const finalLink = s.link || (tm && tm.material_link) || '';
 
           const linkData = {
             user_id: user.id,
             materia: s.nome,
             titulo: s.nome,
-            url: s.link || '',
-            tipo: s.link ? 'curso' : 'pendente'
+            url: finalLink,
+            tipo: finalLink ? 'curso' : 'pendente'
           };
 
-          console.log('[Supabase] Salvando matéria ' + (i+1) + '/' + subjects.length + ':', s.nome, s.link ? '(com link)' : '(sem link)');
+          console.log('[Supabase] Salvando matéria ' + (i+1) + '/' + subjects.length + ':', s.nome, finalLink ? '(com link)' : '(sem link)');
 
           const { error: linkError } = await supabase
             .from('links_materias')
@@ -2793,15 +2814,30 @@
         let aulasSalvas = 0;
         for (let i = 0; i < subjects.length; i++) {
           const s = subjects[i];
-          const numAulas = s.aulas || 10;
-          const aulasRows = [];
+          const tm = templateMap[s.nome];
+          const templateTopicos = (tm && Array.isArray(tm.topicos)) ? tm.topicos : null;
 
+          // Count: template topicos wins; otherwise user's input; never hardcoded 10
+          let numAulas;
+          if (templateTopicos && templateTopicos.length > 0) {
+            numAulas = templateTopicos.length;
+          } else if (s.aulas && s.aulas > 0) {
+            numAulas = s.aulas;
+          } else {
+            numAulas = 1; // minimum fallback
+          }
+
+          const aulasRows = [];
           for (let a = 1; a <= numAulas; a++) {
+            // Name: template's aula title at this index; fallback to generic "Aula N"
+            const tituloAula = (templateTopicos && templateTopicos[a-1] && String(templateTopicos[a-1]).trim())
+              ? String(templateTopicos[a-1]).trim()
+              : ('Aula ' + a);
             aulasRows.push({
               user_id: user.id,
               materia: s.nome,
               numero: a,
-              titulo: 'Aula ' + a,
+              titulo: tituloAula,
               status: 'pendente'
             });
           }
@@ -2814,7 +2850,7 @@
             console.error('[Supabase] ERRO aulas "' + s.nome + '":', aulasError.message);
           } else {
             aulasSalvas += numAulas;
-            console.log('[Supabase] ' + numAulas + ' aulas criadas para:', s.nome);
+            console.log('[Supabase] ' + numAulas + ' aulas criadas para:', s.nome, templateTopicos ? '(nomes do template)' : '(genericos)');
           }
         }
 
