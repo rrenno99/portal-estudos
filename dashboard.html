@@ -1625,11 +1625,58 @@
     .timer-float-header:active { cursor: grabbing; }
     .timer-float-header h4 { font-size: 0.82rem; font-weight: 600; margin: 0; }
     .timer-float-materia { font-size: 0.72rem; color: rgba(255,255,255,0.7); }
-    .timer-float-close {
-      background: none; border: none; color: rgba(255,255,255,0.6);
-      font-size: 1.1rem; cursor: pointer; padding: 4px 6px; border-radius: 4px;
+    .timer-float-header-actions { display: flex; gap: 4px; align-items: center; }
+    .timer-float-close, .timer-float-min {
+      background: none; border: none; color: rgba(255,255,255,0.7);
+      font-size: 1rem; cursor: pointer; padding: 6px 10px; border-radius: 4px;
+      line-height: 1; font-family: inherit;
     }
-    .timer-float-close:hover { color: white; background: rgba(255,255,255,0.15); }
+    .timer-float-close:hover, .timer-float-min:hover { color: white; background: rgba(255,255,255,0.15); }
+    .timer-float-min { font-size: 1.2rem; }
+
+    /* --- Minimized pill (sticky status bar while studying) --- */
+    .timer-mini-pill {
+      display: none;
+      position: fixed;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 901;
+      background: var(--secondary);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      max-width: calc(100vw - 24px);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .timer-mini-pill.show { display: inline-flex; }
+    .timer-mini-pill:active { transform: translateX(-50%) scale(0.97); }
+    .timer-mini-pill .mini-pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #4CAF50; display: inline-block;
+      animation: miniPulse 1.6s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .timer-mini-pill.paused .mini-pulse { background: #FF9800; animation: none; }
+    @keyframes miniPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(76,175,80,0.6); }
+      50%      { opacity: 0.6; box-shadow: 0 0 0 6px rgba(76,175,80,0); }
+    }
+    .timer-mini-pill .mini-time {
+      font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: 0.5px;
+    }
+    .timer-mini-pill .mini-mat {
+      font-weight: 500; opacity: 0.85;
+      max-width: 40vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .timer-mini-pill .mini-hint { opacity: 0.6; font-size: 0.7rem; }
 
     .timer-float-body { padding: 20px 16px; text-align: center; }
 
@@ -2290,13 +2337,24 @@
   </div>
 
   <!-- FLOATING TIMER (draggable) -->
+  <!-- Minimized pill: sticky bar shown when user collapses the full timer -->
+  <button class="timer-mini-pill" id="timerMiniPill" onclick="expandTimer()" aria-label="Expandir cronometro">
+    <span class="mini-pulse" aria-hidden="true"></span>
+    <span class="mini-time" id="timerMiniTime">00:00</span>
+    <span class="mini-mat" id="timerMiniMateria">—</span>
+    <span class="mini-hint" aria-hidden="true">▲</span>
+  </button>
+
   <div class="timer-float" id="timerFloat">
     <div class="timer-float-header" id="timerDragHandle">
       <div>
         <h4>Cronômetro de Estudo</h4>
         <div class="timer-float-materia" id="timerMateria">—</div>
       </div>
-      <button class="timer-float-close" onclick="timerCancel()" title="Minimizar">✕</button>
+      <div class="timer-float-header-actions">
+        <button class="timer-float-min" onclick="minimizeTimer()" title="Ocultar (continua rodando)" aria-label="Minimizar">▾</button>
+        <button class="timer-float-close" onclick="timerCancel()" title="Cancelar sessao" aria-label="Cancelar">✕</button>
+      </div>
     </div>
 
     <!-- Timer view -->
@@ -3010,8 +3068,10 @@
       abrirTimerParaMateria(materia);
     }
 
-    // Helper: opens the timer window (same behavior as iniciarEstudos, minus link open)
+    // Helper: opens the timer (same behavior as iniciarEstudos, minus link open)
     function abrirTimerParaMateria(materia) {
+      if (_isMobile()) { abrirTimer(materia); return; }
+
       var w = 420, h = 560;
       var left = window.screenX + window.outerWidth - w - 40;
       var top = window.screenY + 60;
@@ -3409,28 +3469,36 @@
 
     var _timerPopup = null;
 
+    // Mobile devices: the timer.html popup opens as a full-screen tab
+    // on Chrome Mobile / Safari, which traps the user. On mobile we always
+    // use the floating overlay so the student can navigate the queue /
+    // material app freely while the clock keeps running.
+    function _isMobile() {
+      return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+    }
+
     function iniciarEstudos(materia) {
       const links = getLinksStorage();
       if (links[materia] && links[materia].url) {
         window.open(links[materia].url, '_blank');
       }
 
-      // Open timer as pop-out window
+      if (_isMobile()) {
+        abrirTimer(materia);
+        return;
+      }
+
       var w = 420, h = 560;
       var left = window.screenX + window.outerWidth - w - 40;
       var top = window.screenY + 60;
       var features = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top;
       features += ',resizable=yes,scrollbars=no,menubar=no,toolbar=no,location=no,status=no';
 
-      if (_timerPopup && !_timerPopup.closed) {
-        _timerPopup.close();
-      }
+      if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
       _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
 
-      // Fallback: if popup blocked, use internal timer
-      if (!_timerPopup || _timerPopup.closed) {
-        abrirTimer(materia);
-      }
+      // Fallback: if popup blocked, use floating
+      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia);
     }
 
     // =============================================
@@ -3484,11 +3552,14 @@
 
     function _persistFloat() {
       try {
+        var pill = document.getElementById('timerMiniPill');
+        var minimized = pill && pill.classList.contains('show');
         localStorage.setItem(FLOAT_STORAGE_KEY, JSON.stringify({
           materia: timerMateria,
           startedAt: _float.startedAt,
           accumulated: _float.accumulated,
           running: _float.running,
+          minimized: minimized,
           alerted25: pomodoroAlerted25,
           alerted50: pomodoroAlerted50,
           startTimeIso: timerStartTime ? timerStartTime.toISOString() : null
@@ -3504,6 +3575,14 @@
       timerSeconds = Math.floor(_floatElapsedMs() / 1000);
       document.getElementById('timerDisplay').textContent = formatTimer(timerSeconds);
       updateTimerRing(timerSeconds);
+
+      // Also keep the minimized pill in sync
+      var miniTime = document.getElementById('timerMiniTime');
+      var miniMat  = document.getElementById('timerMiniMateria');
+      var miniPill = document.getElementById('timerMiniPill');
+      if (miniTime) miniTime.textContent = _formatMiniTime(timerSeconds);
+      if (miniMat)  miniMat.textContent  = timerMateria || '';
+      if (miniPill) miniPill.classList.toggle('paused', !_float.running);
 
       // Pomodoro alerts — use >= so we still trigger if we crossed while backgrounded
       if (timerSeconds >= 25 * 60 && !pomodoroAlerted25) {
@@ -3544,6 +3623,36 @@
       document.getElementById('timerFeedbackView').classList.remove('show');
       updateTimerRing(0);
       document.getElementById('timerFloat').classList.add('show');
+      // Ensure the minimized pill is hidden when opening fresh
+      document.getElementById('timerMiniPill').classList.remove('show');
+    }
+
+    // Minimized view: keep the session running, collapse the big panel,
+    // surface a sticky pill at the top so the student can open the study
+    // material or browse the queue without losing the clock.
+    function minimizeTimer() {
+      document.getElementById('timerFloat').classList.remove('show');
+      // Only show the pill if there is something to show (session started).
+      if (timerSeconds > 0 || _float.running) {
+        renderFloatTimer(); // refresh pill content before showing
+        document.getElementById('timerMiniPill').classList.add('show');
+      }
+    }
+
+    function expandTimer() {
+      document.getElementById('timerMiniPill').classList.remove('show');
+      document.getElementById('timerFloat').classList.add('show');
+      renderFloatTimer();
+    }
+
+    // Short mini format: MM:SS when under 1h, HH:MM:SS when longer
+    function _formatMiniTime(totalSecs) {
+      if (totalSecs < 3600) {
+        var m = Math.floor(totalSecs / 60);
+        var s = totalSecs % 60;
+        return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      }
+      return formatTimer(totalSecs); // HH:MM:SS
     }
 
     function timerStart() {
@@ -3748,6 +3857,7 @@
       clearInterval(timerInterval);
       _isSubmitting = false;
       document.getElementById('timerFloat').classList.remove('show');
+      document.getElementById('timerMiniPill').classList.remove('show');
       document.getElementById('btnTimerFinish').disabled = false;
       document.querySelectorAll('#timerFeedbackView .feedback-option').forEach(function(btn) {
         btn.disabled = false;
@@ -3796,14 +3906,23 @@
       document.getElementById('timerStatus').className = 'timer-float-status ' + (running ? 'running' : 'paused');
       document.getElementById('timerBodyView').style.display = '';
       document.getElementById('timerFeedbackView').classList.remove('show');
-      document.getElementById('timerFloat').classList.add('show');
+
+      // Respect saved minimized preference
+      if (saved.minimized) {
+        document.getElementById('timerFloat').classList.remove('show');
+        document.getElementById('timerMiniPill').classList.add('show');
+      } else {
+        document.getElementById('timerFloat').classList.add('show');
+        document.getElementById('timerMiniPill').classList.remove('show');
+      }
 
       renderFloatTimer();
       if (running) {
         clearInterval(timerInterval);
         timerInterval = setInterval(renderFloatTimer, 1000);
       }
-      console.log('[Timer] Sessao anterior restaurada:', timerMateria, timerSeconds + 's');
+      console.log('[Timer] Sessao anterior restaurada:', timerMateria, timerSeconds + 's',
+        saved.minimized ? '(minimizada)' : '');
     }
 
     function _resyncFloatFromWallClock() {
@@ -3838,6 +3957,19 @@
     } else {
       restoreFloatTimerIfAny();
     }
+
+    // Prevent accidental tab-close while a session is active.
+    // Only triggers when the clock is actually running — a paused session
+    // is safe to leave since its state is already persisted.
+    window.addEventListener('beforeunload', function(e) {
+      if (_float.running && timerSeconds > 5) {
+        e.preventDefault();
+        // Modern browsers ignore the custom string, but setting returnValue
+        // is what triggers the confirmation dialog.
+        e.returnValue = 'Sua sessao de estudo ainda esta ativa. Deseja realmente sair?';
+        return e.returnValue;
+      }
+    });
 
     function formatTimer(totalSecs) {
       const h = Math.floor(totalSecs / 3600);
