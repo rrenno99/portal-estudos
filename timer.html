@@ -307,17 +307,39 @@
     var channel = new BroadcastChannel('planejador-timer');
 
     // =============================================
-    //  TIMER STATE
+    //  TIMER STATE (wall-clock-based, mobile-safe)
+    //
+    //  Elapsed (ms) = accumulated + (running ? Date.now() - startedAt : 0)
+    //
+    //  This is robust to setInterval throttling when the tab is
+    //  backgrounded or the phone switches apps: the UI tick only
+    //  reads the wall clock; it never increments a counter.
+    //
+    //  Persisted to localStorage so reloads / tab kills restore state.
     // =============================================
+    var STORAGE_KEY = 'planejador_timer_state';
     var interval = null;
-    var seconds = 0;
-    var running = false;
-    var startTime = null;
+    var state = {
+      materia: materia,
+      startedAt: null,       // ms timestamp of the current run segment; null when paused
+      accumulated: 0,        // ms of time already counted from previous run segments
+      running: false,
+      alerted25: false,
+      alerted50: false,
+      createdAt: Date.now()  // first time this session started (for startTime reporting)
+    };
     var isSubmitting = false;
-    var alerted25 = false;
-    var alerted50 = false;
     var RING_R = 80;
     var RING_CIRC = 2 * Math.PI * RING_R;
+
+    function currentElapsedMs() {
+      var extra = state.running && state.startedAt ? (Date.now() - state.startedAt) : 0;
+      return state.accumulated + extra;
+    }
+
+    function currentSeconds() {
+      return Math.floor(currentElapsedMs() / 1000);
+    }
 
     function formatTime(totalSecs) {
       var h = Math.floor(totalSecs / 3600);
@@ -355,83 +377,153 @@
       } catch (e) {}
     }
 
+    function persist() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+
+    function clearPersisted() {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    }
+
+    function restoreState() {
+      var raw;
+      try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { return false; }
+      if (!raw) return false;
+      try {
+        var saved = JSON.parse(raw);
+        // Only restore if it's the same materia — different materia means a fresh session
+        if (!saved || saved.materia !== materia) return false;
+        state = {
+          materia: saved.materia,
+          startedAt: saved.startedAt || null,
+          accumulated: saved.accumulated || 0,
+          running: !!saved.running,
+          alerted25: !!saved.alerted25,
+          alerted50: !!saved.alerted50,
+          createdAt: saved.createdAt || Date.now()
+        };
+        return true;
+      } catch (e) { return false; }
+    }
+
+    // =============================================
+    //  RENDER (reads wall-clock state, never mutates time)
+    // =============================================
+    function render() {
+      var secs = currentSeconds();
+      document.getElementById('timerDisplay').textContent = formatTime(secs);
+      updateRing(secs);
+
+      if (state.running) {
+        document.getElementById('timerStatus').textContent = 'Estudando...';
+        document.getElementById('timerStatus').className = 'timer-status running';
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnPause').style.display = '';
+        document.getElementById('btnFinish').style.display = '';
+        document.title = '[' + formatShort(secs) + '] ' + materia + ' — Planejador Renno';
+      } else if (secs > 0) {
+        document.getElementById('timerStatus').textContent = 'Pausado';
+        document.getElementById('timerStatus').className = 'timer-status paused';
+        document.getElementById('btnPause').style.display = 'none';
+        document.getElementById('btnStart').style.display = '';
+        document.getElementById('btnStart').textContent = '▶ Retomar';
+        document.getElementById('btnFinish').style.display = '';
+        document.title = '[PAUSADO] ' + materia + ' — Planejador Renno';
+      } else {
+        document.getElementById('timerStatus').textContent = 'Pronto';
+        document.getElementById('timerStatus').className = 'timer-status stopped';
+        document.getElementById('btnStart').style.display = '';
+        document.getElementById('btnStart').textContent = '▶ Iniciar';
+        document.getElementById('btnPause').style.display = 'none';
+        document.getElementById('btnFinish').style.display = 'none';
+        document.title = 'Pronto — ' + materia;
+      }
+
+      // Pomodoro alerts — use >= so crossing the threshold while backgrounded still fires
+      if (secs >= 25 * 60 && !state.alerted25) {
+        state.alerted25 = true;
+        persist();
+        playBeep();
+        document.body.classList.add('pomodoro-flash');
+        setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
+      }
+      if (secs >= 50 * 60 && !state.alerted50) {
+        state.alerted50 = true;
+        persist();
+        playBeep();
+        document.body.classList.add('pomodoro-flash');
+        setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
+      }
+
+      channel.postMessage({ type: 'tick', seconds: secs, materia: materia });
+    }
+
+    function startTicking() {
+      clearInterval(interval);
+      interval = setInterval(render, 1000);
+    }
+
+    function stopTicking() {
+      clearInterval(interval);
+      interval = null;
+    }
+
     // =============================================
     //  TIMER CONTROLS
     // =============================================
     function timerStart() {
-      if (!startTime) startTime = new Date();
-      running = true;
-
-      document.getElementById('timerStatus').textContent = 'Estudando...';
-      document.getElementById('timerStatus').className = 'timer-status running';
-      document.getElementById('btnStart').style.display = 'none';
-      document.getElementById('btnPause').style.display = '';
-      document.getElementById('btnFinish').style.display = '';
-
-      clearInterval(interval);
-      interval = setInterval(function() {
-        seconds++;
-        document.getElementById('timerDisplay').textContent = formatTime(seconds);
-        updateRing(seconds);
-
-        // Dynamic tab title
-        document.title = '[' + formatShort(seconds) + '] ' + materia + ' — Planejador Renno';
-
-        // Broadcast tick to dashboard
-        channel.postMessage({ type: 'tick', seconds: seconds, materia: materia });
-
-        // Pomodoro alerts
-        if (seconds === 25 * 60 && !alerted25) {
-          alerted25 = true;
-          playBeep();
-          document.body.classList.add('pomodoro-flash');
-          setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
-        }
-        if (seconds === 50 * 60 && !alerted50) {
-          alerted50 = true;
-          playBeep();
-          document.body.classList.add('pomodoro-flash');
-          setTimeout(function() { document.body.classList.remove('pomodoro-flash'); }, 2000);
-        }
-      }, 1000);
-
+      if (state.running) return;
+      state.startedAt = Date.now();
+      state.running = true;
+      if (!state.accumulated) state.createdAt = state.startedAt; // first start sets session origin
+      persist();
+      render();
+      startTicking();
       channel.postMessage({ type: 'started', materia: materia });
     }
 
     function timerPause() {
-      running = false;
-      clearInterval(interval);
-      document.getElementById('timerStatus').textContent = 'Pausado';
-      document.getElementById('timerStatus').className = 'timer-status paused';
-      document.getElementById('btnPause').style.display = 'none';
-      document.getElementById('btnStart').style.display = '';
-      document.getElementById('btnStart').textContent = '▶ Retomar';
-      document.title = '[PAUSADO] ' + materia + ' — Planejador Renno';
-
-      channel.postMessage({ type: 'paused', seconds: seconds, materia: materia });
+      if (!state.running) return;
+      // Freeze wall-clock delta into accumulated
+      state.accumulated += Date.now() - state.startedAt;
+      state.startedAt = null;
+      state.running = false;
+      persist();
+      stopTicking();
+      render();
+      channel.postMessage({ type: 'paused', seconds: currentSeconds(), materia: materia });
     }
 
     function timerFinish() {
-      clearInterval(interval);
-      running = false;
+      // Freeze elapsed if still running
+      if (state.running && state.startedAt) {
+        state.accumulated += Date.now() - state.startedAt;
+        state.startedAt = null;
+        state.running = false;
+      }
+      stopTicking();
 
-      if (seconds < 5) {
+      var secs = currentSeconds();
+      if (secs < 5) {
         channel.postMessage({ type: 'cancelled', materia: materia });
+        clearPersisted();
         window.close();
         return;
       }
 
-      var mins = Math.floor(seconds / 60);
-      var secs = seconds % 60;
-      document.getElementById('feedbackTime').textContent = '(' + mins + 'min ' + secs + 's)';
+      persist();
+      var mins = Math.floor(secs / 60);
+      var rem = secs % 60;
+      document.getElementById('feedbackTime').textContent = '(' + mins + 'min ' + rem + 's)';
       document.getElementById('timerBodyView').style.display = 'none';
       document.getElementById('feedbackView').classList.add('show');
       document.title = 'Finalizar — ' + materia;
     }
 
     function timerCancel() {
-      clearInterval(interval);
-      running = false;
+      stopTicking();
+      state.running = false;
+      clearPersisted();
       channel.postMessage({ type: 'cancelled', materia: materia });
       window.close();
     }
@@ -443,7 +535,6 @@
       if (isSubmitting) return;
       isSubmitting = true;
 
-      // Disable all buttons
       document.querySelectorAll('.feedback-option').forEach(function(btn) {
         btn.disabled = true;
       });
@@ -451,34 +542,63 @@
       var h4 = document.querySelector('#feedbackView h4');
       if (h4) h4.innerHTML = '⏳ Salvando sessao...';
 
-      // Send result to dashboard (it handles saving to Supabase)
       channel.postMessage({
         type: 'finished',
         materia: materia,
-        seconds: seconds,
-        startTime: startTime ? startTime.toISOString() : new Date().toISOString(),
+        seconds: currentSeconds(),
+        startTime: state.createdAt ? new Date(state.createdAt).toISOString() : new Date().toISOString(),
         feedback: tipo
       });
     }
 
-    // Listen for confirmation from dashboard
     channel.onmessage = function(e) {
       if (e.data.type === 'saved') {
+        clearPersisted();
         document.title = 'Salvo! — ' + materia;
         setTimeout(function() { window.close(); }, 800);
       }
     };
 
     // =============================================
+    //  VISIBILITY / FOCUS: resync display from wall clock
+    //  Mobile browsers throttle setInterval in background.
+    //  When the user returns, we recompute from Date.now() so the
+    //  display jumps to the correct elapsed time.
+    // =============================================
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        render();
+        if (state.running) startTicking();
+      }
+    });
+    window.addEventListener('focus', function() {
+      render();
+      if (state.running) startTicking();
+    });
+
+    // =============================================
     //  PREVENT ACCIDENTAL CLOSE
     // =============================================
     window.addEventListener('beforeunload', function(e) {
-      if (seconds > 5 && !isSubmitting) {
+      var secs = currentSeconds();
+      if (secs > 5 && !isSubmitting) {
         e.preventDefault();
         e.returnValue = 'Sua sessao ainda esta ativa. Deseja mesmo sair?';
         return e.returnValue;
       }
     });
+
+    // =============================================
+    //  BOOT: restore previous session if any
+    // =============================================
+    (function boot() {
+      var restored = restoreState();
+      render();
+      if (state.running) startTicking();
+      if (restored) {
+        console.log('[Timer] Restored session:', currentSeconds(), 's');
+      }
+    })();
   </script>
 </body>
 </html>

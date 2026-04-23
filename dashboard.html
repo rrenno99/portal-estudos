@@ -3406,23 +3406,35 @@
     }
 
     // =============================================
-    //  FLOATING DRAGGABLE TIMER
+    //  FLOATING DRAGGABLE TIMER (wall-clock based)
+    //
+    //  Elapsed is always derived from Date.now() - startedAt (+ accumulated),
+    //  never from an incrementing counter. This survives mobile background
+    //  throttling (switching to Estratégia, TEC, etc.) and full page reloads
+    //  via localStorage persistence.
     // =============================================
     let timerInterval = null;
-    let timerSeconds = 0;
+    let timerSeconds = 0;      // last snapshot in seconds (updated on render/pause/finish)
     let timerRunning = false;
     let timerMateria = '';
-    let timerStartTime = null;
+    let timerStartTime = null; // original start of the session (Date) — for DB data_inicio
     let pomodoroAlerted25 = false;
     let pomodoroAlerted50 = false;
     const RING_R = 62;
     const RING_CIRC = 2 * Math.PI * RING_R;
+    const FLOAT_STORAGE_KEY = 'planejador_float_timer_state';
+
+    // Wall-clock state (internal)
+    var _float = {
+      startedAt: null,   // ms timestamp of the current run segment; null when paused
+      accumulated: 0,    // ms of time already counted from previous run segments
+      running: false
+    };
 
     // Audio context for Pomodoro alerts
     function playPomodoroBeep() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        // Play 3 gentle beeps
         [0, 0.25, 0.5].forEach(delay => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -3437,6 +3449,51 @@
       } catch (e) { /* audio not available */ }
     }
 
+    function _floatElapsedMs() {
+      var extra = _float.running && _float.startedAt ? (Date.now() - _float.startedAt) : 0;
+      return _float.accumulated + extra;
+    }
+
+    function _persistFloat() {
+      try {
+        localStorage.setItem(FLOAT_STORAGE_KEY, JSON.stringify({
+          materia: timerMateria,
+          startedAt: _float.startedAt,
+          accumulated: _float.accumulated,
+          running: _float.running,
+          alerted25: pomodoroAlerted25,
+          alerted50: pomodoroAlerted50,
+          startTimeIso: timerStartTime ? timerStartTime.toISOString() : null
+        }));
+      } catch (e) {}
+    }
+
+    function _clearPersistFloat() {
+      try { localStorage.removeItem(FLOAT_STORAGE_KEY); } catch (e) {}
+    }
+
+    function renderFloatTimer() {
+      timerSeconds = Math.floor(_floatElapsedMs() / 1000);
+      document.getElementById('timerDisplay').textContent = formatTimer(timerSeconds);
+      updateTimerRing(timerSeconds);
+
+      // Pomodoro alerts — use >= so we still trigger if we crossed while backgrounded
+      if (timerSeconds >= 25 * 60 && !pomodoroAlerted25) {
+        pomodoroAlerted25 = true;
+        _persistFloat();
+        playPomodoroBeep();
+        document.getElementById('timerFloat').classList.add('pomodoro-alert');
+        setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
+      }
+      if (timerSeconds >= 50 * 60 && !pomodoroAlerted50) {
+        pomodoroAlerted50 = true;
+        _persistFloat();
+        playPomodoroBeep();
+        document.getElementById('timerFloat').classList.add('pomodoro-alert');
+        setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
+      }
+    }
+
     function abrirTimer(materia) {
       timerMateria = materia;
       timerSeconds = 0;
@@ -3444,6 +3501,8 @@
       timerStartTime = null;
       pomodoroAlerted25 = false;
       pomodoroAlerted50 = false;
+      _float = { startedAt: null, accumulated: 0, running: false };
+      _clearPersistFloat();
 
       document.getElementById('timerMateria').textContent = materia;
       document.getElementById('timerDisplay').textContent = '00:00:00';
@@ -3460,8 +3519,13 @@
     }
 
     function timerStart() {
-      if (!timerStartTime) timerStartTime = new Date();
+      if (_float.running) return;
+      var now = Date.now();
+      _float.startedAt = now;
+      _float.running = true;
+      if (!timerStartTime) timerStartTime = new Date(now);
       timerRunning = true;
+      _persistFloat();
 
       document.getElementById('timerStatus').textContent = 'Estudando...';
       document.getElementById('timerStatus').className = 'timer-float-status running';
@@ -3469,31 +3533,20 @@
       document.getElementById('btnTimerPause').style.display = '';
       document.getElementById('btnTimerFinish').style.display = '';
 
+      renderFloatTimer();
       clearInterval(timerInterval);
-      timerInterval = setInterval(function() {
-        timerSeconds++;
-        document.getElementById('timerDisplay').textContent = formatTimer(timerSeconds);
-        updateTimerRing(timerSeconds);
-
-        // Pomodoro alerts at 25min and 50min
-        if (timerSeconds === 25 * 60 && !pomodoroAlerted25) {
-          pomodoroAlerted25 = true;
-          playPomodoroBeep();
-          document.getElementById('timerFloat').classList.add('pomodoro-alert');
-          setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
-        }
-        if (timerSeconds === 50 * 60 && !pomodoroAlerted50) {
-          pomodoroAlerted50 = true;
-          playPomodoroBeep();
-          document.getElementById('timerFloat').classList.add('pomodoro-alert');
-          setTimeout(() => document.getElementById('timerFloat').classList.remove('pomodoro-alert'), 2000);
-        }
-      }, 1000);
+      timerInterval = setInterval(renderFloatTimer, 1000);
     }
 
     function timerPause() {
+      if (!_float.running) return;
+      _float.accumulated += Date.now() - _float.startedAt;
+      _float.startedAt = null;
+      _float.running = false;
       timerRunning = false;
+      _persistFloat();
       clearInterval(timerInterval);
+      renderFloatTimer();
       document.getElementById('timerStatus').textContent = 'Pausado';
       document.getElementById('timerStatus').className = 'timer-float-status paused';
       document.getElementById('btnTimerPause').style.display = 'none';
@@ -3502,12 +3555,19 @@
     }
 
     function timerFinish() {
-      clearInterval(timerInterval);
+      // Freeze wall-clock state
+      if (_float.running && _float.startedAt) {
+        _float.accumulated += Date.now() - _float.startedAt;
+        _float.startedAt = null;
+        _float.running = false;
+      }
       timerRunning = false;
+      clearInterval(timerInterval);
+      renderFloatTimer(); // refreshes timerSeconds from the final accumulated
 
-      if (timerSeconds < 5) { fecharTimer(); return; }
+      if (timerSeconds < 5) { _clearPersistFloat(); fecharTimer(); return; }
 
-      // Show feedback options
+      _persistFloat();
       const mins = Math.floor(timerSeconds / 60);
       const secs = timerSeconds % 60;
       document.getElementById('feedbackTime').textContent = '(' + mins + 'min ' + secs + 's)';
@@ -3651,6 +3711,8 @@
     function timerCancel() {
       clearInterval(timerInterval);
       timerRunning = false;
+      _float = { startedAt: null, accumulated: 0, running: false };
+      _clearPersistFloat();
       fecharTimer();
     }
 
@@ -3659,12 +3721,83 @@
       _isSubmitting = false;
       document.getElementById('timerFloat').classList.remove('show');
       document.getElementById('btnTimerFinish').disabled = false;
-      // Re-enable feedback buttons for next session
       document.querySelectorAll('#timerFeedbackView .feedback-option').forEach(function(btn) {
         btn.disabled = false;
         btn.style.opacity = '';
         btn.style.pointerEvents = '';
       });
+      _clearPersistFloat();
+    }
+
+    // =============================================
+    //  RESTORE FLOAT TIMER + VISIBILITY SYNC
+    // =============================================
+    function restoreFloatTimerIfAny() {
+      var raw;
+      try { raw = localStorage.getItem(FLOAT_STORAGE_KEY); } catch (e) { return; }
+      if (!raw) return;
+      var saved;
+      try { saved = JSON.parse(raw); } catch (e) { _clearPersistFloat(); return; }
+      if (!saved || !saved.materia) { _clearPersistFloat(); return; }
+
+      // Discard if no real time elapsed yet
+      var running = !!saved.running;
+      var accumulated = saved.accumulated || 0;
+      var extra = running && saved.startedAt ? (Date.now() - saved.startedAt) : 0;
+      var totalMs = accumulated + extra;
+      if (totalMs < 1000) { _clearPersistFloat(); return; }
+
+      // Rehydrate state
+      timerMateria = saved.materia;
+      _float = {
+        startedAt: running ? saved.startedAt : null,
+        accumulated: accumulated,
+        running: running
+      };
+      pomodoroAlerted25 = !!saved.alerted25;
+      pomodoroAlerted50 = !!saved.alerted50;
+      timerStartTime = saved.startTimeIso ? new Date(saved.startTimeIso) : new Date(Date.now() - totalMs);
+      timerRunning = running;
+
+      document.getElementById('timerMateria').textContent = timerMateria;
+      document.getElementById('btnTimerPause').style.display = running ? '' : 'none';
+      document.getElementById('btnTimerStart').style.display = running ? 'none' : '';
+      document.getElementById('btnTimerStart').textContent = '▶ Retomar';
+      document.getElementById('btnTimerFinish').style.display = '';
+      document.getElementById('timerStatus').textContent = running ? 'Estudando...' : 'Pausado';
+      document.getElementById('timerStatus').className = 'timer-float-status ' + (running ? 'running' : 'paused');
+      document.getElementById('timerBodyView').style.display = '';
+      document.getElementById('timerFeedbackView').classList.remove('show');
+      document.getElementById('timerFloat').classList.add('show');
+
+      renderFloatTimer();
+      if (running) {
+        clearInterval(timerInterval);
+        timerInterval = setInterval(renderFloatTimer, 1000);
+      }
+      console.log('[Timer] Sessao anterior restaurada:', timerMateria, timerSeconds + 's');
+    }
+
+    // When the tab regains visibility, force a re-render so the display
+    // catches up with the wall clock (setInterval may have been throttled)
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && timerMateria && _float.running) {
+        renderFloatTimer();
+        clearInterval(timerInterval);
+        timerInterval = setInterval(renderFloatTimer, 1000);
+      }
+    });
+    window.addEventListener('focus', function() {
+      if (timerMateria && _float.running) {
+        renderFloatTimer();
+      }
+    });
+
+    // Run restore on page load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', restoreFloatTimerIfAny);
+    } else {
+      restoreFloatTimerIfAny();
     }
 
     function formatTimer(totalSecs) {
