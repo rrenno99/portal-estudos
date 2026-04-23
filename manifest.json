@@ -1,0 +1,20 @@
+{
+  "name": "Planejador Renno",
+  "short_name": "Planejador",
+  "description": "Seu plano de estudos inteligente para concursos",
+  "start_url": "/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F6FA",
+  "theme_color": "#1E88E5",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

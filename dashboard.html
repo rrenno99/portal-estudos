@@ -9,6 +9,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1E88E5">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Planejador">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }); }</script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <style>
     /* =========================================
@@ -1317,6 +1326,22 @@
     .link-modal .form-group { margin-bottom: 16px; }
     .link-modal .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text); display: block; margin-bottom: 6px; }
 
+    .link-input-row {
+      display: flex; gap: 8px; align-items: stretch;
+    }
+    .link-input-row input { flex: 1; }
+    .btn-paste {
+      padding: 0 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: var(--bg);
+      font-family: inherit; font-size: 0.82rem; font-weight: 600; color: var(--text);
+      cursor: pointer; white-space: nowrap; transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-paste:hover { border-color: var(--primary); color: var(--primary); background: rgba(30,136,229,0.04); }
+    .btn-paste:active { transform: scale(0.97); }
+    .btn-paste.flash-ok { border-color: var(--success); color: var(--success); background: rgba(56,161,105,0.08); }
+    .btn-paste.flash-fail { border-color: #E53E3E; color: #E53E3E; background: #FFF5F5; }
+
     .link-modal-actions {
       display: flex;
       justify-content: flex-end;
@@ -2182,7 +2207,10 @@
       <p class="modal-subtitle" id="linkModalSubtitle">Cole o link do seu material (Estratégia, Gran, etc.)</p>
       <div class="form-group">
         <label for="linkUrlInput">Link do material</label>
-        <input type="url" class="form-control" id="linkUrlInput" placeholder="https://app.estrategiaconcursos.com.br/..." required>
+        <div class="link-input-row">
+          <input type="url" class="form-control" id="linkUrlInput" placeholder="https://app.estrategiaconcursos.com.br/..." required>
+          <button type="button" class="btn-paste" onclick="colarLink()" title="Colar da area de transferencia" aria-label="Colar link da area de transferencia">📋 Colar</button>
+        </div>
       </div>
       <div class="form-group">
         <label for="linkTituloInput">Nome do curso (opcional)</label>
@@ -3778,19 +3806,30 @@
       console.log('[Timer] Sessao anterior restaurada:', timerMateria, timerSeconds + 's');
     }
 
-    // When the tab regains visibility, force a re-render so the display
-    // catches up with the wall clock (setInterval may have been throttled)
-    document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'visible' && timerMateria && _float.running) {
-        renderFloatTimer();
+    function _resyncFloatFromWallClock() {
+      if (!timerMateria) return;
+      // Sanity check: if startedAt rolled into the future (user changed device clock),
+      // clamp to now to avoid negative deltas.
+      if (_float.running && _float.startedAt && _float.startedAt > Date.now()) {
+        _float.startedAt = Date.now();
+        _persistFloat();
+      }
+      renderFloatTimer();
+      if (_float.running) {
         clearInterval(timerInterval);
         timerInterval = setInterval(renderFloatTimer, 1000);
       }
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') _resyncFloatFromWallClock();
     });
-    window.addEventListener('focus', function() {
-      if (timerMateria && _float.running) {
-        renderFloatTimer();
-      }
+    window.addEventListener('focus', _resyncFloatFromWallClock);
+    // iOS Safari bfcache: pageshow.persisted means the page is restored
+    // from cache with its JS heap frozen; setInterval will not have been
+    // ticking. Force a resync so the elapsed display reflects wall clock.
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) _resyncFloatFromWallClock();
     });
 
     // Run restore on page load
@@ -4456,6 +4495,53 @@
 
     function fecharLinkModal() {
       document.getElementById('linkModalOverlay').classList.remove('show');
+    }
+
+    async function colarLink() {
+      var btn = document.querySelector('.btn-paste');
+      var input = document.getElementById('linkUrlInput');
+
+      // Clear any prior flash state
+      if (btn) btn.classList.remove('flash-ok', 'flash-fail');
+
+      // navigator.clipboard requires a secure context (https or localhost)
+      // and user gesture. The button click IS a user gesture, so this works.
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        if (btn) {
+          btn.classList.add('flash-fail');
+          btn.textContent = 'Nao suportado';
+          setTimeout(function() { btn.classList.remove('flash-fail'); btn.textContent = '📋 Colar'; }, 1800);
+        }
+        input.focus();
+        return;
+      }
+
+      try {
+        var text = (await navigator.clipboard.readText() || '').trim();
+        if (!text) {
+          if (btn) {
+            btn.classList.add('flash-fail');
+            btn.textContent = 'Vazio';
+            setTimeout(function() { btn.classList.remove('flash-fail'); btn.textContent = '📋 Colar'; }, 1500);
+          }
+          return;
+        }
+        input.value = text;
+        input.focus();
+        if (btn) {
+          btn.classList.add('flash-ok');
+          btn.textContent = '✓ Colado';
+          setTimeout(function() { btn.classList.remove('flash-ok'); btn.textContent = '📋 Colar'; }, 1500);
+        }
+      } catch (err) {
+        // Permission denied — user must paste manually
+        if (btn) {
+          btn.classList.add('flash-fail');
+          btn.textContent = 'Permissao negada';
+          setTimeout(function() { btn.classList.remove('flash-fail'); btn.textContent = '📋 Colar'; }, 2000);
+        }
+        input.focus();
+      }
     }
 
     function salvarLink() {

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Planejador Renno">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#1565C0"/>
+    </linearGradient>
+  </defs>
+  <!-- Background: full-bleed so the icon works as "maskable" on Android -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- Safe zone monogram (within inner 80%) -->
+  <g>
+    <text x="256" y="330"
+          font-family="Inter, -apple-system, Arial, sans-serif"
+          font-size="220" font-weight="800" letter-spacing="-6"
+          fill="#ffffff" text-anchor="middle">PR</text>
+    <!-- Subtle accent bar below monogram -->
+    <rect x="180" y="360" width="152" height="6" rx="3" fill="#ffffff" opacity="0.7"/>
+  </g>
+</svg>

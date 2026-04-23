@@ -8,6 +8,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏱</text></svg>">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0F1923">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cronometro">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); }); }</script>
   <style>
     :root {
       --primary: #42A5F5;
@@ -565,15 +574,26 @@
     //  When the user returns, we recompute from Date.now() so the
     //  display jumps to the correct elapsed time.
     // =============================================
-    document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'visible') {
-        render();
-        if (state.running) startTicking();
+    function resyncFromWallClock() {
+      // Sanity check: if startedAt is in the future (device clock rolled back),
+      // reset to "now" so we don't report negative elapsed.
+      if (state.running && state.startedAt && state.startedAt > Date.now()) {
+        state.startedAt = Date.now();
+        persist();
       }
-    });
-    window.addEventListener('focus', function() {
       render();
       if (state.running) startTicking();
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') resyncFromWallClock();
+    });
+    window.addEventListener('focus', resyncFromWallClock);
+    // iOS Safari back-forward cache: pageshow fires when the page is
+    // restored from bfcache. Force a resync so the display reflects the
+    // real elapsed (bfcache pauses all timers).
+    window.addEventListener('pageshow', function(e) {
+      if (e.persisted) resyncFromWallClock();
     });
 
     // =============================================
