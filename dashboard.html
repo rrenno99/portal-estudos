@@ -2787,7 +2787,7 @@
                 </button>
                 <span class="aula-nome ${statusCls}" onclick="event.stopPropagation(); abrirEditAula('${escapedName}', ${a.numero})" title="Clique para editar" style="cursor:pointer">${a.titulo || 'Aula ' + a.numero}</span>
                 <button class="aula-action-btn edit" onclick="event.stopPropagation(); abrirEditAula('${escapedName}', ${a.numero})" title="Editar aula">✎</button>
-                <button class="aula-action-btn play" onclick="event.stopPropagation(); iniciarAula('${escapedName}', ${a.numero})" title="Iniciar esta aula (abre material + cronometro)">▶</button>
+                <button class="aula-action-btn play" onclick="event.stopPropagation(); iniciarAula('${escapedName}', ${a.numero}, this)" title="Iniciar esta aula (abre material + cronometro)">▶</button>
                 <span class="aula-tag ${statusCls}">${a.status === 'concluido' ? 'Concluída' : a.status === 'estudando' ? 'Estudando' : 'Pendente'}</span>
                 <div class="aula-actions">
                   ${canDelete ? '<button class="aula-action-btn delete" onclick="event.stopPropagation(); deletarAula(\'' + escapedName + '\',' + a.numero + ')" title="Excluir aula">🗑</button>' : ''}
@@ -2823,7 +2823,7 @@
             <span>${pct}%</span>
             <div class="mini-bar"><div class="mini-fill" style="width:${pct}%;background:${color.bg}"></div></div>
           </div>
-          <button class="btn-iniciar" onclick="event.stopPropagation(); iniciarEstudos('${escapedName}')">${btnLabel}</button>
+          <button class="btn-iniciar" onclick="event.stopPropagation(); iniciarEstudos('${escapedName}', this)">${btnLabel}</button>
           ${aulasHtml}
         `;
         container.appendChild(item);
@@ -3051,26 +3051,42 @@
 
     // =============================================
     //  INICIAR AULA (play button: timer + link da materia)
+    //
+    //  CRITICAL SEQUENCING on mobile:
+    //   1. Show timer panel (abrirTimer) — sync
+    //   2. timerStart() — sync; this is what writes startedAt to localStorage.
+    //      Must happen BEFORE window.open or a tab switch would strand the
+    //      session in a "ready but not started" state (the original bug).
+    //   3. window.open(materialLink) — same tick, preserves the user gesture,
+    //      so mobile popup blockers don't trip.
     // =============================================
-    function iniciarAula(materia, numero) {
+    function iniciarAula(materia, numero, btnEl) {
+      _flashLoading(btnEl, '⏳');
+
       var links = getLinksStorage();
       var linkData = links[materia];
+      var hasLink = !!(linkData && linkData.url);
 
-      if (linkData && linkData.url) {
-        window.open(linkData.url, '_blank');
+      // 1 + 2: open panel AND start the clock (persists startedAt synchronously)
+      abrirTimerParaMateria(materia, { autoStart: true });
+
+      // 3: open the material link — only NOW, after the session is live
+      if (hasLink) {
+        var opened = _openLinkSafely(linkData.url);
+        if (!opened) showDashToast('Popup bloqueado. Toque no link salvo da materia para abrir.');
       } else {
         showDashToast('Nenhum link de material cadastrado para ' + materia);
       }
-
-      // Start Pomodoro (iniciarEstudos also opens the link — we suppress the double-open
-      // by temporarily routing through the same flow; since iniciarEstudos reads the same
-      // links table, calling it directly would open the link twice. Inline the timer open.)
-      abrirTimerParaMateria(materia);
     }
 
-    // Helper: opens the timer (same behavior as iniciarEstudos, minus link open)
-    function abrirTimerParaMateria(materia) {
-      if (_isMobile()) { abrirTimer(materia); return; }
+    // Helper: opens the timer (same behavior as iniciarEstudos, minus link open).
+    // autoStart: whether to call timerStart() immediately after mounting the panel
+    // (always true on the floating path, never on the desktop popup — the popup
+    // has its own ▶ Iniciar since it stays visible while the student studies).
+    function abrirTimerParaMateria(materia, opts) {
+      opts = opts || {};
+
+      if (_isMobile()) { abrirTimer(materia, { autoStart: opts.autoStart }); return; }
 
       var w = 420, h = 560;
       var left = window.screenX + window.outerWidth - w - 40;
@@ -3081,7 +3097,33 @@
       if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
       _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
 
-      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia);
+      // If the popup was blocked, fall back to the floating panel — and in
+      // that case autoStart becomes important (same reasoning as mobile).
+      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia, { autoStart: opts.autoStart });
+    }
+
+    // Safely open an external link in a new tab; returns true if the browser
+    // actually opened a window. Used to detect popup-blocker interference.
+    function _openLinkSafely(url) {
+      if (!url) return false;
+      try {
+        var w = window.open(url, '_blank', 'noopener');
+        return !!(w && !w.closed);
+      } catch (e) { return false; }
+    }
+
+    // Temporarily disable a button and show a loading glyph. Prevents double
+    // taps while the timer state is written + the external link opens.
+    function _flashLoading(btnEl, glyph) {
+      if (!btnEl) return;
+      var originalHtml = btnEl.innerHTML;
+      var originalDisabled = btnEl.disabled;
+      btnEl.disabled = true;
+      btnEl.innerHTML = glyph || '⏳';
+      setTimeout(function() {
+        btnEl.innerHTML = originalHtml;
+        btnEl.disabled = originalDisabled;
+      }, 1000);
     }
 
     // =============================================
@@ -3477,16 +3519,27 @@
       return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
     }
 
-    function iniciarEstudos(materia) {
-      const links = getLinksStorage();
-      if (links[materia] && links[materia].url) {
-        window.open(links[materia].url, '_blank');
-      }
+    function iniciarEstudos(materia, btnEl) {
+      _flashLoading(btnEl, '⏳ Iniciando...');
 
+      const links = getLinksStorage();
+      const linkData = links[materia];
+      const hasLink = !!(linkData && linkData.url);
+
+      // MOBILE PATH: auto-start the floating timer FIRST (persists startedAt),
+      // only then open the material link. Prevents the "timer zerado" bug.
       if (_isMobile()) {
-        abrirTimer(materia);
+        abrirTimer(materia, { autoStart: true });
+        if (hasLink) {
+          var opened = _openLinkSafely(linkData.url);
+          if (!opened) showDashToast('Popup bloqueado. Toque no link salvo da materia para abrir.');
+        }
         return;
       }
+
+      // DESKTOP PATH: open the material link first (historical order),
+      // then the timer.html popup which has its own ▶ Iniciar.
+      if (hasLink) window.open(linkData.url, '_blank');
 
       var w = 420, h = 560;
       var left = window.screenX + window.outerWidth - w - 40;
@@ -3497,8 +3550,8 @@
       if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
       _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
 
-      // Fallback: if popup blocked, use floating
-      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia);
+      // Fallback: if popup blocked, use floating AND autoStart (same reasoning as mobile)
+      if (!_timerPopup || _timerPopup.closed) abrirTimer(materia, { autoStart: true });
     }
 
     // =============================================
@@ -3601,7 +3654,8 @@
       }
     }
 
-    function abrirTimer(materia) {
+    function abrirTimer(materia, opts) {
+      opts = opts || {};
       timerMateria = materia;
       timerSeconds = 0;
       timerRunning = false;
@@ -3625,6 +3679,12 @@
       document.getElementById('timerFloat').classList.add('show');
       // Ensure the minimized pill is hidden when opening fresh
       document.getElementById('timerMiniPill').classList.remove('show');
+
+      // Auto-start: timerStart() persists startedAt synchronously (localStorage)
+      // before any potential navigation/window.open steals the user gesture.
+      // Mobile calls it with autoStart=true so the session is already live
+      // when the material link opens in a new tab.
+      if (opts.autoStart) timerStart();
     }
 
     // Minimized view: keep the session running, collapse the big panel,
