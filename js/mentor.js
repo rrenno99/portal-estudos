@@ -1216,6 +1216,30 @@ function normalizarData(str) {
   return null;
 }
 
+// Strip emojis + zero-width chars + extra hyphens/spaces from a string.
+// Used so a heading like "📘 Direito Administrativo --" becomes "Direito Administrativo".
+function _cleanText(s) {
+  if (s == null) return '';
+  return String(s)
+    // Emoji ranges (covers most common pictographs, dingbats, flags, supplemental)
+    .replace(/[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{1FA00}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}]/gu, '')
+    // Zero-width joiners and variation selectors
+    .replace(/[​-‍﻿\u{FE0F}]/gu, '')
+    // Leading/trailing markdown noise: hyphens, dashes, bullets, underscores, asterisks
+    .replace(/^[\s\-–—_•·*=>+]+|[\s\-–—_•·*=]+$/g, '')
+    // Collapse multiple whitespace runs
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Heuristic: skip headings that are clearly metadata, not subjects.
+var _NOISE_HEADINGS = /^(sumario|sum[aá]rio|introdu[cç][aã]o|apresenta[cç][aã]o|pref[aá]cio|capa|conte[uú]do|cronograma|legenda|sobre|autor|disposi|inscri|edital|recomenda|estrat[eé]gia|dicas?|observa)/i;
+
+// Bullet detector — handles -, *, •, with optional checkbox markdown
+function _matchBullet(line) {
+  return line.match(/^[-*•]\s+(?:\[[ xX]\]\s+)?(.+)$/);
+}
+
 function parsePlanoMarkdown(mdText) {
   var resultado = {
     concurso: '',
@@ -1225,14 +1249,15 @@ function parsePlanoMarkdown(mdText) {
     trilha: 'consistente',
     materias: [],
     totalPontos: 0,
-    erros: []
+    erros: [],     // soft warnings (no longer block — admin can fix in editor)
+    avisos: [],    // informational notes about what was inferred
+    fonte: 'estrita' // 'estrita' (frontmatter) | 'flexivel' (heuristic) | 'misto'
   };
 
   var linhas = mdText.split(/\n/);
   var bodyStart = 0;
 
-  // ===== FRONTMATTER: parse YAML between --- delimiters =====
-  // REQUIRED: file MUST start with ---
+  // ===== FRONTMATTER (optional) =====
   resultado.hasFrontmatter = false;
 
   if (linhas[0] && linhas[0].trim() === '---') {
@@ -1255,7 +1280,7 @@ function parsePlanoMarkdown(mdText) {
           case 'DATA_PROVA':
             resultado.dataProva = normalizarData(fmVal);
             if (!resultado.dataProva) {
-              resultado.erros.push('DATA_PROVA invalida: "' + fmVal + '". Use DD/MM/AAAA ou AAAA-MM-DD.');
+              resultado.erros.push('DATA_PROVA com formato invalido: "' + fmVal + '". Esperado DD/MM/AAAA ou AAAA-MM-DD.');
             }
             break;
           case 'TRILHA': resultado.trilha = fmVal.toLowerCase(); break;
@@ -1263,34 +1288,23 @@ function parsePlanoMarkdown(mdText) {
       }
     }
     if (!frontmatterClosed) {
-      resultado.erros.push('Frontmatter aberto: falta o segundo --- de fechamento.');
-    }
-  } else {
-    // NO FRONTMATTER = REJECTED
-    resultado.erros.push('Erro: Arquivo fora do Padrao Estruturado Renno. O arquivo deve comecar com --- seguido dos campos obrigatorios.');
-  }
-
-  // Validate required fields
-  if (resultado.hasFrontmatter) {
-    if (!resultado.concurso) {
-      resultado.erros.push('Campo CONCURSO obrigatorio no cabecalho. Adicione CONCURSO: Nome do Concurso');
-    }
-    if (!resultado.dataProva) {
-      resultado.erros.push('Campo DATA_PROVA obrigatorio no cabecalho. Adicione DATA_PROVA: DD/MM/AAAA');
+      resultado.erros.push('Frontmatter aberto sem fechamento (falta o segundo "---"). Tratei o restante como conteudo.');
+      bodyStart = 0; // treat the whole file as body
     }
   }
+  // No frontmatter = OK; we will infer from body. No more "Arquivo fora do padrao" rejection.
 
-  // ===== BODY: parse markdown content =====
+  // ===== STRICT BODY PASS: ## sections (Estrutura / Conteudo) =====
   var secaoAtual = null;
   var materiaConteudoAtual = null;
 
   for (var i = bodyStart; i < linhas.length; i++) {
     var linha = linhas[i].trim();
 
-    // H1: concurso name (enrichment only — frontmatter is truth)
+    // H1: concurso name (enrichment only — frontmatter wins if present)
     var h1 = linha.match(/^#\s+(.+)$/);
     if (h1) {
-      var parts = h1[1].split(/\s*[-–—]\s*/);
+      var parts = _cleanText(h1[1]).split(/\s*[-–—]\s*/);
       if (!resultado.concurso) resultado.concurso = parts[0].trim();
       if (parts[1] && !resultado.cargo) resultado.cargo = parts[1].trim();
       continue;
@@ -1309,14 +1323,14 @@ function parsePlanoMarkdown(mdText) {
     // H3: materia name in conteudo section
     var h3 = linha.match(/^###\s+(.+)$/);
     if (h3 && secaoAtual === 'conteudo') {
-      var nomeMat = h3[1].trim();
+      var nomeMat = _cleanText(h3[1]);
+      if (!nomeMat) continue;
       materiaConteudoAtual = resultado.materias.find(function(m) {
         return m.nome.toLowerCase() === nomeMat.toLowerCase() ||
                nomeMat.toLowerCase().indexOf(m.nome.toLowerCase()) !== -1 ||
                m.nome.toLowerCase().indexOf(nomeMat.toLowerCase()) !== -1;
       });
       if (!materiaConteudoAtual) {
-        // Materia from conteudo not in estrutura — add it without weight
         materiaConteudoAtual = { nome: nomeMat, peso: 1, questoes: 0, pontos: 0, topicos: [] };
         resultado.materias.push(materiaConteudoAtual);
       }
@@ -1325,14 +1339,13 @@ function parsePlanoMarkdown(mdText) {
 
     // Table rows in estrutura section
     if (secaoAtual === 'estrutura' && linha.indexOf('|') !== -1) {
-      // Skip header separator (|---|---|)
       if (/^\|?\s*[-:]+\s*\|/.test(linha)) continue;
-      // Skip header row
       if (/mat[eé]ria|disciplina/i.test(linha) && /quest|peso|ponto/i.test(linha)) continue;
 
       var cells = linha.split('|').map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });
       if (cells.length >= 2) {
-        var nome = cells[0];
+        var nome = _cleanText(cells[0]);
+        if (!nome) continue;
         var nums = [];
         for (var j = 1; j < cells.length; j++) {
           var n = parseFloat(cells[j].replace(',', '.'));
@@ -1345,7 +1358,7 @@ function parsePlanoMarkdown(mdText) {
         resultado.materias.push({
           nome: nome,
           questoes: questoes,
-          peso: peso,
+          peso: peso || 1,
           pontos: pontos,
           topicos: []
         });
@@ -1354,17 +1367,98 @@ function parsePlanoMarkdown(mdText) {
       continue;
     }
 
-    // Topic lines in conteudo section (- bullet points)
+    // Topic lines in conteudo section
     if (secaoAtual === 'conteudo' && materiaConteudoAtual) {
-      var bullet = linha.match(/^[-*•]\s+(.+)$/);
+      var bullet = _matchBullet(linha);
       if (bullet) {
-        var topico = bullet[1].trim();
-        if (topico.length > 2 && topico.length < 100) {
+        var topico = _cleanText(bullet[1]);
+        if (topico.length > 1 && topico.length < 200) {
           materiaConteudoAtual.topicos.push(topico);
         }
       }
     }
   }
+
+  // ===== FLEXIBLE FALLBACK PASS =====
+  // If the strict pass didn't find any materia, scan again accepting ANY
+  // ## or ### heading (with bullet lists below) as a materia. Skips noise
+  // like "Sumario", "Introducao", etc.
+  if (resultado.materias.length === 0) {
+    resultado.fonte = 'flexivel';
+    resultado.avisos.push('Estrutura do Padrao Estruturado nao detectada — usei deteccao por padroes de cabecalhos.');
+
+    var currentMat = null;
+    for (var k = bodyStart; k < linhas.length; k++) {
+      var ln = linhas[k].trim();
+
+      var hAny = ln.match(/^(#{2,4})\s+(.+)$/);
+      if (hAny) {
+        var nm = _cleanText(hAny[2]);
+        // Skip empty after cleanup, noise, or section labels
+        if (!nm || nm.length < 2 || _NOISE_HEADINGS.test(nm)) {
+          currentMat = null;
+          continue;
+        }
+        currentMat = { nome: nm, peso: 1, questoes: 0, pontos: 0, topicos: [] };
+        resultado.materias.push(currentMat);
+        continue;
+      }
+
+      // Setext-style heading: a line of === or --- right below a non-empty line
+      // Only trigger if next-line was a long underline
+      if (/^={3,}$|^-{3,}$/.test(ln) && k > 0) {
+        var prev = _cleanText(linhas[k - 1]);
+        if (prev && !_NOISE_HEADINGS.test(prev) && prev.length > 1 && prev.length < 80) {
+          // Avoid duplicating if last materia is the same
+          var last = resultado.materias[resultado.materias.length - 1];
+          if (!last || last.nome !== prev) {
+            currentMat = { nome: prev, peso: 1, questoes: 0, pontos: 0, topicos: [] };
+            resultado.materias.push(currentMat);
+          }
+          continue;
+        }
+      }
+
+      if (currentMat) {
+        var b = _matchBullet(ln);
+        if (b) {
+          var t = _cleanText(b[1]);
+          if (t.length > 1 && t.length < 200) currentMat.topicos.push(t);
+        }
+      }
+    }
+  } else if (!resultado.hasFrontmatter) {
+    resultado.fonte = 'misto';
+  }
+
+  // ===== INFER MISSING dataProva from body =====
+  // Scan for the first DD/MM/AAAA or AAAA-MM-DD pattern if frontmatter didn't set it
+  if (!resultado.dataProva) {
+    var dateMatch = mdText.match(/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/);
+    if (dateMatch) {
+      var inferred = normalizarData(dateMatch[1]);
+      if (inferred) {
+        resultado.dataProva = inferred;
+        resultado.avisos.push('Data da prova inferida do corpo do arquivo: ' + dateMatch[1]);
+      }
+    }
+  }
+
+  // ===== DEFAULTS PER MATERIA =====
+  // peso → 1 (already enforced above)
+  // topicos → if empty, generate 10 placeholder aulas the admin can rename
+  resultado.materias.forEach(function(m) {
+    m.nome = _cleanText(m.nome);
+    m.peso = m.peso || 1;
+    if (!Array.isArray(m.topicos)) m.topicos = [];
+    if (m.topicos.length === 0) {
+      m.topicos = [];
+      for (var z = 1; z <= 10; z++) m.topicos.push('Aula ' + z);
+      m._aulasDefault = true;
+    } else {
+      m.topicos = m.topicos.map(_cleanText).filter(function(t) { return !!t; });
+    }
+  });
 
   // Calculate relevancia
   if (resultado.totalPontos > 0) {
@@ -1373,7 +1467,11 @@ function parsePlanoMarkdown(mdText) {
     });
   }
 
-  console.log('[MD Parser]', resultado.concurso, '|', resultado.materias.length, 'materias |', resultado.totalPontos, 'pontos');
+  console.log('[MD Parser]', resultado.concurso || '(sem concurso)',
+              '| fonte:', resultado.fonte,
+              '|', resultado.materias.length, 'materias',
+              '|', resultado.totalPontos, 'pontos',
+              resultado.avisos.length ? '| avisos: ' + resultado.avisos.length : '');
   return resultado;
 }
 

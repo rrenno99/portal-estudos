@@ -588,30 +588,29 @@
       var text = await file.text();
       _parsedPlan = window.MentorIA.parsePlanoMarkdown(text);
 
-      // STRICT CONTRACT: reject if no frontmatter or missing required fields
-      if (!_parsedPlan.hasFrontmatter) {
-        showStatus('Erro: Arquivo fora do Padrao Estruturado Renno.\n\nO arquivo DEVE comecar com:\n---\nCONCURSO: Nome do Concurso\nCARGO: Nome do Cargo\nDATA_PROVA: DD/MM/AAAA\nBANCA: Nome da Banca\nTRILHA: consistente\n---', 'error');
-        _parsedPlan = null;
-        limparUpload();
-        return;
+      // TOLERANT MODE: never reject. The parser may return any combination
+      // of empty fields; we fill defaults and route the admin to the editor
+      // for manual correction. The editor is the source of truth.
+
+      // Fallback concurso name from filename if parser couldn't infer one
+      if (!_parsedPlan.concurso) {
+        _parsedPlan.concurso = file.name.replace(/\.(md|markdown|txt)$/i, '').trim() || 'Plano sem nome';
+      }
+      if (!_parsedPlan.cargo) _parsedPlan.cargo = '';
+      if (!_parsedPlan.banca) _parsedPlan.banca = '';
+      if (!_parsedPlan.dataProva) _parsedPlan.dataProva = '';
+      if (!Array.isArray(_parsedPlan.materias)) _parsedPlan.materias = [];
+
+      // Ensure at least one materia row so the editor isn't blank
+      if (_parsedPlan.materias.length === 0) {
+        _parsedPlan.materias.push({
+          nome: 'Materia 1', peso: 1, questoes: 0, pontos: 0, relevancia: 0,
+          topicos: ['Aula 1','Aula 2','Aula 3','Aula 4','Aula 5','Aula 6','Aula 7','Aula 8','Aula 9','Aula 10'],
+          material_link: ''
+        });
       }
 
-      // Show validation errors (but allow preview if materias exist)
-      if (_parsedPlan.erros && _parsedPlan.erros.length > 0) {
-        showStatus(_parsedPlan.erros.join('\n'), 'error');
-        if (!_parsedPlan.concurso || !_parsedPlan.dataProva) {
-          // Missing required → block
-          _parsedPlan = null;
-          return;
-        }
-      }
-
-      if (!_parsedPlan.materias || _parsedPlan.materias.length === 0) {
-        showStatus('Erro: Nenhuma materia encontrada.\n\nAdicione a secao:\n## Estrutura das Provas\n| Materia | Questoes | Peso | Pontos |\n|---------|----------|------|--------|\n| Nome | 10 | 1 | 10 |', 'error');
-        return;
-      }
-
-      // Normalize materias: ensure topicos is array, add material_link field
+      // Normalize: topicos always array, material_link present
       _parsedPlan.materias.forEach(function(m) {
         if (!Array.isArray(m.topicos)) {
           m.topicos = m.topicos ? String(m.topicos).split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
@@ -619,7 +618,25 @@
         if (typeof m.material_link === 'undefined') m.material_link = '';
       });
 
-      // Fresh upload → not editing
+      // Build a soft info banner — never blocks
+      var notas = [];
+      if (_parsedPlan.fonte === 'flexivel') {
+        notas.push('Detectei a estrutura por padroes flexiveis (sem frontmatter).');
+      }
+      if (_parsedPlan.avisos && _parsedPlan.avisos.length) {
+        notas = notas.concat(_parsedPlan.avisos);
+      }
+      var temAulasDefault = _parsedPlan.materias.some(function(m) { return m._aulasDefault; });
+      if (temAulasDefault) {
+        notas.push('Algumas materias entraram com 10 aulas padrao (Aula 1 a 10) — renomeie ou ajuste a quantidade no editor.');
+      }
+      if (_parsedPlan.erros && _parsedPlan.erros.length) {
+        notas = notas.concat(_parsedPlan.erros);
+      }
+      if (notas.length) {
+        showStatus('ℹ Arquivo carregado. Revise no editor:\n• ' + notas.join('\n• '), 'success');
+      }
+
       _editingPlanId = null;
       fillEditorHeader();
       renderEditor();
