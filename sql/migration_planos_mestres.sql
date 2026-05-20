@@ -46,3 +46,6 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Unique constraint for upsert
 CREATE UNIQUE INDEX IF NOT EXISTS idx_planos_mestres_nome_unique ON planos_mestres(concurso_nome);
+
+-- Data API GRANTs (Supabase requirement). RLS still gates row access.
+GRANT ALL ON TABLE public.planos_mestres TO postgres, anon, authenticated, service_role;

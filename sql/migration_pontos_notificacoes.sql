@@ -34,3 +34,6 @@ DO $$ BEGIN
   CREATE POLICY "Aluno atualiza proprias notificacoes" ON notificacoes_aluno FOR UPDATE USING (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- Data API GRANTs (Supabase requirement). RLS still gates row access.
+GRANT ALL ON TABLE public.notificacoes_aluno TO postgres, anon, authenticated, service_role;

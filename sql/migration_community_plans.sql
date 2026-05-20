@@ -36,3 +36,6 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY "Aluno atualiza votos" ON community_plans FOR UPDATE USING (auth.uid() IS NOT NULL);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Data API GRANTs (Supabase requirement). RLS still controls row visibility.
+GRANT ALL ON TABLE public.community_plans TO postgres, anon, authenticated, service_role;

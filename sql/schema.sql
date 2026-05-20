@@ -218,3 +218,16 @@ ALTER TABLE usuarios_autorizados ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Qualquer um pode verificar autorização"
   ON usuarios_autorizados FOR SELECT
   USING (true);
+
+-- =============================================
+--  DATA API GRANTS (Supabase requirement)
+--  RLS still gates the row-level access; these GRANTs only expose
+--  the tables to the @supabase/supabase-js Data API roles.
+-- =============================================
+GRANT ALL ON TABLE public.perfil_aluno         TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.links_materias       TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.atividades_aluno     TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.sessoes_estudo       TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.aulas_materia        TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.notificacoes_aluno   TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.usuarios_autorizados TO postgres, anon, authenticated, service_role;

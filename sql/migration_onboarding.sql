@@ -62,3 +62,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY "Aluno deleta proprio plano_fundo" ON plano_fundo FOR DELETE USING (auth.uid() = user_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Data API GRANTs (Supabase requirement). RLS still gates row access.
+GRANT ALL ON TABLE public.materia_perfil TO postgres, anon, authenticated, service_role;
+GRANT ALL ON TABLE public.plano_fundo    TO postgres, anon, authenticated, service_role;
