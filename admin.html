@@ -332,12 +332,104 @@
       margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
     }
 
+    /* --- Curadoria tab --- */
+    .cur-help { font-size: 0.78rem; color: var(--text-light); margin-bottom: 12px; }
+    .cur-help code {
+      background: var(--bg); padding: 1px 6px; border-radius: 3px;
+      font-size: 0.85em; color: var(--secondary);
+    }
+    .cur-meta-grid {
+      display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 10px;
+    }
+    .cur-meta-grid label {
+      font-size: 0.72rem; font-weight: 600; color: var(--text-light);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .cur-meta-grid input {
+      padding: 7px 10px; font-size: 0.85rem; border: 1px solid var(--border);
+      border-radius: 4px; font-family: inherit; background: var(--bg-card);
+    }
+    .cur-meta-grid input:focus { outline: none; border-color: var(--primary); }
+
+    .cur-filter-row {
+      display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .cur-filter-row label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.78rem; color: var(--text-light); font-weight: 500;
+    }
+    .cur-filter-row select, .cur-filter-row input[type="text"] {
+      padding: 6px 10px; font-size: 0.82rem; border: 1px solid var(--border);
+      border-radius: 4px; font-family: inherit; background: var(--bg-card);
+    }
+    .cur-filter-row input[type="text"] { min-width: 220px; }
+    .cur-count {
+      font-size: 0.72rem; color: var(--text-lighter); margin-left: auto;
+    }
+
+    .cur-topicos-lista {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      max-height: 320px; overflow-y: auto; background: var(--bg-card);
+    }
+    .cur-topico-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .cur-topico-row:last-child { border-bottom: none; }
+    .cur-topico-row:hover { background: rgba(30,136,229,0.03); }
+    .cur-topico-row input[type="checkbox"] {
+      width: 16px; height: 16px; flex-shrink: 0; cursor: pointer;
+    }
+    .cur-topico-row label {
+      flex: 1; cursor: pointer; color: var(--secondary); font-weight: 500;
+    }
+    .cur-topico-row .topico-questoes {
+      font-size: 0.7rem; color: var(--text-lighter); white-space: nowrap;
+    }
+    .cur-topico-row.selected { background: rgba(30,136,229,0.05); }
+
+    .cur-selecionados {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-card);
+    }
+    .cur-sel-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+    }
+    .cur-sel-row:last-child { border-bottom: none; }
+    .cur-sel-row .cur-order {
+      font-size: 0.72rem; color: var(--text-lighter); width: 22px; text-align: right;
+    }
+    .cur-sel-row .cur-name {
+      flex: 1; font-size: 0.85rem; font-weight: 600; color: var(--secondary);
+    }
+    .cur-sel-row .cur-peso {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 0.72rem; color: var(--text-light);
+    }
+    .cur-sel-row .cur-peso input {
+      width: 54px; padding: 4px 8px; font-size: 0.8rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      font-family: inherit; background: var(--bg);
+    }
+    .cur-sel-row .cur-actions { display: flex; gap: 2px; }
+    .cur-sel-row .cur-actions button {
+      width: 26px; height: 26px; padding: 0; border: 1px solid var(--border);
+      background: var(--bg); border-radius: 4px; cursor: pointer;
+      font-size: 0.7rem; line-height: 1; font-family: inherit;
+    }
+    .cur-sel-row .cur-actions button:hover { border-color: var(--primary); color: var(--primary); }
+    .cur-sel-row .cur-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
     @media (max-width: 768px) {
       .admin-page { padding: 16px 12px; }
       .kpi-grid { grid-template-columns: 1fr; gap: 10px; }
       .alunos-toolbar { flex-direction: column; gap: 10px; align-items: stretch; }
       .alunos-toolbar > div { justify-content: stretch; }
       .alunos-search { width: 100%; }
+      .cur-meta-grid { grid-template-columns: 1fr 1fr; }
+      .cur-filter-row input[type="text"] { min-width: 0; flex: 1; }
     }
   </style>
 </head>
@@ -351,6 +443,7 @@
     <!-- Tabs -->
     <div class="admin-tabs">
       <button class="admin-tab active" onclick="switchTab('planos')">Planos Mestres</button>
+      <button class="admin-tab" onclick="switchTab('curadoria')">Curadoria</button>
       <button class="admin-tab" onclick="switchTab('alunos')">Gestao de Alunos</button>
     </div>
 
@@ -420,6 +513,59 @@
     </div>
 
     </div><!-- /section-planos -->
+
+    <!-- ==================== TAB: CURADORIA ==================== -->
+    <div class="admin-section" id="section-curadoria">
+
+      <div class="admin-card">
+        <h2>1. Dados do plano</h2>
+        <p class="cur-help">Preencha o cabecalho do plano que vai ser publicado em <code>planos_mestres</code>.</p>
+        <div class="cur-meta-grid">
+          <label>Concurso
+            <input type="text" id="curConcurso" placeholder="Ex: Banco do Brasil 2026">
+          </label>
+          <label>Cargo
+            <input type="text" id="curCargo" placeholder="Ex: Escriturario">
+          </label>
+          <label>Banca
+            <input type="text" id="curBanca" placeholder="Ex: CESGRANRIO">
+          </label>
+          <label>Data da prova
+            <input type="date" id="curDataProva">
+          </label>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h2>2. Topicos disponiveis</h2>
+        <div class="cur-filter-row">
+          <label>Materia
+            <select id="curMateriaFilter" onchange="carregarTopicosCuradoria()">
+              <option value="Vendas e Negociação">Vendas e Negociação</option>
+            </select>
+          </label>
+          <input type="text" id="curBusca" placeholder="Buscar por nome do topico..." oninput="filtrarTopicosCuradoria()">
+          <span id="curTopicosCount" class="cur-count">—</span>
+        </div>
+        <div id="curTopicosLista" class="cur-topicos-lista">
+          <p class="empty-state">Carregando topicos...</p>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h2>3. Topicos selecionados <span id="curSelecionadosCount" class="alunos-count">(0)</span></h2>
+        <p class="cur-help">Defina a ordem (▲ ▼) e o peso de cada topico no plano. O nome de cada topico vira uma materia na fila do aluno.</p>
+        <div id="curSelecionados" class="cur-selecionados">
+          <p class="empty-state">Marque topicos acima para inclui-los no plano.</p>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-ghost" onclick="resetCuradoria()">Limpar</button>
+          <button class="btn btn-primary" id="btnPublicarCurado" onclick="salvarPlanoCurado()">✓ Publicar plano curado</button>
+        </div>
+        <div class="status-msg" id="curStatus"></div>
+      </div>
+
+    </div><!-- /section-curadoria -->
 
     <!-- ==================== TAB: GESTAO DE ALUNOS ==================== -->
     <div class="admin-section" id="section-alunos">
@@ -1019,13 +1165,231 @@
       document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
       document.querySelectorAll('.admin-section').forEach(function(s) { s.classList.remove('active'); });
 
+      var TAB_ORDER = ['planos', 'curadoria', 'alunos'];
+      var idx = TAB_ORDER.indexOf(tab);
+      if (idx === -1) idx = 0;
+      document.querySelectorAll('.admin-tab')[idx].classList.add('active');
+
       if (tab === 'alunos') {
-        document.querySelectorAll('.admin-tab')[1].classList.add('active');
         document.getElementById('section-alunos').classList.add('active');
         carregarAlunos();
+      } else if (tab === 'curadoria') {
+        document.getElementById('section-curadoria').classList.add('active');
+        carregarTopicosCuradoria();
       } else {
-        document.querySelectorAll('.admin-tab')[0].classList.add('active');
         document.getElementById('section-planos').classList.add('active');
+      }
+    }
+
+    // =============================================
+    //  CURADORIA — montagem de planos a partir de topics_content
+    // =============================================
+    var _curTopicos = [];           // topics_content rows for current subject
+    var _curSelecionados = [];      // [{topic_id, topic_name, peso}] in order
+    var _curQuestoesCount = {};     // topic_id -> # questoes (loaded async)
+
+    async function carregarTopicosCuradoria() {
+      var subject = document.getElementById('curMateriaFilter').value;
+      var lista = document.getElementById('curTopicosLista');
+      var countEl = document.getElementById('curTopicosCount');
+      lista.innerHTML = '<p class="empty-state">Carregando topicos...</p>';
+
+      try {
+        var { data, error } = await _sb.from('topics_content')
+          .select('id, subject_name, topic_name')
+          .eq('subject_name', subject)
+          .order('topic_name', { ascending: true });
+        if (error) throw error;
+        _curTopicos = data || [];
+
+        // Quick count of questoes per topic (best-effort; ignored on failure)
+        try {
+          var { data: qData } = await _sb.from('bank_questions')
+            .select('topic_id', { count: 'exact', head: false });
+          if (qData) {
+            _curQuestoesCount = {};
+            qData.forEach(function(r) {
+              _curQuestoesCount[r.topic_id] = (_curQuestoesCount[r.topic_id] || 0) + 1;
+            });
+          }
+        } catch (e) {}
+
+        countEl.textContent = _curTopicos.length + ' topico(s)';
+        renderTopicosCuradoria();
+        renderSelecionadosCuradoria();
+      } catch (e) {
+        lista.innerHTML = '<p style="color:#C53030;font-size:0.85rem;text-align:center;padding:16px">Erro: ' + e.message + '</p>';
+      }
+    }
+
+    function renderTopicosCuradoria(filterText) {
+      var lista = document.getElementById('curTopicosLista');
+      var term = (filterText || '').toLowerCase().trim();
+
+      var visiveis = _curTopicos.filter(function(t) {
+        return !term || (t.topic_name || '').toLowerCase().includes(term);
+      });
+
+      if (visiveis.length === 0) {
+        lista.innerHTML = '<p class="empty-state">Nenhum topico encontrado. Use scripts/upload-content.js para carregar.</p>';
+        return;
+      }
+
+      var selectedSet = new Set(_curSelecionados.map(function(s) { return s.topic_id; }));
+
+      lista.innerHTML = visiveis.map(function(t) {
+        var isSel = selectedSet.has(t.id);
+        var qCount = _curQuestoesCount[t.id] || 0;
+        var safeName = String(t.topic_name).replace(/"/g, '&quot;');
+        return '<div class="cur-topico-row' + (isSel ? ' selected' : '') + '" data-tid="' + t.id + '">'
+          + '<input type="checkbox" id="cur-cb-' + t.id + '" ' + (isSel ? 'checked' : '') + ' onchange="toggleTopicoCurado(\'' + t.id + '\', this.checked)">'
+          + '<label for="cur-cb-' + t.id + '">' + safeName + '</label>'
+          + '<span class="topico-questoes">' + qCount + ' questao(oes)</span>'
+          + '</div>';
+      }).join('');
+    }
+
+    function filtrarTopicosCuradoria() {
+      var term = document.getElementById('curBusca').value;
+      renderTopicosCuradoria(term);
+    }
+
+    function toggleTopicoCurado(topicId, checked) {
+      var topic = _curTopicos.find(function(t) { return t.id === topicId; });
+      if (!topic) return;
+
+      var idx = _curSelecionados.findIndex(function(s) { return s.topic_id === topicId; });
+      if (checked && idx === -1) {
+        _curSelecionados.push({ topic_id: topicId, topic_name: topic.topic_name, peso: 1 });
+      } else if (!checked && idx !== -1) {
+        _curSelecionados.splice(idx, 1);
+      }
+      renderTopicosCuradoria(document.getElementById('curBusca').value);
+      renderSelecionadosCuradoria();
+    }
+
+    function renderSelecionadosCuradoria() {
+      var el = document.getElementById('curSelecionados');
+      var count = document.getElementById('curSelecionadosCount');
+      count.textContent = '(' + _curSelecionados.length + ')';
+
+      if (_curSelecionados.length === 0) {
+        el.innerHTML = '<p class="empty-state">Marque topicos acima para inclui-los no plano.</p>';
+        return;
+      }
+
+      el.innerHTML = _curSelecionados.map(function(s, i) {
+        var safeName = String(s.topic_name).replace(/"/g, '&quot;');
+        var first = i === 0;
+        var last = i === _curSelecionados.length - 1;
+        return '<div class="cur-sel-row">'
+          + '<span class="cur-order">' + (i + 1) + '.</span>'
+          + '<span class="cur-name">' + safeName + '</span>'
+          + '<span class="cur-peso">Peso <input type="number" min="0" step="0.5" value="' + s.peso + '" '
+          + 'oninput="updatePesoCurado(' + i + ', this.value)"></span>'
+          + '<span class="cur-actions">'
+          + '<button onclick="moverTopicoCurado(' + i + ', -1)"' + (first ? ' disabled' : '') + ' title="Subir">▲</button>'
+          + '<button onclick="moverTopicoCurado(' + i + ', 1)"' + (last ? ' disabled' : '') + ' title="Descer">▼</button>'
+          + '<button onclick="toggleTopicoCurado(\'' + s.topic_id + '\', false)" title="Remover">×</button>'
+          + '</span>'
+          + '</div>';
+      }).join('');
+    }
+
+    function moverTopicoCurado(idx, delta) {
+      var newIdx = idx + delta;
+      if (newIdx < 0 || newIdx >= _curSelecionados.length) return;
+      var tmp = _curSelecionados[idx];
+      _curSelecionados[idx] = _curSelecionados[newIdx];
+      _curSelecionados[newIdx] = tmp;
+      renderSelecionadosCuradoria();
+    }
+
+    function updatePesoCurado(idx, value) {
+      if (!_curSelecionados[idx]) return;
+      var v = parseFloat(value);
+      _curSelecionados[idx].peso = isNaN(v) || v < 0 ? 1 : v;
+    }
+
+    function resetCuradoria() {
+      _curSelecionados = [];
+      ['curConcurso','curCargo','curBanca','curDataProva'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      renderTopicosCuradoria(document.getElementById('curBusca').value);
+      renderSelecionadosCuradoria();
+      var s = document.getElementById('curStatus');
+      if (s) s.className = 'status-msg';
+    }
+
+    async function salvarPlanoCurado() {
+      var concurso = document.getElementById('curConcurso').value.trim();
+      var cargo    = document.getElementById('curCargo').value.trim();
+      var banca    = document.getElementById('curBanca').value.trim();
+      var data     = document.getElementById('curDataProva').value;
+      var btn      = document.getElementById('btnPublicarCurado');
+      var statusEl = document.getElementById('curStatus');
+      statusEl.className = 'status-msg';
+
+      if (!concurso) {
+        statusEl.textContent = 'Informe o nome do concurso.';
+        statusEl.className = 'status-msg error';
+        return;
+      }
+      if (_curSelecionados.length === 0) {
+        statusEl.textContent = 'Selecione pelo menos um topico.';
+        statusEl.className = 'status-msg error';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '⏳ Salvando...';
+
+      try {
+        // Each curated topic becomes a "materia" entry in planos_mestres.materias.
+        // We keep topic_id + subject_origem so future student-side flow can fetch
+        // teoria/questoes from topics_content + bank_questions.
+        var subjectOrigem = document.getElementById('curMateriaFilter').value;
+        var materias = _curSelecionados.map(function(s) {
+          return {
+            nome: s.topic_name,
+            peso: s.peso || 1,
+            questoes: 0,
+            pontos: 0,
+            relevancia: 0,
+            topicos: [],         // student-side will default to 10 aulas (per tolerant policy)
+            topic_id: s.topic_id, // FK link to topics_content
+            subject_origem: subjectOrigem,
+            material_link: null
+          };
+        });
+
+        var payload = {
+          concurso_nome: concurso,
+          cargo: cargo || null,
+          banca: banca || null,
+          data_prova: data || null,
+          materias: materias,
+          trilha_sugerida: 'consistente',
+          ativo: true,
+          criado_por: _userId
+        };
+
+        var { error } = await _sb.from('planos_mestres')
+          .upsert(payload, { onConflict: 'concurso_nome' });
+        if (error) throw error;
+
+        statusEl.textContent = '✅ Plano "' + concurso + '" publicado com ' + materias.length + ' topico(s).';
+        statusEl.className = 'status-msg success';
+        resetCuradoria();
+        carregarPlanosExistentes();
+      } catch (e) {
+        statusEl.textContent = 'Erro: ' + e.message;
+        statusEl.className = 'status-msg error';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '✓ Publicar plano curado';
       }
     }
 

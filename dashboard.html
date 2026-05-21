@@ -1271,6 +1271,35 @@
       margin-top: 4px;
     }
 
+    /* --- Revisoes de Hoje (espacada) --- */
+    .revisoes-card { margin-bottom: 16px; }
+    .revisao-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+      font-size: 0.85rem;
+    }
+    .revisao-row:last-child { border-bottom: none; }
+    .revisao-tipo {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 99px;
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; flex-shrink: 0;
+    }
+    .revisao-tipo.resumo   { background: #FFF3E0; color: #E65100; }
+    .revisao-tipo.questoes { background: #E3F2FD; color: #1565C0; }
+    .revisao-info { flex: 1; }
+    .revisao-info strong { color: var(--secondary); font-weight: 600; }
+    .revisao-info span { display: block; font-size: 0.72rem; color: var(--text-lighter); }
+    .revisao-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .revisao-actions button {
+      font-size: 0.72rem; padding: 4px 10px; height: 28px;
+      border: 1px solid var(--border); background: var(--bg-card);
+      border-radius: 4px; cursor: pointer; font-family: inherit;
+    }
+    .revisao-actions button:hover { border-color: var(--primary); color: var(--primary); }
+    .revisao-actions .btn-done { background: #E8F5E9; border-color: #C8E6C9; color: #2E7D32; }
+    .revisao-actions .btn-done:hover { background: #C8E6C9; }
+
     /* Iniciar Estudos button */
     .btn-iniciar {
       padding: 6px 14px;
@@ -2218,6 +2247,15 @@
             </div>
           </div>
           <div class="weekly-calendar" id="weeklyCalendar"></div>
+        </div>
+
+        <!-- Revisoes de Hoje (oculto quando vazio) -->
+        <div class="card revisoes-card" id="revisoesCard" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <h3>🔁 Revisões de Hoje <span id="revisoesCount" style="font-size:0.72rem;color:var(--text-lighter);font-weight:500"></span></h3>
+            <span style="font-size:0.7rem;color:var(--text-lighter)">D+1 resumo · D+3 questões</span>
+          </div>
+          <div id="revisoesLista"></div>
         </div>
 
         <!-- Fila de Estudos + Atividade Recente -->
@@ -3919,9 +3957,145 @@
           }
           await registrarAtividade('aula_concluida',
             '✓ Concluiu <strong>Aula ' + aula.numero + '</strong> de <strong>' + timerMateria + '</strong>');
-        } catch (e) {}
+
+          // D-0 concluido → agenda Resumo (D+1) e Questoes (D+3) na fila do aluno.
+          // Dedupe garantido pela UNIQUE (user_id, materia, numero_aula, tipo, origem_data).
+          await agendarRevisoes(timerMateria, aula.numero);
+        } catch (e) { console.error('[Revisoes] Erro ao agendar:', e); }
       }
       fecharTimer();
+    }
+
+    // =============================================
+    //  MOTOR DE REVISAO ESPACADA (D-0 → D+1 resumo, D+3 questoes)
+    // =============================================
+    function _ymd(date) {
+      // Local YYYY-MM-DD (evita off-by-one por timezone do toISOString)
+      var y = date.getFullYear();
+      var m = String(date.getMonth() + 1).padStart(2, '0');
+      var d = String(date.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+
+    async function agendarRevisoes(materia, numeroAula) {
+      var supabase = window._supabase;
+      if (!supabase || !window._userId) return;
+
+      var hoje = new Date();
+      var d1 = new Date(hoje); d1.setDate(d1.getDate() + 1);
+      var d3 = new Date(hoje); d3.setDate(d3.getDate() + 3);
+
+      var rows = [
+        {
+          user_id: window._userId,
+          materia: materia,
+          numero_aula: numeroAula,
+          tipo: 'resumo',
+          scheduled_for: _ymd(d1),
+          origem_data: _ymd(hoje),
+          status: 'pendente'
+        },
+        {
+          user_id: window._userId,
+          materia: materia,
+          numero_aula: numeroAula,
+          tipo: 'questoes',
+          scheduled_for: _ymd(d3),
+          origem_data: _ymd(hoje),
+          status: 'pendente'
+        }
+      ];
+
+      var res = await supabase.from('tarefas_agendadas')
+        .upsert(rows, {
+          onConflict: 'user_id,materia,numero_aula,tipo,origem_data',
+          ignoreDuplicates: true
+        });
+      if (res.error) {
+        console.warn('[Revisoes] Falha ao agendar:', res.error.message);
+        return;
+      }
+      console.log('[Revisoes] Agendado: resumo em', _ymd(d1), '/ questoes em', _ymd(d3),
+                  'para', materia, 'aula', numeroAula);
+
+      // Refresh today's card in case D+1/D+3 includes today (re-runs harmless)
+      carregarRevisoesHoje();
+    }
+
+    async function carregarRevisoesHoje() {
+      var card    = document.getElementById('revisoesCard');
+      var lista   = document.getElementById('revisoesLista');
+      var countEl = document.getElementById('revisoesCount');
+      if (!card || !lista) return;
+
+      var supabase = window._supabase;
+      if (!supabase || !window._userId) { card.style.display = 'none'; return; }
+
+      var hojeStr = _ymd(new Date());
+      try {
+        var { data, error } = await supabase.from('tarefas_agendadas')
+          .select('id, materia, numero_aula, tipo, scheduled_for, origem_data, status')
+          .eq('user_id', window._userId)
+          .eq('status', 'pendente')
+          .lte('scheduled_for', hojeStr)  // inclui atrasadas
+          .order('scheduled_for', { ascending: true });
+        if (error) throw error;
+
+        var tarefas = data || [];
+        if (tarefas.length === 0) {
+          card.style.display = 'none';
+          return;
+        }
+
+        countEl.textContent = '(' + tarefas.length + ')';
+        lista.innerHTML = tarefas.map(function(t) {
+          var atrasada = t.scheduled_for < hojeStr;
+          var dias = atrasada
+            ? ' · <span style="color:#C53030">atrasada desde ' + new Date(t.scheduled_for + 'T00:00:00').toLocaleDateString('pt-BR') + '</span>'
+            : '';
+          var labelTipo = t.tipo === 'resumo' ? '📝 Resumo' : '❓ Questões';
+          var origem = t.origem_data
+            ? 'do estudo de ' + new Date(t.origem_data + 'T00:00:00').toLocaleDateString('pt-BR')
+            : '';
+          return '<div class="revisao-row" data-tid="' + t.id + '">'
+            + '<span class="revisao-tipo ' + t.tipo + '">' + labelTipo + '</span>'
+            + '<div class="revisao-info">'
+            +   '<strong>' + t.materia + '</strong>'
+            + (t.numero_aula ? ' · Aula ' + t.numero_aula : '')
+            +   '<span>' + origem + dias + '</span>'
+            + '</div>'
+            + '<div class="revisao-actions">'
+            +   '<button class="btn-done" onclick="concluirRevisao(\'' + t.id + '\')">✓ Concluir</button>'
+            +   '<button onclick="pularRevisao(\'' + t.id + '\')" title="Pular esta revisao">Pular</button>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+        card.style.display = '';
+      } catch (e) {
+        console.warn('[Revisoes] Falha ao carregar:', e.message);
+        card.style.display = 'none';
+      }
+    }
+
+    async function concluirRevisao(tarefaId) {
+      var supabase = window._supabase;
+      if (!supabase) return;
+      var res = await supabase.from('tarefas_agendadas')
+        .update({ status: 'concluido', concluido_em: new Date().toISOString() })
+        .eq('id', tarefaId);
+      if (res.error) { console.warn('[Revisoes] update:', res.error.message); return; }
+      await carregarRevisoesHoje();
+    }
+
+    async function pularRevisao(tarefaId) {
+      if (!confirm('Pular esta revisao? Ela nao voltara a aparecer.')) return;
+      var supabase = window._supabase;
+      if (!supabase) return;
+      var res = await supabase.from('tarefas_agendadas')
+        .update({ status: 'pulado' })
+        .eq('id', tarefaId);
+      if (res.error) { console.warn('[Revisoes] update:', res.error.message); return; }
+      await carregarRevisoesHoje();
     }
 
     // Feedback: Ainda estou estudando
@@ -5318,6 +5492,7 @@
         try { await carregarCiclo(); } catch (e) { console.error('[Init] ciclo:', e); }
         try { await carregarPontos(); } catch (e) { console.error('[Init] pontos:', e); }
         try { await carregarNotificacoes(); } catch (e) { console.error('[Init] notificações:', e); }
+        try { await carregarRevisoesHoje(); } catch (e) { console.error('[Init] revisoes:', e); }
         atualizarPulsoFogo();
 
         // 4. Final render
