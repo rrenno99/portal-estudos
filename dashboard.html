@@ -3050,39 +3050,48 @@
     }
 
     // =============================================
-    //  INICIAR AULA (play button: timer + link da materia)
+    //  INICIAR AULA (play button)
     //
-    //  CRITICAL SEQUENCING on mobile:
-    //   1. Show timer panel (abrirTimer) — sync
-    //   2. timerStart() — sync; this is what writes startedAt to localStorage.
-    //      Must happen BEFORE window.open or a tab switch would strand the
-    //      session in a "ready but not started" state (the original bug).
-    //   3. window.open(materialLink) — same tick, preserves the user gesture,
-    //      so mobile popup blockers don't trip.
+    //  Async sequencing — refactored per beta feedback:
+    //   1. SYNC: open a placeholder tab (about:blank) in the same gesture
+    //      tick so iOS Safari does not classify it as a popup-after-await.
+    //   2. SYNC: open the timer panel + timerStart() — writes startedAt to
+    //      localStorage immediately (the canonical timestamp).
+    //   3. ASYNC: await _persistSessionStart(materia) — records an audit
+    //      row in atividades_aluno via Supabase. This is the "confirmacao"
+    //      the bug-fix requires before we redirect.
+    //   4. After confirmation: redirect the placeholder tab to the material
+    //      URL. Even if the Supabase write fails, localStorage already has
+    //      the timestamp — we still navigate, just log offline.
     // =============================================
-    function iniciarAula(materia, numero, btnEl) {
-      _flashLoading(btnEl, '⏳');
+    async function iniciarAula(materia, numero, btnEl) {
+      var restore = _setButtonLoading(btnEl, '⏳');
 
       var links = getLinksStorage();
       var linkData = links[materia];
       var hasLink = !!(linkData && linkData.url);
 
-      // 1 + 2: open panel AND start the clock (persists startedAt synchronously)
+      // 1. Same-gesture placeholder for the material tab (mobile-safe)
+      var materialTab = hasLink ? _openLinkPlaceholder() : null;
+
+      // 2. Sync timer mount + start (localStorage write inside)
       abrirTimerParaMateria(materia, { autoStart: true });
 
-      // 3: open the material link — only NOW, after the session is live
+      // 3. Async audit — server-side confirmation that the session began
+      var confirm = await _persistSessionStart(materia);
+      if (!confirm.ok) console.log('[Timer] Confirmacao offline (' + confirm.mode + '):', confirm.error || 'sem rede');
+
+      // 4. Now safe to redirect the placeholder
       if (hasLink) {
-        var opened = _openLinkSafely(linkData.url);
-        if (!opened) showDashToast('Popup bloqueado. Toque no link salvo da materia para abrir.');
+        _redirectPlaceholder(materialTab, linkData.url);
       } else {
         showDashToast('Nenhum link de material cadastrado para ' + materia);
       }
+
+      restore();
     }
 
     // Helper: opens the timer (same behavior as iniciarEstudos, minus link open).
-    // autoStart: whether to call timerStart() immediately after mounting the panel
-    // (always true on the floating path, never on the desktop popup — the popup
-    // has its own ▶ Iniciar since it stays visible while the student studies).
     function abrirTimerParaMateria(materia, opts) {
       opts = opts || {};
 
@@ -3097,33 +3106,70 @@
       if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
       _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
 
-      // If the popup was blocked, fall back to the floating panel — and in
-      // that case autoStart becomes important (same reasoning as mobile).
       if (!_timerPopup || _timerPopup.closed) abrirTimer(materia, { autoStart: opts.autoStart });
     }
 
-    // Safely open an external link in a new tab; returns true if the browser
-    // actually opened a window. Used to detect popup-blocker interference.
-    function _openLinkSafely(url) {
-      if (!url) return false;
-      try {
-        var w = window.open(url, '_blank', 'noopener');
-        return !!(w && !w.closed);
-      } catch (e) { return false; }
+    // Open a same-tab placeholder window in the user gesture. We navigate
+    // it AFTER an await — iOS Safari only allows this if the window was
+    // opened in the synchronous click handler, not after a microtask.
+    function _openLinkPlaceholder() {
+      try { return window.open('about:blank', '_blank'); }
+      catch (e) { return null; }
     }
 
-    // Temporarily disable a button and show a loading glyph. Prevents double
-    // taps while the timer state is written + the external link opens.
-    function _flashLoading(btnEl, glyph) {
-      if (!btnEl) return;
+    function _redirectPlaceholder(tab, url) {
+      if (tab && !tab.closed) {
+        try { tab.location.href = url; return; }
+        catch (e) { try { tab.close(); } catch (_) {} }
+      }
+      showDashToast('Popup bloqueado. Toque no link salvo da materia para abrir.');
+    }
+
+    // Async confirmation: writes a session-start audit row to Supabase.
+    // localStorage state is already durable at this point (set by timerStart
+    // before this is awaited), so this is purely a server-side breadcrumb.
+    async function _persistSessionStart(materia) {
+      try {
+        var sb = window._supabase;
+        if (!sb || !window._userId) return { ok: true, mode: 'local-only' };
+
+        var res = await sb.from('atividades_aluno').insert([{
+          user_id: window._userId,
+          tipo_evento: 'aula_iniciada',
+          descricao: '⏱ Iniciou estudo de <strong>' + materia + '</strong>'
+        }]);
+
+        if (res.error) return { ok: false, mode: 'local-only', error: res.error.message };
+        return { ok: true, mode: 'remote' };
+      } catch (e) {
+        return { ok: false, mode: 'local-only', error: e.message };
+      }
+    }
+
+    // Disable a button + show loading glyph; returns a restore() function
+    // the caller invokes when async work finishes (always paired in finally).
+    function _setButtonLoading(btnEl, glyph) {
+      if (!btnEl) return function() {};
       var originalHtml = btnEl.innerHTML;
       var originalDisabled = btnEl.disabled;
       btnEl.disabled = true;
       btnEl.innerHTML = glyph || '⏳';
-      setTimeout(function() {
-        btnEl.innerHTML = originalHtml;
-        btnEl.disabled = originalDisabled;
-      }, 1000);
+      var startedAt = Date.now();
+      return function() {
+        // Keep the loading state visible for at least 250ms so it doesn't
+        // flash imperceptibly when the await resolves instantly.
+        var minRemaining = Math.max(0, 250 - (Date.now() - startedAt));
+        setTimeout(function() {
+          btnEl.innerHTML = originalHtml;
+          btnEl.disabled = originalDisabled;
+        }, minRemaining);
+      };
+    }
+
+    // Legacy alias kept for any old callers; behaves like the old _flashLoading.
+    function _flashLoading(btnEl, glyph) {
+      var restore = _setButtonLoading(btnEl, glyph);
+      setTimeout(restore, 750);
     }
 
     // =============================================
@@ -3519,26 +3565,30 @@
       return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
     }
 
-    function iniciarEstudos(materia, btnEl) {
-      _flashLoading(btnEl, '⏳ Iniciando...');
+    async function iniciarEstudos(materia, btnEl) {
+      var restore = _setButtonLoading(btnEl, '⏳ Iniciando...');
 
       const links = getLinksStorage();
       const linkData = links[materia];
       const hasLink = !!(linkData && linkData.url);
 
-      // MOBILE PATH: auto-start the floating timer FIRST (persists startedAt),
-      // only then open the material link. Prevents the "timer zerado" bug.
       if (_isMobile()) {
+        // MOBILE: same async pattern as iniciarAula — placeholder tab,
+        // then sync timer start, then await server confirmation, then redirect.
+        var materialTab = hasLink ? _openLinkPlaceholder() : null;
         abrirTimer(materia, { autoStart: true });
-        if (hasLink) {
-          var opened = _openLinkSafely(linkData.url);
-          if (!opened) showDashToast('Popup bloqueado. Toque no link salvo da materia para abrir.');
-        }
+
+        var confirm = await _persistSessionStart(materia);
+        if (!confirm.ok) console.log('[Timer] Confirmacao offline:', confirm.error || 'sem rede');
+
+        if (hasLink) _redirectPlaceholder(materialTab, linkData.url);
+        restore();
         return;
       }
 
-      // DESKTOP PATH: open the material link first (historical order),
-      // then the timer.html popup which has its own ▶ Iniciar.
+      // DESKTOP: keep historical popup flow — timer.html stays visible while
+      // the student studies, has its own ▶ Iniciar. Two windows opened in the
+      // user-gesture tick (link first, then timer popup).
       if (hasLink) window.open(linkData.url, '_blank');
 
       var w = 420, h = 560;
@@ -3550,8 +3600,9 @@
       if (_timerPopup && !_timerPopup.closed) _timerPopup.close();
       _timerPopup = window.open('timer.html?materia=' + encodeURIComponent(materia), 'planejador_timer', features);
 
-      // Fallback: if popup blocked, use floating AND autoStart (same reasoning as mobile)
+      // Fallback: if popup blocked, use floating AND autoStart
       if (!_timerPopup || _timerPopup.closed) abrirTimer(materia, { autoStart: true });
+      restore();
     }
 
     // =============================================
